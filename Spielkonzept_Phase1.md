@@ -1,5 +1,5 @@
 # Spielkonzept: Industrial Pac-Man – "Production Runner"
-**Team:** [Dein Team-Name]  
+**Team:** 4 
 **Projektphase 1** | ifm statmath GmbH | November 2025
 
 ---
@@ -122,5 +122,5 @@ Ein erfolgreiches Spiel liegt vor, wenn:
 
 ---
 
-**Kontakt:** [Deine E-Mail]  
-**GitHub Repository:** [Dein Private Repo mit it.statmath@ifm.com als Leser]
+
+
