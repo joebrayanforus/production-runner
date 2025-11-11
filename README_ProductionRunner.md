@@ -134,17 +134,17 @@ production-runner/
 
 ## 👥 Team
 
-- **[Dein Name]** - Lead Developer
-- **[Team-Mitglied 2]** - Frontend/Game Logic
-- **[Team-Mitglied 3]** - Backend/Database
+- **[]** - Lead Developer
+- **[]** - Frontend/Game Logic
+- **[]** - Backend/Database
 
 ---
 
 ## 📧 Kontakt
 
-- **E-Mail:** [deine-email@example.com]
+- **E-Mail:** []
 - **ifm statmath Kontakt:** it.statmath@ifm.com
-- **GitHub Issues:** [Link zu Issues]
+- **GitHub Issues:** []
 
 ---
 
