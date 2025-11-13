@@ -50,7 +50,7 @@ Der Spieler steuert einen AGV durch eine Fabrikhalle, sammelt Produktionsaufträ
 ### Schritte  
 ```bash
 # 1. Repository klonen
-git clone <dein-private-repo-url>
+git clone https://github.com/joebrayanforus/production-runner
 cd production-runner
 
 # 2. Projekt starten
