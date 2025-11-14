@@ -10,6 +10,7 @@
 ---
 
 ## 📋 Projektübersicht
+![pacman_gif.gif](pacman_gif.gif)
 
 **Production Runner** ist ein industrielles Pac-Man-Spiel, das während Ladezeiten in ifm statmath Produkten (s.FOX, moneo IAIA) gespielt werden kann. Der Spieler steuert einen AGV durch eine Fabrikhalle, sammelt Produktionsaufträge und vermeidet fehlerhafte Sensoren.
 
