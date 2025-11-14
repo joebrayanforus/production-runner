@@ -20,6 +20,11 @@
 - **Lauffähig** auf Arcade-Automaten für Messestände
 
 ---
+## Kernmechanik:
+Sammle alle Aufträge ohne von Sensoren erfasst zu werden
+Power-Up "KI-Optimierung" ermöglicht Sensor-Reparatur (200 Punkte) Scoring: Aufträge (10P), Streak-Bonus (bis x3), Level-Bonus (1000P)
+
+---
 
 ## 🚀 Features
 
@@ -45,6 +50,8 @@
 
 ---
 
+
+
 ## 📦 Installation & Setup
 
 ### Voraussetzungen
@@ -56,17 +63,7 @@
 git clone https://github.com/joebrayanforus/production-runner.git
 cd production-runner
 ```
-
-### Schritt 2: Projekt starten (Docker-Compose)
-```bash
-docker-compose up --build
-```
-
-### Schritt 3: Spiel öffnen
-- **Browser:** ...
-- **Arcade-Automat:** USB-Kabel anschließen und rechten Gamepad nutzen
-
----
+...
 
 ## 🎮 Steuerung
 
