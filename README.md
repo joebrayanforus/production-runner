@@ -52,11 +52,5 @@ Der Spieler steuert einen AGV durch eine Fabrikhalle, sammelt Produktionsaufträ
 # 1. Repository klonen
 git clone https://github.com/joebrayanforus/production-runner
 cd production-runner
-
-# 2. Projekt starten
-docker-compose up --build
-
-# 3. Spiel öffnen
-# Browser:
-http://localhost:4200
+coming...
 
