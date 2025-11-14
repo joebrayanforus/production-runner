@@ -63,7 +63,7 @@ Power-Up "KI-Optimierung" ermöglicht Sensor-Reparatur (200 Punkte) Scoring: Auf
 git clone https://github.com/joebrayanforus/production-runner.git
 cd production-runner
 ```
-...
+...(coming soon)
 
 ## 🎮 Steuerung
 
