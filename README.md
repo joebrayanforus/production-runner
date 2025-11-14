@@ -128,8 +128,8 @@ production-runner/
 
 ### Assets:
 - **Grafiken:** Eigene Pixel-Art (selbst erstellt) ✅
-- **Sounds:** Freesound.org (CC0 / CC-BY) - GEMA-frei ✅
-- **Fonts:** Google Fonts (Open Font License) ✅
+- **Sounds:** ...
+- **Fonts:**...
 
 ---
 
@@ -171,32 +171,23 @@ dotnet run
 ```
 
 #### Datenbank:
-```bash
-docker run --name postgres-dev -e POSTGRES_PASSWORD=dev123 -p 5432:5432 -d postgres:16
-```
+...
 
 ---
 
 ## 🐛 Debugging Arcade-Automat
 
 ### Linker Gamepad (über Laptop):
-1. USB-Kabel unterhalb der linken Steuerung anschließen
-2. Browser öffnen: `chrome://device-log` (Gamepad-Events prüfen)
-3. Spiel starten und Gamepad testen
-
+...
 ### Rechter Gamepad (direkt am Automaten):
-1. USB-Anschlüsse unterhalb des rechten Gamepads nutzen
-2. Direkt mit eingebautem PC verbinden
-3. Spiel lokal testen
-
+...
 ---
 
 ## 📖 Weitere Dokumentation
 
 - [Spielkonzept (Phase 1)](./Spielkonzept_Phase1.md)
 - [Spielfeld-Skizzen](./Skizzen_Phase1.md)
-- [API Dokumentation](./docs/API.md) *(Coming Soon)*
-- [Deployment Guide](./docs/DEPLOYMENT.md) *(Coming Soon)*
+
 
 ---
 
