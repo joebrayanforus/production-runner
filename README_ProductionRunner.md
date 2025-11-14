@@ -132,20 +132,6 @@ production-runner/
 
 ---
 
-## 👥 Team
-
-- **[]** - Lead Developer
-- **[]** - Frontend/Game Logic
-- **[]** - Backend/Database
-
----
-
-## 📧 Kontakt
-
-- **E-Mail:** []
-- **ifm statmath Kontakt:** it.statmath@ifm.com
-- **GitHub Issues:** []
-
 ---
 
 ## 🏆 Highscore Leaderboard
