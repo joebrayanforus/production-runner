@@ -52,7 +52,7 @@
 
 ### Schritt 1: Repository klonen
 ```bash
-git clone <dein-private-repo-url>
+git clone https://github.com/joebrayanforus/production-runner.git
 cd production-runner
 ```
 
@@ -62,7 +62,7 @@ docker-compose up --build
 ```
 
 ### Schritt 3: Spiel öffnen
-- **Browser:** http://localhost:4200
+- **Browser:** ...
 - **Arcade-Automat:** USB-Kabel anschließen und rechten Gamepad nutzen
 
 ---
