@@ -5,3 +5,4 @@ services:
     image: alpine:latest
     container_name: placeholder
     command: ["echo", "Docker Compose Setup Placeholder – noch keine Services definiert."]
+
