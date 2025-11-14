@@ -37,6 +37,9 @@
 ║  3. TOM_S      6910           |    [START]   : Neues Spiel   ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
+## Skizze 1: Spielfeld Layout (Fabrikhalle)
+
+![Factory Layout](https://raw.githubusercontent.com/joebrayanforus/production-runner/main/factory_layout.png)
 
 ### Beschreibung Skizze 1:
 **Spielfeld-Design:**
