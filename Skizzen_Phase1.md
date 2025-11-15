@@ -37,7 +37,7 @@
 ║  3. TOM_S      6910           |    [START]   : Neues Spiel   ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
-## erste Visualisation
+## Erste Visualisation
 
 ![Factory Layout](Factory_Layout.png)
 
