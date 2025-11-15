@@ -37,7 +37,7 @@
 ║  3. TOM_S      6910           |    [START]   : Neues Spiel   ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
-## Skizze 1: Spielfeld Layout (Fabrikhalle)
+## erste Visualisation
 
 ![Factory Layout](Factory_Layout.png)
 
