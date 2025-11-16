@@ -158,8 +158,10 @@ production-runner/
 - **Npgsql:** PostgreSQL License ✅
 
 ### Assets:
-- **Grafiken:** Eigene Pixel-Art (selbst erstellt) ✅
-- **Sounds:** ...
+- **Grafiken:** Eigene Pixel-Art (selbst erstellt) 
+- **Sounds:** 🎵 Sounds: GEMA-freie Chiptune-Samples werden in Phase 3 integriert.  
+- **Fonts: Pixel-Art Schriftarten werden noch ausgewählt.
+
 - **Fonts:**...
 
 ---
@@ -202,18 +204,20 @@ dotnet run
 ```
 
 #### Datenbank:
-...(coming soon)
+⏳ PostgreSQL-Setup mit Init-Skripten wird in Phase 2 ergänzt.
+
 
 ---
 
 ## 🐛 Debugging Arcade-Automat
 
 ### Linker Gamepad (über Laptop):
+📝 Anleitung zur Gamepad-Konfiguration folgt in Phase 2.
 
-...(coming soon)
 ### Rechter Gamepad (direkt am Automaten):
-
-...(coming soon)
+⏳ Dokumentation zur Hardware-Anbindung wird in Phase 2 ergänzt.  
+📝 Geplant: Testen direkt am Automaten über die eingebauten USB-Anschlüsse.  
+🎮 Ziel: Steuerung und Debugging mit dem rechten Gamepad am Arcade-Automaten.
 
 ---
 
