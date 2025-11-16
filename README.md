@@ -175,9 +175,12 @@ dotnet run
 ## 🐛 Debugging Arcade-Automat
 
 ### Linker Gamepad (über Laptop):
+
 ...(coming soon)
 ### Rechter Gamepad (direkt am Automaten):
+
 ...(coming soon)
+
 ---
 
 ## 📖 Weitere Dokumentation
