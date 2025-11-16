@@ -25,6 +25,40 @@ Sammle alle Aufträge ohne von Sensoren erfasst zu werden
 Power-Up "KI-Optimierung" ermöglicht Sensor-Reparatur (200 Punkte) Scoring: Aufträge (10P), Streak-Bonus (bis x3), Level-Bonus (1000P)
 
 ---
+### Gegner-KI (Sensoren)
+
+| Typ        | Farbe   | Verhalten                          |
+|------------|---------|------------------------------------|
+| Aggressive | 🔴 Rot  | Verfolgt AGV direkt (Blinky)       |
+| Ambush     | 🌸 Rosa | Lauert voraus (Pinky)              |
+| Patrol     | 🔵 Cyan | Feste Routen (Inky)                |
+| Random     | 🟠 Orange | Unberechenbar (Clyde)           |
+
+### Power-Up Mechanik
+- **KI-Optimierung** verwandelt Sensoren temporär  
+- AGV kann sie „reparieren“ (+200 Punkte)  
+- Dauer: 10 Sekunden  
+- Geschwindigkeit der Gegner reduziert auf 80%  
+
+---
+
+## 📊 Scoring-System
+
+| Aktion                  | Punkte |
+|--------------------------|--------|
+| Produktionsauftrag       | +10    |
+| KI-Optimierung (Power-Up)| +50    |
+| Reparierter Sensor       | +200   |
+| Level Complete Bonus     | +1000  |
+
+**Production Streak Bonus:**
+- 10 Aufträge → x1.5  
+- 20 Aufträge → x2.0  
+- 30 Aufträge → x3.0  
+
+*Beispiel:* 25 Aufträge × 10 × 2.0 = **500 Punkte**
+
+---
 
 ## 🚀 Features
 
