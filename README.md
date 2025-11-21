@@ -1,5 +1,5 @@
 
-# 🏭 Production Runner - Industrial Pac-Man Game
+# 🏭 Production Runner - Industrial Pac-Man Game.
 
 **Ein ifm statmath Gamification-Projekt**
 
@@ -10,12 +10,12 @@
 
 ---
 
-## 📋 Projektübersicht
+## 📋 Projektübersicht:
 ![pacman_gif.gif](pacman_gif.gif)
 
 **Production Runner** ist ein industrielles Pac-Man-Spiel, das während Ladezeiten in ifm statmath Produkten (s.FOX, moneo IAIA) gespielt werden kann. Der Spieler steuert einen AGV durch eine Fabrikhalle, sammelt Produktionsaufträge und vermeidet fehlerhafte Sensoren.
 
-### 🎯 Projektziel
+### 🎯 Projektziel:
 - **Gamification** für Wartezeiten bei Modell-Training und Produktionsplanung
 - **Nahtlose Integration** in ifm statmath Produkte
 - **Lauffähig** auf Arcade-Automaten für Messestände
@@ -35,7 +35,7 @@ Power-Up "KI-Optimierung" ermöglicht Sensor-Reparatur (200 Punkte) Scoring: Auf
 | Patrol     | 🔵 Cyan | Feste Routen (Inky)                |
 | Random     | 🟠 Orange | Unberechenbar (Clyde)           |
 
-### Power-Up Mechanik
+### Power-Up Mechanik:
 - **KI-Optimierung** verwandelt Sensoren temporär  
 - AGV kann sie „reparieren“ (+200 Punkte)  
 - Dauer: 10 Sekunden  
@@ -43,7 +43,7 @@ Power-Up "KI-Optimierung" ermöglicht Sensor-Reparatur (200 Punkte) Scoring: Auf
 
 ---
 
-## 📊 Scoring-System
+## 📊 Scoring-System:
 
 | Aktion                  | Punkte |
 |--------------------------|--------|
