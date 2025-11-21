@@ -228,7 +228,7 @@ dotnet run
 - [Spielfeld-Skizzen](./Skizzen_Phase1.md)
 
 
----
+---     
 
 **Entwickelt für ifm statmath GmbH** | Datenbanksysteme 1 Projekt | 2025
 >>>>>>> 6cde4d57041a96158bd1e8b99d1c3d76cd930549

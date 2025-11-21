@@ -1,6 +1,7 @@
 import { Component, ElementRef, OnInit, OnDestroy, ViewChild, AfterViewInit } from '@angular/core';
 import { GameManager } from '../models/game-manager';
 import { Block } from '../models/Block';
+import { AudioService } from '../services/audio.service';
 @Component({
   selector: 'app-game-canvas',
   standalone: true,
@@ -112,7 +113,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Debug-Modus
   debugMode = false;
-  constructor() {
+  constructor(private audioService: AudioService) {
     this.initAssets();
   }
 
@@ -231,6 +232,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private startGameLoop() {
+    this.audioService.playBackgroundMusic();
     const loop = (timestamp: number) => {
       const delta = timestamp - this.lastFrameTime;
       if (delta > 1000 / this.FPS) { // target FPS
@@ -272,6 +274,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.animationFrameId = 0;
       this.lastFrameTime = 0;
     }
+    this.audioService.stopBackgroundMusic();
   }
 
   private collision(a: Block, b: Block): boolean {
@@ -302,6 +305,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.collision(ghost, this.pacman)) {
         if (ghost.scared) {
           // Reparatur: Ghost "reparieren" (+200 Punkte)
+          this.audioService.play('eatghost');
           this.score += 200;
           // Respawn ghost at starting position
           ghost.reset();
@@ -313,6 +317,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           continue;
         } else {
           // Normaler Ghost-Kontakt: Leben verlieren
+          this.audioService.play('die');
           this.lives -= 1;
           if (this.lives === 0) {
             this.gameOver = true;
@@ -346,6 +351,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     let foodEaten: Block | null = null;
     for (const food of this.foods) {
       if (this.collision(this.pacman, food)) {
+        this.audioService.play('waka');
         foodEaten = food;
         this.pelletStreak++;
         // Update streak multiplier
@@ -367,6 +373,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     let powerEaten: Block | null = null;
     for (const pellet of this.powerPellets) {
       if (this.collision(this.pacman, pellet)) {
+        this.audioService.play('powerpill');
         powerEaten = pellet;
         this.score += 50;
         // Activate scared mode for 10 seconds
