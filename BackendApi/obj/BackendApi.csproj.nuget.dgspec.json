@@ -1,32 +1,25 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\user1\\projettest1\\BackendApi\\BackendApi.csproj": {}
+    "C:\\Users\\abu99\\OneDrive\\Desktop\\PROPRA25\\PROPRA_PACMAN2\\production-runner\\BackendApi\\BackendApi.csproj": {}
   },
   "projects": {
-    "C:\\Users\\user1\\projettest1\\BackendApi\\BackendApi.csproj": {
+    "C:\\Users\\abu99\\OneDrive\\Desktop\\PROPRA25\\PROPRA_PACMAN2\\production-runner\\BackendApi\\BackendApi.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\user1\\projettest1\\BackendApi\\BackendApi.csproj",
+        "projectUniqueName": "C:\\Users\\abu99\\OneDrive\\Desktop\\PROPRA25\\PROPRA_PACMAN2\\production-runner\\BackendApi\\BackendApi.csproj",
         "projectName": "BackendApi",
-        "projectPath": "C:\\Users\\user1\\projettest1\\BackendApi\\BackendApi.csproj",
-        "packagesPath": "C:\\Users\\user1\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\user1\\projettest1\\BackendApi\\obj\\",
+        "projectPath": "C:\\Users\\abu99\\OneDrive\\Desktop\\PROPRA25\\PROPRA_PACMAN2\\production-runner\\BackendApi\\BackendApi.csproj",
+        "packagesPath": "C:\\Users\\abu99\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\abu99\\OneDrive\\Desktop\\PROPRA25\\PROPRA_PACMAN2\\production-runner\\BackendApi\\obj\\",
         "projectStyle": "PackageReference",
-        "fallbackFolders": [
-          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-        ],
         "configFilePaths": [
-          "C:\\Users\\user1\\AppData\\Roaming\\NuGet\\NuGet.Config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+          "C:\\Users\\abu99\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net9.0"
         ],
         "sources": {
-          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
-          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {

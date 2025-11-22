@@ -1,0 +1,26 @@
+.start-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  background: black;
+  color: yellow;
+  font-family: sans-serif;
+}
+
+button {
+  padding: 10px 24px;
+  font-size: 30px;
+  cursor: pointer;
+}
+
+.small {
+  font-size: 15px;
+  opacity: 0.7;
+}
+.nomi {
+    color:orangered;
+    font-family: 'Montserrat';
+}
