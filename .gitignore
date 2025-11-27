@@ -40,3 +40,18 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# .NET / C#
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+.vs/
+*.user
+*.suo
+*.sln.docstates
+
+# Docker
+docker-compose.override.yml
+
