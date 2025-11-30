@@ -1,19 +1,131 @@
 <div class="start-container">
-  <h1>🟡Pacman🟡</h1>
+  <!-- Hero Section -->
+  <header class="hero">
+    <div class="logo">
+      <span class="logo-icon">🏭</span>
+      <h1>PRODUCTION RUNNER</h1>
+    </div>
+    <p class="tagline">Das industrielle Arcade-Spiel für ifm statmath</p>
+    <p class="subtitle">Navigiere mit deinem AGV durch die Fabrikhalle</p>
+  </header>
 
+  <!-- Game Modes Section -->
+  <section class="modes-section">
+    <h2>🎮 Spielmodi</h2>
+    <div class="modes-grid">
 
-  <p>Klicke auf Start, um das Spiel zu beginnen.</p>
+      <!-- Classic Mode -->
+      <div class="mode-card" [class.selected]="selectedMode === 'classic'" (click)="selectMode('classic')">
+        <div class="mode-icon">▶️</div>
+        <h3>Classic Mode</h3>
+        <p>Das klassische Spielerlebnis. Sammle alle Produktionsaufträge und weiche den fehlerhaften Sensoren aus.</p>
+        <ul class="mode-features">
+          <li>✓ 3 Leben</li>
+          <li>✓ Steigende Schwierigkeit</li>
+          <li>✓ Highscore-Jagd</li>
+        </ul>
+      </div>
 
-  <!-- Button, der zur Game-Seite navigiert -->
-  <button routerLink="/game">Start</button>
+      <!-- Practice Mode -->
+      <div class="mode-card" [class.selected]="selectedMode === 'practice'" (click)="selectMode('practice')">
+        <div class="mode-icon">🏋️</div>
+        <h3>Trainings-Modus</h3>
+        <p>Spezielle Features: Zeitlupe, Zeit-Rückspulen und Unverwundbarkeit zum Üben.</p>
+        <ul class="mode-features">
+          <li>✓ Shift = Zeit zurückspulen</li>
+          <li>✓ 1/2 = Zeitlupe</li>
+          <li>✓ I = Unverwundbar</li>
+          <li>✓ Q-T = Sensor-Ziele anzeigen</li>
+        </ul>
+      </div>
 
-  <p class="small">Projekt von Gruppe4 - PROPRA25/26</p>
-  <ul class="nomi">
-    <li>Tchinda Oumbe  Joe Brayan</li>
-    <li>Gashi  Elda</li>
-    <li>Djomo Touka  Merveilles Freeman</li>
-    <li>Dneprovskii  Artem</li>
-    <li>Berger  Gerrit</li>
-    <li>Aminu  Abubakr</li>
-  </ul>
+    </div>
+  </section>  <!-- Controls Section -->
+  <section class="controls-section">
+    <h2>🕹️ Steuerung</h2>
+    <div class="controls-grid">
+      <div class="control-item">
+        <span class="key">←↑↓→</span>
+        <span class="action">AGV Bewegung</span>
+      </div>
+      <div class="control-item">
+        <span class="key">ESC</span>
+        <span class="action">Menü / Pause</span>
+      </div>
+      <div class="control-item" *ngIf="selectedMode === 'practice'">
+        <span class="key">SHIFT</span>
+        <span class="action">Zeit zurück</span>
+      </div>
+      <div class="control-item" *ngIf="selectedMode === 'practice'">
+        <span class="key">I</span>
+        <span class="action">Unverwundbar</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Start Button -->
+  <button class="start-button" [routerLink]="['/game']" [queryParams]="{mode: selectedMode}">
+    <span class="play-icon">▶</span>
+    SPIEL STARTEN
+  </button>
+
+  <!-- About Section -->
+  <section class="about-section">
+    <h2>ℹ️ Über das Spiel</h2>
+    <div class="about-content">
+      <div class="about-card">
+        <h4>🤖 AGV</h4>
+        <p>Steuere das automatische Transportfahrzeug durch die Fabrikhalle und sammle Produktionsaufträge.</p>
+      </div>
+      <div class="about-card">
+        <h4>👻 Sensoren</h4>
+        <p>Weiche den 4 fehlerhaften Sensoren aus – jeder hat ein eigenes Verhaltensmuster!</p>
+      </div>
+      <div class="about-card">
+        <h4>⚡ KI-Optimierung</h4>
+        <p>Sammle Power-Ups um Sensoren temporär zu "reparieren" und Bonuspunkte zu erhalten.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sensor Types -->
+  <section class="sensors-section">
+    <h2>🔴 Sensor-Typen</h2>
+    <div class="sensors-grid">
+      <div class="sensor-card red">
+        <span class="sensor-icon">👻</span>
+        <h4>AGGRESSIVE</h4>
+        <p>Verfolgt direkt den AGV</p>
+      </div>
+      <div class="sensor-card pink">
+        <span class="sensor-icon">👻</span>
+        <h4>AMBUSH</h4>
+        <p>Lauert 4 Felder voraus</p>
+      </div>
+      <div class="sensor-card cyan">
+        <span class="sensor-icon">👻</span>
+        <h4>PATROL</h4>
+        <p>Feste Route entlang Korridoren</p>
+      </div>
+      <div class="sensor-card orange">
+        <span class="sensor-icon">👻</span>
+        <h4>RANDOM</h4>
+        <p>Zufällige Bewegung</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p class="team">Projekt von Gruppe 4 - PROPRA 25/26</p>
+    <ul class="team-members">
+      <li>Tchinda Oumbe Joe Brayan</li>
+      <li>Gashi Elda</li>
+      <li>Djomo Touka Merveilles Freeman</li>
+      <li>Dneprovskii Artem</li>
+      <li>Berger Gerrit</li>
+      <li>Aminu Abubakr</li>
+    </ul>
+    <p class="copyright">© 2025 Production Runner | ifm statmath | Educational Project</p>
+  </footer>
 </div>

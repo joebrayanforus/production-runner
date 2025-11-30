@@ -40,3 +40,12 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Backend build artifacts
+/BackendApi/obj/
+/BackendApi/bin/
+*.user
+*.suo
+
+# Solution files (local)
+*.sln.docstates
