@@ -55,3 +55,11 @@ obj/
 # Docker
 docker-compose.override.yml
 
+# Backend build artifacts
+/BackendApi/obj/
+/BackendApi/bin/
+*.user
+*.suo
+
+# Solution files (local)
+*.sln.docstates

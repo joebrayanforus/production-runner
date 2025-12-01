@@ -1,10 +1,10 @@
 import { Component } from '@angular/core';
-import { GameCanvasComponent } from './game-canvas/game-canvas.component';
+import { RouterOutlet } from '@angular/router';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [GameCanvasComponent],
+  imports: [RouterOutlet],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
