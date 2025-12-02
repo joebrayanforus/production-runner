@@ -62,9 +62,22 @@
       </div>
     </div>
   </section>
+  
+  <!-- Player Name Input -->
+  <div style="max-width:500px;margin:15px auto;padding:18px;background:rgba(255,255,255,.08);border:2px solid rgba(255,215,0,.3);border-radius:10px">
+    <label style="display:block;font-size:16px;font-weight:600;color:#FFD700;margin-bottom:8px">👤 Spielername:</label>
+    <input [(ngModel)]="playerName" type="text" placeholder="Gib deinen Namen ein..." maxlength="50" style="width:100%;box-sizing:border-box;padding:10px;font-size:15px;color:#fff;background:rgba(255,255,255,.08);border:2px solid rgba(255,215,0,.4);border-radius:6px;outline:0">
+    <p style="font-size:12px;color:#FF6B6B;margin:6px 0 0;font-style:italic" *ngIf="!isPlayerNameValid()">Bitte gib deinen Namen ein</p>
+  </div>
 
   <!-- Start Button -->
-  <button class="start-button" [routerLink]="['/game']" [queryParams]="{mode: selectedMode}">
+  <button 
+    class="start-button" 
+    style="max-width:500px;width:100%;margin:0 auto;display:flex;justify-content:center;align-items:center"
+    [routerLink]="['/game']" 
+    [queryParams]="{mode: selectedMode, playerName: playerName.trim()}"
+    [disabled]="!isPlayerNameValid()"
+  >
     <span class="play-icon">▶</span>
     SPIEL STARTEN
   </button>
@@ -129,3 +142,5 @@
     <p class="copyright">© 2025 Production Runner | ifm statmath | Educational Project</p>
   </footer>
 </div>
+
+  <!-- (duplicate player-name blocks removed) -->
