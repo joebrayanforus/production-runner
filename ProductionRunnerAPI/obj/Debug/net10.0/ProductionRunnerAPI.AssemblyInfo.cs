@@ -13,10 +13,10 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ProductionRunnerAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b647c5d11c91c5799d15e93beb59a3305fa1c9cc")]
 [assembly: System.Reflection.AssemblyProductAttribute("ProductionRunnerAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ProductionRunnerAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
 
-// Von der MSBuild WriteCodeFragment-Klasse generiert.
+// Создано классом WriteCodeFragment MSBuild.
 
