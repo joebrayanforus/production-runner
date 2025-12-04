@@ -128,6 +128,38 @@
     </div>
   </section>
 
+  <!-- Leaderboard Section -->
+  <section class="leaderboard-section">
+    <h2>🏆 Live Leaderboard</h2>
+
+    <table class="leaderboard-table" *ngIf="leaderboard.length > 0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Spieler</th>
+          <th>Punkte</th>
+          <th>Level</th>
+          <th>Reparierte Sensoren</th>
+          <th>Datum</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let entry of leaderboard">
+          <td>{{ entry.rank }}</td>
+          <td>{{ entry.username }}</td>
+          <td>{{ entry.points }}</td>
+          <td>{{ entry.level }}</td>
+          <td>{{ entry.sensorsRepaired }}</td>
+          <td>{{ entry.achievedAt | date:'short' }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="leaderboard-empty" *ngIf="leaderboard.length === 0">
+      Noch keine Scores – sei der Erste!
+    </p>
+  </section>
+
   <!-- Footer -->
   <footer class="footer">
     <p class="team">Projekt von Gruppe 4 - PROPRA 25/26</p>
