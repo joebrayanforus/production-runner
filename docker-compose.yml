@@ -1,10 +1,10 @@
 services:
-  backend:
+  productionrunnerapi:
     build:
-      context: ./BackendApi
+      context: ./ProductionRunnerAPI
       dockerfile: Dockerfile
     ports:
-      - "5000:5000"
+      - "5001:80"
     environment:
       ASPNETCORE_ENVIRONMENT: "Production"
 
@@ -15,5 +15,5 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
+      - productionrunnerapi
   
