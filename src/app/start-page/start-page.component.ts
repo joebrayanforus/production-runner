@@ -2,6 +2,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import {
   LeaderboardService,
   LeaderboardEntry
@@ -12,12 +13,13 @@ export type GameMode = 'classic' | 'practice';
 @Component({
   selector: 'app-start-page',
   standalone: true,
-  imports: [RouterLink, CommonModule],
+  imports: [RouterLink, CommonModule, FormsModule],
   templateUrl: './start-page.component.html',
   styleUrls: ['./start-page.component.css']
 })
 export class StartPageComponent implements OnInit, OnDestroy {
   selectedMode: GameMode = 'classic';
+  playerName = '';
 
   leaderboard: LeaderboardEntry[] = [];
 
@@ -38,5 +40,9 @@ export class StartPageComponent implements OnInit, OnDestroy {
 
   selectMode(mode: GameMode): void {
     this.selectedMode = mode;
+  }
+
+  isPlayerNameValid(): boolean {
+    return this.playerName.trim().length > 0;
   }
 }

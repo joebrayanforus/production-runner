@@ -1,5 +1,7 @@
 import { Component, ElementRef, OnInit, OnDestroy, ViewChild, AfterViewInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { HttpClientModule } from '@angular/common/http';
 import { GameManager } from '../models/game-manager';
 import { Block } from '../models/Block';
 import { AudioService } from '../services/audio.service';
@@ -9,7 +11,7 @@ export type GameMode = 'classic' | 'practice';
 @Component({
   selector: 'app-game-canvas',
   standalone: true,
-  imports: [],
+  imports: [HttpClientModule],
   templateUrl: './game-canvas.component.html',
   styleUrls: ['./game-canvas.component.css']
 })
@@ -50,6 +52,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   lives = 3;
   score = 0;
   gameOver = false;
+  playerName = ''; // Player name for leaderboard
   scaredTimer = 0;
   scaredDuration = 10000; // 10 seconds in ms
   pelletStreak = 0;
@@ -498,7 +501,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private isRewinding = false;
   private readonly MAX_HISTORY = 300; // ~10 Sekunden bei 30 FPS
 
-  constructor(private audioService: AudioService, private route: ActivatedRoute) {
+  constructor(private audioService: AudioService, private route: ActivatedRoute, private http: HttpClient) {
     this.initAssets();
   }
 
@@ -627,12 +630,19 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void{
     console.log('🎮 GameCanvasComponent initialized');
 
-    // Lese Spielmodus aus Query-Parametern
+    // Lese Spielmodus und Spielername aus Query-Parametern
     this.route.queryParams.subscribe(params => {
       const mode = params['mode'] as GameMode;
       if (mode && ['classic', 'practice'].includes(mode)) {
         this.gameMode = mode;
         this.applyGameMode();
+      }
+      
+      // Lese Spielername
+      const playerName = params['playerName'] as string;
+      if (playerName) {
+        this.playerName = playerName;
+        console.log(`👤 Player: ${this.playerName}`);
       }
     });
 
@@ -719,6 +729,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           if (this.lives <= 0) {
             this.gameState = 'gameover';
             this.gameOver = true;
+            // Submit final score to backend
+            this.submitScore();
             this.stopGameLoop();
           } else {
             this.resetPositions();
@@ -1149,6 +1161,29 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       const directions = ['U', 'D', 'L', 'R'];
       const newDirection = directions[Math.floor(Math.random() * 4)];
       ghost.updateDirection(newDirection, this.CELL_SIZE, this.walls);
+    }
+  }
+
+  // Send final score to backend API
+  private submitScore(): void {
+    try {
+      const collected = Math.max(0, this.totalPellets - (this.foods.size + this.powerPellets.size));
+      const dto = {
+        Username: this.playerName?.trim() || 'Anonymous',
+        Points: this.score,
+        Level: this.currentLevel,
+        LivesRemaining: this.lives,
+        ProductionOrdersCollected: collected,
+        SensorsRepaired: 0,
+        PlaytimeSeconds: 0
+      };
+
+      this.http.post('/api/scores', dto).subscribe({
+        next: (res) => console.log('✅ Score submitted', res),
+        error: (err) => console.error('❌ Error submitting score', err)
+      });
+    } catch (e) {
+      console.error('Exception while submitting score', e);
     }
   }
 

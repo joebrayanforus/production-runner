@@ -166,6 +166,7 @@ section h2 {
 }
 
 /* === START BUTTON === */
+/* === START BUTTON === */
 .start-button {
   display: flex;
   align-items: center;
@@ -184,7 +185,20 @@ section h2 {
 
 .start-button:hover {
   transform: scale(1.05);
-  box-shadow: 0 12px 40px rgba(255, 165, 0, 0.6);
+  box-shadow: 0 12px 40px rgba(255,165,0,.6);
+}
+
+.start-button:disabled {
+  background: linear-gradient(135deg, #666666, #444444);
+  color: #999;
+  cursor: not-allowed;
+  box-shadow: 0 4px 15px rgba(100,100,100,.3);
+  transform: scale(1);
+}
+
+.start-button:disabled:hover {
+  transform: scale(1);
+  box-shadow: 0 4px 15px rgba(100,100,100,.3);
 }
 
 .play-icon {
