@@ -3,6 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { GameManager } from '../models/game-manager';
 import { Block } from '../models/Block';
 import { AudioService } from '../services/audio.service';
+import { InputService } from '../services/input.service';
 
 export type GameMode = 'classic' | 'practice';
 
@@ -82,7 +83,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private powerPelletBlinkTimer = 0;
 
   // Ready/Game Over Screen
-  private gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' = 'ready';
+  private gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' | 'paused' = 'ready';
+  private startButtonPressed = false;
+  private restartButtonPressed = false; // A-Button für Restart
+  private lastStickDirection: string = ''; // Letzte Stick-Richtung für Flanken-Erkennung
+  private pendingDirection: string = ''; // Gewünschte Richtung (Input Buffering)
   private stateTimer = 0;
   private readonly READY_DURATION = 2000; // 2 Sekunden "READY!"
   private readonly DEATH_DURATION = 1500; // 1.5 Sekunden Todesanimation
@@ -395,6 +400,17 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.textAlign = 'center';
       ctx.fillText(`LEVEL ${this.currentLevel - 1} COMPLETE!`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
     }
+
+    // Pause Screen
+    if (this.gameState === 'paused') {
+      ctx.font = 'bold 28px "Press Start 2P", monospace';
+      ctx.fillStyle = '#FFFF00';
+      ctx.textAlign = 'center';
+      ctx.fillText('PAUSE', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      ctx.font = '12px monospace';
+      ctx.fillStyle = 'white';
+      ctx.fillText('Press START to continue', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2 + 30);
+    }
   }
 
   // Zeichnet Ghost-Ziele (Learn/Practice Mode)
@@ -498,7 +514,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private isRewinding = false;
   private readonly MAX_HISTORY = 300; // ~10 Sekunden bei 30 FPS
 
-  constructor(private audioService: AudioService, private route: ActivatedRoute) {
+  constructor(private audioService: AudioService,private inputService : InputService,private route: ActivatedRoute) {
     this.initAssets();
   }
 
@@ -686,7 +702,33 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     window.removeEventListener('keyup', this.onKeyUpBound);
   }
 
+  private restartGame(): void {
+    this.walls.clear();
+    this.foods.clear();
+    this.powerPellets.clear();
+    this.ghosts.clear();
+    this.cherry = null;
+    this.loadMap();
+    this.resetPositions();
+    this.lives = 3;
+    this.score = 0;
+    this.pelletStreak = 0;
+    this.streakMultiplier = 1.0;
+    this.currentLevel = 1;
+    this.scaredTimer = 0;
+    this.scaredDuration = 10000;
+    this.gameOver = false;
+    this.modePhase = 0;
+    this.modeTimer = 0;
+    this.ghostMode = 'scatter';
+    this.gameState = 'ready';
+    this.stateTimer = 0;
+    this.gameHistory = [];
+    this.startGameLoop();
+  }
+
   private startGameLoop() {
+    // Starte Hintergrundmusik
     this.audioService.playBackgroundMusic();
     const loop = (timestamp: number) => {
       const delta = timestamp - this.lastFrameTime;
@@ -703,6 +745,34 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private update() {
     const deltaTime = 1000 / this.FPS;
 
+    // Pause-Toggle mit Start-Button (Button 9)
+    const pads = navigator.getGamepads();
+    if (pads && this.inputService.controllerIndex !== null) {
+      const gamepad = pads[this.inputService.controllerIndex];
+      if (gamepad && gamepad.buttons[9]) {
+        if (gamepad.buttons[9].pressed && !this.startButtonPressed) {
+          this.startButtonPressed = true;
+          if (this.gameState === 'playing') {
+            this.gameState = 'paused';
+          } else if (this.gameState === 'paused') {
+            this.gameState = 'playing';
+          }
+        } else if (!gamepad.buttons[9].pressed) {
+          this.startButtonPressed = false;
+        }
+      }
+      
+      // Game Over Restart mit A-Button (Button 0)
+      if (this.gameState === 'gameover' && gamepad && gamepad.buttons[0]) {
+        if (gamepad.buttons[0].pressed && !this.restartButtonPressed) {
+          this.restartButtonPressed = true;
+          this.restartGame();
+        } else if (!gamepad.buttons[0].pressed) {
+          this.restartButtonPressed = false;
+        }
+      }
+    }
+
     // State Machine
     switch (this.gameState) {
       case 'ready':
@@ -712,6 +782,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           this.stateTimer = 0;
         }
         return; // Keine Bewegung während Ready
+
+      case 'paused':
+        return; // Keine Bewegung während Pause
 
       case 'dying':
         this.stateTimer += deltaTime;
@@ -740,6 +813,56 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
       case 'playing':
         break; // Weiter mit normalem Update
+    }
+
+    // Gamepad Input (jedes Frame aktualisieren)
+    this.inputService.updateGamepad();
+    const stickX = this.inputService.gethorizontalAxis();
+    const stickY = this.inputService.getVerticalAxis();
+    
+    if (this.pacman) {
+      // Bestimme stärkste Achse für diagonale Inputs
+      const absX = Math.abs(stickX);
+      const absY = Math.abs(stickY);
+      
+      let currentDirection = '';
+      
+      if (absX > 0.5 || absY > 0.5) {
+        if (absX > absY) {
+          // Horizontale Bewegung dominiert
+          currentDirection = stickX > 0.5 ? 'R' : 'L';
+        } else {
+          // Vertikale Bewegung dominiert
+          currentDirection = stickY > 0.5 ? 'D' : 'U';
+        }
+      }
+      
+      // Speichere gewünschte Richtung bei Richtungswechsel
+      if (currentDirection && currentDirection !== this.lastStickDirection) {
+        this.pendingDirection = currentDirection;
+        
+        // Update Pac-Man Sprite sofort (visuelles Feedback)
+        if (currentDirection === 'R') this.pacman.image = this.pacmanRightImage;
+        else if (currentDirection === 'L') this.pacman.image = this.pacmanLeftImage;
+        else if (currentDirection === 'D') this.pacman.image = this.pacmanDownImage;
+        else if (currentDirection === 'U') this.pacman.image = this.pacmanUpImage;
+        
+        this.lastStickDirection = currentDirection;
+      } else if (!currentDirection) {
+        // Stick in Neutralposition → Reset
+        this.lastStickDirection = '';
+      }
+      
+      // Versuche JEDES FRAME die gewünschte Richtung anzuwenden (Input Buffering)
+      if (this.pendingDirection) {
+        const prevDir = this.pacman.direction;
+        this.pacman.updateDirection(this.pendingDirection, this.CELL_SIZE, this.walls);
+        
+        // Wenn Richtungsänderung erfolgreich war, lösche pending
+        if (this.pacman.direction === this.pendingDirection) {
+          this.pendingDirection = '';
+        }
+      }
     }
 
     // Pac-Man Mundanimation
@@ -1155,28 +1278,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private onKeyDown(e: KeyboardEvent) {
     // Restart bei Game Over
     if (this.gameState === 'gameover') {
-      this.walls.clear();
-      this.foods.clear();
-      this.powerPellets.clear();
-      this.ghosts.clear();
-      this.cherry = null;
-      this.loadMap();
-      this.resetPositions();
-      this.lives = 3;
-      this.score = 0;
-      this.pelletStreak = 0;
-      this.streakMultiplier = 1.0;
-      this.currentLevel = 1;
-      this.scaredTimer = 0;
-      this.scaredDuration = 10000;
-      this.gameOver = false;
-      this.modePhase = 0;
-      this.modeTimer = 0;
-      this.ghostMode = 'scatter';
-      this.gameState = 'ready';
-      this.stateTimer = 0;
-      this.gameHistory = [];
-      this.startGameLoop();
+      this.restartGame();
       return;
     }
 
