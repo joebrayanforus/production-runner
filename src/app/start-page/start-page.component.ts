@@ -7,6 +7,7 @@ import {
   LeaderboardService,
   LeaderboardEntry
 } from '../services/leaderboard.service';
+import { ScoreService, ScoreEntry } from '../services/score.service';
 
 export type GameMode = 'classic' | 'practice';
 
@@ -22,10 +23,15 @@ export class StartPageComponent implements OnInit, OnDestroy {
   playerName = '';
 
   leaderboard: LeaderboardEntry[] = [];
+  lastScore: number | null = null;
+  lastScores: ScoreEntry[] = [];
 
-  constructor(private leaderboardService: LeaderboardService) {}
+  constructor(private leaderboardService: LeaderboardService, private scoreService: ScoreService) {}
 
   ngOnInit(): void {
+    this.lastScore = this.scoreService.getLastScore();
+    this.lastScores = this.scoreService.getLastScores();
+
     this.leaderboardService.start();
 
     this.leaderboardService.leaderboard$
@@ -43,6 +49,14 @@ export class StartPageComponent implements OnInit, OnDestroy {
   }
 
   isPlayerNameValid(): boolean {
-    return this.playerName.trim().length > 0;
+    return this.playerName.trim().length === 3;
+  }
+
+  onPlayerNameInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    // Limit to 3 characters
+    if (input.value.length > 3) {
+      this.playerName = input.value.substring(0, 3);
+    }
   }
 }

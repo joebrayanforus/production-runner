@@ -44,12 +44,35 @@ export class LeaderboardService {
       .build();
 
     this.hubConnection.on('ReceiveNewScore', () => {
-      this.zone.run(() => this.reloadLeaderboard());
+      this.zone.run(() => {
+        console.log('📢 SignalR: ReceiveNewScore event received, reloading leaderboard...');
+        this.reloadLeaderboard();
+      });
+    });
+
+    this.hubConnection.on('LeaderboardUpdated', (leaderboard: any[]) => {
+      this.zone.run(() => {
+        console.log('📢 SignalR: LeaderboardUpdated event received', leaderboard);
+        // Map PascalCase to camelCase if needed
+        const mapped = leaderboard.map((entry: any) => ({
+          rank: entry.Rank ?? entry.rank,
+          username: entry.Username ?? entry.username,
+          points: entry.Points ?? entry.points,
+          level: entry.Level ?? entry.level,
+          sensorsRepaired: entry.SensorsRepaired ?? entry.sensorsRepaired,
+          achievedAt: entry.AchievedAt ?? entry.achievedAt
+        }));
+        console.log('📊 Mapped leaderboard:', mapped);
+        this.leaderboardSubject.next(mapped);
+      });
     });
 
     this.hubConnection
       .start()
-      .catch(err => console.error('SignalR connection error:', err));
+      .then(() => {
+        console.log('✅ SignalR connected to leaderboard hub');
+      })
+      .catch(err => console.error('❌ SignalR connection error:', err));
   }
 
   stop(): void {
@@ -61,12 +84,27 @@ export class LeaderboardService {
 
   private reloadLeaderboard(): void {
     this.http
-      .get<LeaderboardEntry[]>(
+      .get<any[]>(
         `${this.apiBaseUrl}/api/scores/leaderboard?top=10`
       )
       .subscribe({
-        next: entries => this.leaderboardSubject.next(entries),
-        error: err => console.error('Failed to load leaderboard', err)
+        next: entries => {
+          console.log('📊 Leaderboard loaded:', entries);
+          // Map PascalCase properties from backend to camelCase for frontend
+          const mapped = entries.map(entry => ({
+            rank: entry.Rank || entry.rank,
+            username: entry.Username || entry.username,
+            points: entry.Points || entry.points,
+            level: entry.Level || entry.level,
+            sensorsRepaired: entry.SensorsRepaired || entry.sensorsRepaired,
+            achievedAt: entry.AchievedAt || entry.achievedAt
+          }));
+          this.leaderboardSubject.next(mapped);
+        },
+        error: err => {
+          console.error('❌ Failed to load leaderboard', err);
+          console.error('Error details:', JSON.stringify(err, null, 2));
+        }
       });
   }
 }

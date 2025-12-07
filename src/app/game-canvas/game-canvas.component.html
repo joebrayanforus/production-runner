@@ -1,5 +1,19 @@
 
 <div class="game-container">
-
-  <canvas #gameCanvas ></canvas>
+  <canvas #gameCanvas></canvas>
+  
+  <!-- Game Over Overlay with Back Button -->
+  <div class="game-over-overlay" *ngIf="gameOver">
+    <div class="game-over-content">
+      <h2 class="game-over-title">GAME OVER</h2>
+      <p class="final-score">Final Score: {{ score }}</p>
+      <p class="game-over-info">Level: {{ currentLevel }} | Sensors Repaired: {{ sensorsRepaired }}</p>
+      <div class="game-over-buttons">
+        <button class="back-button" (click)="goToStartPage()">
+          🏠 Back to Start Page
+        </button>
+        <p class="restart-hint">Press any key to restart</p>
+      </div>
+    </div>
+  </div>
 </div>

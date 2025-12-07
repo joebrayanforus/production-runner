@@ -66,8 +66,19 @@
   <!-- Player Name Input -->
   <div style="max-width:500px;margin:15px auto;padding:18px;background:rgba(255,255,255,.08);border:2px solid rgba(255,215,0,.3);border-radius:10px">
     <label style="display:block;font-size:16px;font-weight:600;color:#FFD700;margin-bottom:8px">👤 Spielername:</label>
-    <input [(ngModel)]="playerName" type="text" placeholder="Gib deinen Namen ein..." maxlength="50" style="width:100%;box-sizing:border-box;padding:10px;font-size:15px;color:#fff;background:rgba(255,255,255,.08);border:2px solid rgba(255,215,0,.4);border-radius:6px;outline:0">
-    <p style="font-size:12px;color:#FF6B6B;margin:6px 0 0;font-style:italic" *ngIf="!isPlayerNameValid()">Bitte gib deinen Namen ein</p>
+    <input [(ngModel)]="playerName" type="text" placeholder="Gib deinen Namen ein (3 Buchstaben)..." maxlength="3" (input)="onPlayerNameInput($event)" style="width:100%;box-sizing:border-box;padding:10px;font-size:15px;color:#fff;background:rgba(255,255,255,.08);border:2px solid rgba(255,215,0,.4);border-radius:6px;outline:0">
+    <p style="font-size:12px;color:#FF6B6B;margin:6px 0 0;font-style:italic" *ngIf="!isPlayerNameValid()">Bitte gib genau 3 Buchstaben ein</p>
+  </div>
+
+  <!-- Last Scores Display -->
+  <div style="max-width:500px;margin:15px auto;padding:18px;background:rgba(255,255,255,.08);border:2px solid rgba(255,215,0,.3);border-radius:10px">
+    <h3 style="text-align:center;font-size:18px;color:#FFD700;font-weight:600;margin:0 0 15px 0">Highest score</h3>
+    <div *ngIf="lastScores.length > 0" style="display:flex;flex-direction:column;gap:8px">
+      <p *ngFor="let entry of lastScores; let i = index" style="margin:0;text-align:center;font-size:16px;color:#FFFFFF;font-weight:500">
+        {{ i + 1 }}. place: <span style="color:#FFD700;font-weight:600">{{ entry.playerName }}</span> - <span style="color:#FFD700;font-weight:600">{{ entry.score }}</span> points
+      </p>
+    </div>
+    <p *ngIf="lastScores.length === 0" style="margin:0;text-align:center;font-size:16px;color:#FFD700;font-weight:600">No score yet, start a game!</p>
   </div>
 
   <!-- Start Button -->

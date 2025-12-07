@@ -1,17 +1,19 @@
 import { Component, ElementRef, OnInit, OnDestroy, ViewChild, AfterViewInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { HttpClientModule } from '@angular/common/http';
+import { CommonModule } from '@angular/common';
 import { GameManager } from '../models/game-manager';
 import { Block } from '../models/Block';
 import { AudioService } from '../services/audio.service';
+import { ScoreService } from '../services/score.service';
 
 export type GameMode = 'classic' | 'practice';
 
 @Component({
   selector: 'app-game-canvas',
   standalone: true,
-  imports: [HttpClientModule],
+  imports: [HttpClientModule, CommonModule],
   templateUrl: './game-canvas.component.html',
   styleUrls: ['./game-canvas.component.css']
 })
@@ -58,6 +60,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   pelletStreak = 0;
   streakMultiplier = 1.0;
   currentLevel = 1;
+  sensorsRepaired = 0; // Track number of sensors repaired (scared ghosts eaten)
+  private playtimeStart = 0; // Timestamp when game started playing
+  private scoreSubmitted = false; // Flag to ensure score is only submitted once
 
   // Cherry System
   private cherrySpawnCooldown = 0;
@@ -501,7 +506,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private isRewinding = false;
   private readonly MAX_HISTORY = 300; // ~10 Sekunden bei 30 FPS
 
-  constructor(private audioService: AudioService, private route: ActivatedRoute, private http: HttpClient) {
+  constructor(private audioService: AudioService, private route: ActivatedRoute, private http: HttpClient, private router: Router, private scoreService: ScoreService) {
     this.initAssets();
   }
 
@@ -720,6 +725,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         if (this.stateTimer >= this.READY_DURATION) {
           this.gameState = 'playing';
           this.stateTimer = 0;
+          // Start playtime tracking when game actually starts
+          if (this.playtimeStart === 0) {
+            this.playtimeStart = Date.now();
+          }
         }
         return; // Keine Bewegung während Ready
 
@@ -729,8 +738,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           if (this.lives <= 0) {
             this.gameState = 'gameover';
             this.gameOver = true;
-            // Submit final score to backend
-            this.submitScore();
+            // Submit final score to backend (only once)
+            if (!this.scoreSubmitted) {
+              this.submitScore();
+              this.scoreSubmitted = true;
+            }
             this.stopGameLoop();
           } else {
             this.resetPositions();
@@ -1025,6 +1037,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           // Reparatur: Ghost "reparieren" (+200 Punkte)
           this.audioService.play('eatghost');
           this.score += 200;
+          console.log("Current score:", this.score);
+          this.sensorsRepaired++; // Track sensor repair
           // Respawn ghost at starting position
           ghost.reset();
           ghost.scared = false;
@@ -1082,6 +1096,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           this.streakMultiplier = 1.5;
         }
         this.score += Math.floor(10 * this.streakMultiplier);
+        console.log("Current score:", this.score);
       }
     }
     if (foodEaten) {
@@ -1095,6 +1110,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         this.audioService.play('powerpill');
         powerEaten = pellet;
         this.score += 50;
+        console.log("Current score:", this.score);
         // Activate scared mode for 10 seconds
         this.scaredTimer = this.scaredDuration;
         this.ghosts.forEach(g => {
@@ -1111,6 +1127,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.cherry && this.collision(this.pacman, this.cherry)) {
       this.audioService.play('eatghost'); // Bonus-Sound
       this.score += 500; // 500 Punkte (statt 50)
+      console.log("Current score:", this.score);
 
       // Bonus-Effekt: Kurze Unverwundbarkeit (3 Sekunden)
       // Oder Extraleben bei bestimmten Bedingungen
@@ -1142,6 +1159,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     // Level complete
     if (this.foods.size === 0 && this.powerPellets.size === 0) {
       this.score += 1000; // Level Complete Bonus
+      console.log("Current score:", this.score);
       this.currentLevel++;
       this.pelletStreak = 0;
       this.streakMultiplier = 1.0;
@@ -1168,19 +1186,36 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private submitScore(): void {
     try {
       const collected = Math.max(0, this.totalPellets - (this.foods.size + this.powerPellets.size));
+      // Calculate playtime in seconds
+      const playtimeSeconds = this.playtimeStart > 0 
+        ? Math.floor((Date.now() - this.playtimeStart) / 1000) 
+        : 0;
+      
+      const apiBaseUrl = 'http://localhost:5019';
       const dto = {
         Username: this.playerName?.trim() || 'Anonymous',
         Points: this.score,
         Level: this.currentLevel,
         LivesRemaining: this.lives,
         ProductionOrdersCollected: collected,
-        SensorsRepaired: 0,
-        PlaytimeSeconds: 0
+        SensorsRepaired: this.sensorsRepaired,
+        PlaytimeSeconds: playtimeSeconds
       };
 
-      this.http.post('/api/scores', dto).subscribe({
-        next: (res) => console.log('✅ Score submitted', res),
-        error: (err) => console.error('❌ Error submitting score', err)
+      // Save final score to localStorage (last 5 games)
+      this.scoreService.saveScore(this.score, this.playerName);
+
+      this.http.post(`${apiBaseUrl}/api/scores`, dto).subscribe({
+        next: (res) => {
+          console.log('✅ Score submitted successfully', res);
+          console.log(`📊 Final Score: ${this.score} | Sensors Repaired: ${this.sensorsRepaired} | Playtime: ${playtimeSeconds}s`);
+        },
+        error: (err) => {
+          console.error('❌ Error submitting score', err);
+          console.error('Error details:', JSON.stringify(err, null, 2));
+          // Still log the score even if API call fails
+          console.log(`📊 Final Score (not saved): ${this.score} | Sensors Repaired: ${this.sensorsRepaired} | Playtime: ${playtimeSeconds}s`);
+        }
       });
     } catch (e) {
       console.error('Exception while submitting score', e);
@@ -1205,6 +1240,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.scaredTimer = 0;
       this.scaredDuration = 10000;
       this.gameOver = false;
+      this.sensorsRepaired = 0;
+      this.playtimeStart = 0;
+      this.scoreSubmitted = false;
       this.modePhase = 0;
       this.modeTimer = 0;
       this.ghostMode = 'scatter';
@@ -1291,5 +1329,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         this.slowMotion = 1.0;
       }
     }
+  }
+
+  // Navigate back to start page
+  goToStartPage(): void {
+    // Score is already saved in submitScore() when game ends
+    // Only navigate, don't save again
+    this.router.navigate(['/']);
   }
 }
