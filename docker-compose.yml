@@ -1,19 +1,42 @@
+version: '3.8'
+
 services:
   productionrunnerapi:
     build:
       context: ./ProductionRunnerAPI
       dockerfile: Dockerfile
+    container_name: productionrunnerapi
     ports:
       - "5001:80"
     environment:
       ASPNETCORE_ENVIRONMENT: "Production"
-
-  frontend:
-    build:
-      context: .
-      dockerfile: ./src/Dockerfile
-    ports:
-      - "80:80"
     depends_on:
-      - productionrunnerapi
-  
+      - postgres
+
+  postgres:
+    image: postgres:15
+    container_name: production_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: productiondb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+# FRONTEND REMOVED TO NOT BLOCK SWAGGER
+# If needed,  add it later.
+# frontend:
+#   build:
+#     context: .
+#     dockerfile: ./src/Dockerfile
+#   ports:
+#     - "80:80"
+#   depends_on:
+#     - productionrunnerapi
+
+volumes:
+  pgdata:
+
