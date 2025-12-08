@@ -62,19 +62,40 @@
       </div>
     </div>
   </section>
-  
+
   <!-- Player Name Input -->
-  <div style="max-width:500px;margin:15px auto;padding:18px;background:rgba(255,255,255,.08);border:2px solid rgba(255,215,0,.3);border-radius:10px">
-    <label style="display:block;font-size:16px;font-weight:600;color:#FFD700;margin-bottom:8px">👤 Spielername:</label>
-    <input [(ngModel)]="playerName" type="text" placeholder="Gib deinen Namen ein..." maxlength="50" style="width:100%;box-sizing:border-box;padding:10px;font-size:15px;color:#fff;background:rgba(255,255,255,.08);border:2px solid rgba(255,215,0,.4);border-radius:6px;outline:0">
-    <p style="font-size:12px;color:#FF6B6B;margin:6px 0 0;font-style:italic" *ngIf="!isPlayerNameValid()">Bitte gib deinen Namen ein</p>
+  <div class="player-name-container">
+    <div class="arcade-screen">
+      <label class="player-label">
+        <span class="label-icon">👾</span>
+        <span class="label-text">ENTER PLAYER NAME</span>
+        <span class="label-icon">👾</span>
+      </label>
+      <div class="input-wrapper">
+        <input
+          [(ngModel)]="playerName"
+          type="text"
+          placeholder="TYPE YOUR NAME..."
+          maxlength="20"
+          class="arcade-input"
+          [class.invalid]="!isPlayerNameValid() && playerName.length > 0"
+        >
+        <div class="input-cursor"></div>
+      </div>
+      <p class="error-message" *ngIf="!isPlayerNameValid() && playerName.length > 0">
+        ⚠ NAME REQUIRED
+      </p>
+      <p class="name-preview" *ngIf="isPlayerNameValid()">
+        PLAYER: <span class="preview-name">{{ playerName.toUpperCase() }}</span>
+      </p>
+    </div>
   </div>
 
   <!-- Start Button -->
-  <button 
-    class="start-button" 
+  <button
+    class="start-button"
     style="max-width:500px;width:100%;margin:0 auto;display:flex;justify-content:center;align-items:center"
-    [routerLink]="['/game']" 
+    [routerLink]="['/game']"
     [queryParams]="{mode: selectedMode, playerName: playerName.trim()}"
     [disabled]="!isPlayerNameValid()"
   >
@@ -82,51 +103,13 @@
     SPIEL STARTEN
   </button>
 
-  <!-- About Section -->
-  <section class="about-section">
-    <h2>ℹ️ Über das Spiel</h2>
-    <div class="about-content">
-      <div class="about-card">
-        <h4>🤖 AGV</h4>
-        <p>Steuere das automatische Transportfahrzeug durch die Fabrikhalle und sammle Produktionsaufträge.</p>
-      </div>
-      <div class="about-card">
-        <h4>👻 Sensoren</h4>
-        <p>Weiche den 4 fehlerhaften Sensoren aus – jeder hat ein eigenes Verhaltensmuster!</p>
-      </div>
-      <div class="about-card">
-        <h4>⚡ KI-Optimierung</h4>
-        <p>Sammle Power-Ups um Sensoren temporär zu "reparieren" und Bonuspunkte zu erhalten.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- Sensor Types -->
-  <section class="sensors-section">
-    <h2>🔴 Sensor-Typen</h2>
-    <div class="sensors-grid">
-      <div class="sensor-card red">
-        <span class="sensor-icon">👻</span>
-        <h4>AGGRESSIVE</h4>
-        <p>Verfolgt direkt den AGV</p>
-      </div>
-      <div class="sensor-card pink">
-        <span class="sensor-icon">👻</span>
-        <h4>AMBUSH</h4>
-        <p>Lauert 4 Felder voraus</p>
-      </div>
-      <div class="sensor-card cyan">
-        <span class="sensor-icon">👻</span>
-        <h4>PATROL</h4>
-        <p>Feste Route entlang Korridoren</p>
-      </div>
-      <div class="sensor-card orange">
-        <span class="sensor-icon">👻</span>
-        <h4>RANDOM</h4>
-        <p>Zufällige Bewegung</p>
-      </div>
-    </div>
-  </section>
+  <!-- Info Button -->
+  <button
+    class="info-button"
+    [routerLink]="['/info']"
+  >
+    ℹ️ SPIELINFOS & SENSOR-TYPEN ANSEHEN
+  </button>
 
   <!-- Leaderboard Section -->
   <section class="leaderboard-section">
