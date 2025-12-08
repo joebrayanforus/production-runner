@@ -1,19 +1,39 @@
-services:
+eservices:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: runner
+      POSTGRES_PASSWORD: runnerpassword
+      POSTGRES_DB: productionrunner
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: always
+
   backend:
     build:
-      context: ./BackendApi
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ProductionRunnerAPI/Dockerfile
     ports:
-      - "5000:5000"
+      - "5000:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_URLS: "http://+:8080"
+      ConnectionStrings__DefaultConnection: "Host=db;Database=productionrunner;Username=runner;Password=runnerpassword"
+    depends_on:
+      - db
+    restart: always
 
   frontend:
     build:
       context: .
-      dockerfile: ./src/Dockerfile
+      dockerfile: src/Dockerfile
     ports:
       - "80:80"
     depends_on:
       - backend
-  
+    restart: always
+
+volumes:
+  postgres_data:

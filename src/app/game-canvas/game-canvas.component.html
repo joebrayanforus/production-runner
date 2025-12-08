@@ -1,5 +1,19 @@
 
 <div class="game-container">
-
-  <canvas #gameCanvas ></canvas>
+  <div class="arcade-cabinet">
+    <div class="arcade-screen-frame">
+      <div class="game-info-bar">
+        <div class="player-badge">
+          <span class="player-icon">🎮</span>
+          <span class="player-name-display">{{ playerName || 'PLAYER 1' }}</span>
+        </div>
+        <div class="game-mode-badge">
+          <span class="mode-label">MODE:</span>
+          <span class="mode-value">{{ gameMode.toUpperCase() }}</span>
+        </div>
+      </div>
+      <canvas #gameCanvas></canvas>
+      <div class="scanline-overlay"></div>
+    </div>
+  </div>
 </div>

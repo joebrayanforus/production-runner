@@ -5,6 +5,7 @@ import { HttpClientModule } from '@angular/common/http';
 import { GameManager } from '../models/game-manager';
 import { Block } from '../models/Block';
 import { AudioService } from '../services/audio.service';
+import { InputService } from '../services/input.service';
 
 export type GameMode = 'classic' | 'practice';
 
@@ -48,11 +49,15 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   pacman: Block | null = null;
   cherry: Block | null = null;
 
+  // Buffered input for smoother corner turning
+  private bufferedDirection: string | null = null;
+
   // Basic game state
   lives = 3;
   score = 0;
   gameOver = false;
   playerName = ''; // Player name for leaderboard
+  gameMode: GameMode = 'classic'; // Make gameMode accessible in template
   scaredTimer = 0;
   scaredDuration = 10000; // 10 seconds in ms
   pelletStreak = 0;
@@ -62,6 +67,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   // Cherry System
   private cherrySpawnCooldown = 0;
   private totalPellets = 0; // Wird beim Laden der Map gesetzt
+
+  // Ghost House Release Timer
+  private ghostReleaseTimer = 0;
+  private readonly GHOST_RELEASE_INTERVAL = 2000; // Release a ghost every 2 seconds
+  private ghostsReleased = 0;
 
   // Scatter/Chase Mode (authentisches Pac-Man Verhalten)
   private ghostMode: 'scatter' | 'chase' | 'frightened' = 'scatter';
@@ -123,14 +133,22 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ];
   }
   private draw(ctx: CanvasRenderingContext2D) {
-    // Wände zuerst zeichnen
+    // Wände zeichnen (optimiert sans shadow)
     this.walls.forEach(wall => {
       if (wall.type === 'ghost-door') {
         // Ghost Door als pinke Linie
         ctx.fillStyle = '#FFB8FF';
         ctx.fillRect(wall.x, wall.y + wall.height / 2 - 2, wall.width, 4);
       } else if (wall.image && wall.image.complete) {
+        // Walls drawing
         ctx.drawImage(wall.image, wall.x, wall.y, wall.width, wall.height);
+      } else {
+        // Fallback: Blaue Wände mit 3D-Effekt
+        ctx.fillStyle = '#2121DE';
+        ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+        // Inner highlight für 3D-Effekt
+        ctx.fillStyle = '#4A4AFF';
+        ctx.fillRect(wall.x + 2, wall.y + 2, wall.width - 4, wall.height - 4);
       }
     });
 
@@ -314,29 +332,23 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private drawUI(ctx: CanvasRenderingContext2D) {
-    // Score oben
+    // Score oben (avec padding pour éviter overlap)
     ctx.font = 'bold 16px "Press Start 2P", monospace';
     ctx.fillStyle = 'white';
     ctx.textAlign = 'left';
-    ctx.fillText(`SCORE: ${this.score}`, 10, 18);
-    ctx.fillText(`LEVEL: ${this.currentLevel}`, this.CANVAS_WIDTH / 2 - 50, 18);
+    ctx.fillText(`SCORE: ${this.score}`, 10, 35);
+    ctx.fillText(`LEVEL: ${this.currentLevel}`, this.CANVAS_WIDTH / 2 - 50, 35);
 
-    // Spielmodus-Anzeige oben rechts
+    // High Score anzeigen
     ctx.textAlign = 'right';
-    ctx.font = '12px monospace';
-    let modeColor = '#FFFFFF';
-    let modeText = this.gameMode.toUpperCase();
-    switch (this.gameMode) {
-      case 'classic': modeColor = '#FFFFFF'; break;
-      case 'practice': modeColor = '#00FF88'; break;
-    }
-    ctx.fillStyle = modeColor;
-    ctx.fillText(modeText, this.CANVAS_WIDTH - 10, 18);
+    ctx.font = '14px "Press Start 2P", monospace';
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText(`HI: ${this.getHighScore()}`, this.CANVAS_WIDTH - 10, 35);
 
     // Practice Mode Status-Anzeige
     if (this.gameMode === 'practice') {
       ctx.font = '10px monospace';
-      let statusY = 35;
+      let statusY = 52;
       if (this.isInvincible) {
         ctx.fillStyle = '#00FF00';
         ctx.fillText('🛡️ INVINCIBLE', this.CANVAS_WIDTH - 10, statusY);
@@ -375,20 +387,58 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
       // Zeige Modus-Info
       ctx.font = '12px monospace';
+      const modeColor = this.gameMode === 'classic' ? '#FFFFFF' : '#00FF88';
+      const modeText = this.gameMode.toUpperCase();
       ctx.fillStyle = modeColor;
       ctx.fillText(`[${modeText}]`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2 + 25);
     }
 
     // Game Over Screen
     if (this.gameState === 'gameover') {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+      ctx.fillRect(50, 50, this.CANVAS_WIDTH - 100, this.CANVAS_HEIGHT - 100);
+      ctx.strokeStyle = '#FF0000';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(50, 50, this.CANVAS_WIDTH - 100, this.CANVAS_HEIGHT - 100);
+
       ctx.font = 'bold 24px "Press Start 2P", monospace';
       ctx.fillStyle = '#FF0000';
       ctx.textAlign = 'center';
-      ctx.fillText('GAME OVER', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      ctx.fillText('GAME OVER', this.CANVAS_WIDTH / 2, 100);
+
       ctx.font = '14px monospace';
       ctx.fillStyle = 'white';
-      ctx.fillText(`Final Score: ${this.score}`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2 + 30);
-      ctx.fillText('Press any key to restart', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2 + 60);
+      ctx.fillText(`Final Score: ${this.score}`, this.CANVAS_WIDTH / 2, 130);
+
+      // Leaderboard zeichnen
+      if (this.leaderboard && this.leaderboard.length > 0) {
+        ctx.fillStyle = '#FFD700';
+        ctx.font = '16px "Press Start 2P", monospace';
+        ctx.fillText('TOP SCORES', this.CANVAS_WIDTH / 2, 170);
+
+        ctx.textAlign = 'left';
+        ctx.font = '12px monospace';
+        let yPos = 200;
+        this.leaderboard.slice(0, 5).forEach((entry, index) => {
+          const rank = index + 1;
+          const name = (entry.username || 'Anonymous').substring(0, 10).padEnd(10, ' ');
+          const points = (entry.points || 0).toString().padStart(6, '0');
+
+          ctx.fillStyle = entry.username === this.playerName ? '#00FF00' : '#FFFFFF';
+          ctx.fillText(`${rank}. ${name}  ${points}`, this.CANVAS_WIDTH / 2 - 100, yPos);
+          yPos += 25;
+        });
+        ctx.textAlign = 'center';
+      } else {
+        ctx.fillStyle = '#AAAAAA';
+        ctx.font = '12px monospace';
+        ctx.fillText('No highscores yet...', this.CANVAS_WIDTH / 2, 200);
+        ctx.font = '10px monospace';
+        ctx.fillText('(Backend may not be running)', this.CANVAS_WIDTH / 2, 220);
+      }
+
+      ctx.fillStyle = '#FFFF00';
+      ctx.fillText('Press any key to restart', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT - 80);
     }
 
     // Level Complete Screen
@@ -429,7 +479,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
             targetX = this.pacman!.x + 4 * this.CELL_SIZE;
             targetY = this.pacman!.y;
           }
-          color = 'rgba(255, 184, 255, 0.5)';
+          color = 'rgba(255,184,255,0.5)';
           break;
         case 'patrol':
           if (this.patrolWaypoints.length > 0) {
@@ -479,9 +529,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   // Game Manager
   private game: GameManager | null = null;
 
-  // Spielmodus (von Query-Parameter)
-  gameMode: GameMode = 'classic';
-
   // Modi-spezifische Einstellungen
   showGhostTargets = false;  // Learn Mode: Zeige Sensor-Ziele
   isInvincible = false;      // Practice Mode: Unverwundbarkeit
@@ -501,7 +548,21 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private isRewinding = false;
   private readonly MAX_HISTORY = 300; // ~10 Sekunden bei 30 FPS
 
-  constructor(private audioService: AudioService, private route: ActivatedRoute, private http: HttpClient) {
+  // Leaderboard
+  leaderboard: any[] = [];
+
+  // Get high score from leaderboard
+  private getHighScore(): number {
+    if (this.leaderboard.length === 0) return 0;
+    return Math.max(...this.leaderboard.map(entry => entry.points));
+  }
+
+  constructor(
+    private audioService: AudioService,
+    private route: ActivatedRoute,
+    private http: HttpClient,
+    private inputService: InputService
+  ) {
     this.initAssets();
   }
 
@@ -534,7 +595,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.pacmanLeftImage.src = 'assets/pacmanLeft.png';
     this.pacmanRightImage.src = 'assets/pacmanRight.png';
     this.wallImage.src = 'assets/wall.png';
-    this.powerFoodImage.src = 'assets/powerPellet.png';
+    this.powerFoodImage.src = 'assets/powerFood.png';
     this.scaredGhostImage.src = 'assets/scaredGhost.png';
     this.cherryImage.src = 'assets/cherry.png';
   }
@@ -546,22 +607,22 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     "XXXXXXXXXXXXXXXXXXXXXXXXXXXX",  // 0
     "X            XX            X",  // 1
     "X XXXX XXXXX XX XXXXX XXXX X",  // 2
-    "XO XX  XXXXX XX XXXXX  XX OX",  // 3
+    "XO     XXXXX XX XXXXX  XX OX",  // 3
     "X XXXX XXXXX XX XXXXX XXXX X",  // 4
     "X                          X",  // 5
     "X XXXX XX XXXXXXXX XX XXXX X",  // 6
     "X XXXX XX XXXXXXXX XX XXXX X",  // 7
     "X      XX    XX    XX      X",  // 8
     "XXXXXX XXXXX XX XXXXX XXXXXX",  // 9
-    "     X XXXXX XX XXXXX X     ",  // 10
-    "     X XX          XX X     ",  // 11
-    "     X XX XXX--XXX XX X     ",  // 12
+    "X    X XXXXX XX XXXXX X    X",  // 10
+    "X    X XX          XX X    X",  // 11
+    "X    X XX XXX--XXX XX X    X",  // 12
     "XXXXXX XX XGrGGGGX XX XXXXXX",  // 13 - Ghost house with red ghost
     "T         XGbGpGoX         T",  // 14 - Tunnel + ghosts
     "XXXXXX XX XGGGGGGX XX XXXXXX",  // 15
-    "     X XX XXXXXXXX XX X     ",  // 16
-    "     X XX          XX X     ",  // 17
-    "     X XX XXXXXXXX XX X     ",  // 18
+    "X    X XX XXXXXXXX XX X    X",  // 16
+    "X    X XX          XX X    X",  // 17
+    "X    X XX XXXXXXXX XX X    X",  // 18
     "XXXXXX XX XXXXXXXX XX XXXXXX",  // 19
     "X            XX            X",  // 20
     "X XXXX XXXXX XX XXXXX XXXX X",  // 21
@@ -637,7 +698,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         this.gameMode = mode;
         this.applyGameMode();
       }
-      
+
       // Lese Spielername
       const playerName = params['playerName'] as string;
       if (playerName) {
@@ -713,6 +774,31 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private update() {
     const deltaTime = 1000 / this.FPS;
 
+    // Gamepad Input
+    const gpDir = this.inputService.getDirection();
+    if (gpDir && this.pacman && this.gameState === 'playing') {
+      this.bufferedDirection = gpDir; // Buffer the direction
+    }
+
+    // Try to apply buffered direction first for smoother cornering
+    if (this.bufferedDirection && this.pacman && this.gameState === 'playing') {
+      const canTurn = this.canChangeTo(this.bufferedDirection);
+      if (canTurn) {
+        this.pacman.updateDirection(this.bufferedDirection, this.CELL_SIZE, this.walls);
+        // Update image
+        if (this.bufferedDirection === 'U') this.pacman.image = this.pacmanUpImage;
+        else if (this.bufferedDirection === 'D') this.pacman.image = this.pacmanDownImage;
+        else if (this.bufferedDirection === 'L') this.pacman.image = this.pacmanLeftImage;
+        else if (this.bufferedDirection === 'R') this.pacman.image = this.pacmanRightImage;
+        this.bufferedDirection = null; // Clear buffer after successful turn
+      }
+    }
+
+    // Gamepad Restart
+    if (this.gameState === 'gameover' && this.inputService.isActionButtonPressed()) {
+       this.restartGame();
+    }
+
     // State Machine
     switch (this.gameState) {
       case 'ready':
@@ -729,6 +815,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           if (this.lives <= 0) {
             this.gameState = 'gameover';
             this.gameOver = true;
+            // Load leaderboard immediately
+            this.loadLeaderboard();
             // Submit final score to backend
             this.submitScore();
             this.stopGameLoop();
@@ -796,6 +884,24 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         });
       }
     }
+
+    // Ghost Release Timer - Force ghosts out of box faster
+    this.ghostReleaseTimer += deltaTime;
+    if (this.ghostReleaseTimer >= this.GHOST_RELEASE_INTERVAL && this.ghostsReleased < this.ghosts.size) {
+      this.ghostReleaseTimer = 0;
+      this.ghostsReleased++;
+      let count = 0;
+      for (const ghost of this.ghosts) {
+        count++;
+        if (count === this.ghostsReleased) {
+          // Force ghost out if still in house (center area around y=350-380)
+          if (ghost.y > 340 && ghost.y < 400 && ghost.x > 200 && ghost.x < 360) {
+            ghost.updateDirection('U', this.CELL_SIZE, this.walls);
+          }
+          break;
+        }
+      }
+    }
   }
 
   private reverseGhostDirections() {
@@ -806,6 +912,35 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         ghost.updateDirection(opposite, this.CELL_SIZE, this.walls);
       }
     });
+  }
+
+  // Check if Pac-Man can turn to a new direction (for buffered input)
+  private canChangeTo(newDirection: string): boolean {
+    if (!this.pacman) return false;
+
+    const testX = this.pacman.x;
+    const testY = this.pacman.y;
+    const speed = this.CELL_SIZE / 4;
+
+    let nextX = testX;
+    let nextY = testY;
+
+    if (newDirection === 'U') nextY -= speed;
+    else if (newDirection === 'D') nextY += speed;
+    else if (newDirection === 'L') nextX -= speed;
+    else if (newDirection === 'R') nextX += speed;
+
+    // Check if next position would collide with wall
+    for (const wall of this.walls) {
+      if (wall.type === 'ghost-door') continue;
+      if (nextX < wall.x + wall.width &&
+          nextX + this.pacman.width > wall.x &&
+          nextY < wall.y + wall.height &&
+          nextY + this.pacman.height > wall.y) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private loadNextLevel() {
@@ -908,9 +1043,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
     return bestDir;
-  }
-
-  // Scatter-Ecken für jeden Sensor-Typ
+  }  // Scatter-Ecken für jeden Sensor-Typ
   private getScatterTarget(ghostType: string): { x: number; y: number } {
     switch (ghostType) {
       case 'aggressive': return { x: this.CANVAS_WIDTH - this.CELL_SIZE, y: 0 }; // Oben rechts
@@ -929,70 +1062,88 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private updateGhostAI(ghost: Block) {
     if (!this.pacman) return;
 
+    // Check if ghost is inside the ghost house (Box)
+    // House area approx: X [10..17]*CELL_SIZE, Y [12..16]*CELL_SIZE
+    const gridX = Math.floor(ghost.x / this.CELL_SIZE);
+    const gridY = Math.floor(ghost.y / this.CELL_SIZE);
+
+    // Ghost House Interior is roughly rows 13-15, cols 11-16
+    // Include row 12 (Door) to prevent oscillation when exiting
+    const inGhostHouse = (gridY >= 12 && gridY <= 15 && gridX >= 11 && gridX <= 16);
+
     let targetX = this.pacman.x;
     let targetY = this.pacman.y;
 
-    // Frightened Mode: Zufällige Richtung bei Kreuzungen
-    if (ghost.scared || this.ghostMode === 'frightened') {
-      const directions = ['U', 'D', 'L', 'R'];
-      const randomDir = directions[Math.floor(Math.random() * 4)];
-      ghost.updateDirection(randomDir, this.CELL_SIZE, this.walls);
-      return;
-    }
-
-    // Scatter Mode: Jeder Sensor geht zu seiner Ecke
-    if (this.ghostMode === 'scatter') {
-      const scatterTarget = this.getScatterTarget(ghost.type);
-      targetX = scatterTarget.x;
-      targetY = scatterTarget.y;
+    if (inGhostHouse) {
+      // Force target to be outside the door (Row 11, Col 13.5) to exit the box
+      targetX = 13.5 * this.CELL_SIZE;
+      targetY = 11 * this.CELL_SIZE;
     } else {
-      // Chase Mode: Individuelle Jagdstrategien gemäß Skizze
-      switch (ghost.type) {
-        case 'aggressive': // ROT - Verfolgt direkt den AGV
-          targetX = this.pacman.x;
-          targetY = this.pacman.y;
-          break;
-
-        case 'ambush': // ROSA - Lauert voraus (4 Tiles vor Pac-Man)
-          if (this.pacman.direction === 'U') {
-            targetX = this.pacman.x;
-            targetY = this.pacman.y - 4 * this.CELL_SIZE;
-          } else if (this.pacman.direction === 'D') {
-            targetX = this.pacman.x;
-            targetY = this.pacman.y + 4 * this.CELL_SIZE;
-          } else if (this.pacman.direction === 'L') {
-            targetX = this.pacman.x - 4 * this.CELL_SIZE;
-            targetY = this.pacman.y;
-          } else {
-            targetX = this.pacman.x + 4 * this.CELL_SIZE;
-            targetY = this.pacman.y;
-          }
-          break;
-
-        case 'patrol': // CYAN - Feste Route entlang Korridoren
-          // Folgt Waypoints in einer festen Patrol-Route
-          if (this.patrolWaypoints.length > 0) {
-            const waypoint = this.patrolWaypoints[this.patrolIndex];
-            targetX = waypoint.x;
-            targetY = waypoint.y;
-
-            // Wenn Waypoint erreicht, zum nächsten wechseln
-            const distToWaypoint = this.getDistance(ghost.x, ghost.y, waypoint.x, waypoint.y);
-            if (distToWaypoint < this.CELL_SIZE) {
-              this.patrolIndex = (this.patrolIndex + 1) % this.patrolWaypoints.length;
-            }
-          }
-          break;
-
-        case 'random': // ORANGE - Zufällige Bewegung (schwer vorhersagbar)
-          // Wählt bei jeder Kreuzung eine zufällige Richtung
-          // Aber bevorzugt Richtungswechsel für mehr Unberechenbarkeit
-          const directions = ['U', 'D', 'L', 'R'];
-          const randomDir = directions[Math.floor(Math.random() * 4)];
-          ghost.updateDirection(randomDir, this.CELL_SIZE, this.walls);
-          return; // Sofort zurück, da bereits Richtung gesetzt
+      // Frightened Mode: Zufällige Richtung bei Kreuzungen
+      if (ghost.scared || this.ghostMode === 'frightened') {
+        const directions = ['U', 'D', 'L', 'R'];
+        const randomDir = directions[Math.floor(Math.random() * 4)];
+        ghost.updateDirection(randomDir, this.CELL_SIZE, this.walls);
+        return;
       }
+
+      // Scatter Mode: Jeder Sensor geht zu seiner Ecke
+      if (this.ghostMode === 'scatter') {
+        const scatterTarget = this.getScatterTarget(ghost.type);
+        targetX = scatterTarget.x;
+        targetY = scatterTarget.y;
+      } else {
+        // Chase Mode: Individuelle Jagdstrategien gemäß Skizze
+        switch (ghost.type) {
+          case 'aggressive': // ROT - Verfolgt direkt den AGV
+            targetX = this.pacman.x;
+            targetY = this.pacman.y;
+            break;
+
+          case 'ambush': // ROSA - Lauert voraus (4 Tiles vor Pac-Man)
+            if (this.pacman.direction === 'U') {
+              targetX = this.pacman.x;
+              targetY = this.pacman.y - 4 * this.CELL_SIZE;
+            } else if (this.pacman.direction === 'D') {
+              targetX = this.pacman.x;
+              targetY = this.pacman.y + 4 * this.CELL_SIZE;
+            } else if (this.pacman.direction === 'L') {
+              targetX = this.pacman.x - 4 * this.CELL_SIZE;
+              targetY = this.pacman.y;
+            } else {
+              targetX = this.pacman.x + 4 * this.CELL_SIZE;
+              targetY = this.pacman.y;
+            }
+            break;
+
+          case 'patrol': // CYAN - Feste Route entlang Korridoren
+            // Folgt Waypoints in einer festen Patrol-Route
+            if (this.patrolWaypoints.length > 0) {
+              const waypoint = this.patrolWaypoints[this.patrolIndex];
+              targetX = waypoint.x;
+              targetY = waypoint.y;
+
+              // Wenn Waypoint erreicht, zum nächsten wechseln
+              const distToWaypoint = this.getDistance(ghost.x, ghost.y, waypoint.x, waypoint.y);
+              if (distToWaypoint < this.CELL_SIZE) {
+                this.patrolIndex = (this.patrolIndex + 1) % this.patrolWaypoints.length;
+              }
+            }
+            break;
+
+          case 'random': // ORANGE - Zufällige Bewegung (schwer vorhersagbar)
+            // Wählt bei jeder Kreuzung eine zufällige Richtung
+            // Aber bevorzugt Richtungswechsel für mehr Unberechenbarkeit
+            const directions = ['U', 'D', 'L', 'R'];
+            const randomDir = directions[Math.floor(Math.random() * 4)];
+            ghost.updateDirection(randomDir, this.CELL_SIZE, this.walls);
+            return; // Sofort zurück, da bereits Richtung gesetzt
+        }
     }
+
+    const newDir = this.getDirectionToTarget(ghost, targetX, targetY);
+    ghost.updateDirection(newDir, this.CELL_SIZE, this.walls);
+  }
 
     const newDir = this.getDirectionToTarget(ghost, targetX, targetY);
     ghost.updateDirection(newDir, this.CELL_SIZE, this.walls);
@@ -1162,6 +1313,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       const newDirection = directions[Math.floor(Math.random() * 4)];
       ghost.updateDirection(newDirection, this.CELL_SIZE, this.walls);
     }
+    // Reset ghost release timer
+    this.ghostReleaseTimer = 0;
+    this.ghostsReleased = 0;
   }
 
   // Send final score to backend API
@@ -1179,7 +1333,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       };
 
       this.http.post('/api/scores', dto).subscribe({
-        next: (res) => console.log('✅ Score submitted', res),
+        next: (res) => {
+          console.log('✅ Score submitted', res);
+          this.loadLeaderboard();
+        },
         error: (err) => console.error('❌ Error submitting score', err)
       });
     } catch (e) {
@@ -1187,31 +1344,50 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  private loadLeaderboard() {
+    console.log('🏆 Loading leaderboard...');
+    this.http.get<any[]>('/api/scores/leaderboard?top=5').subscribe({
+      next: (data) => {
+        this.leaderboard = data;
+        console.log(`✅ Leaderboard loaded: ${data.length} entries`, data);
+      },
+      error: (err) => {
+        console.error('❌ Error loading leaderboard', err);
+        // Set empty leaderboard on error so UI shows something
+        this.leaderboard = [];
+      }
+    });
+  }
+
+  private restartGame() {
+    this.walls.clear();
+    this.foods.clear();
+    this.powerPellets.clear();
+    this.ghosts.clear();
+    this.cherry = null;
+    this.loadMap();
+    this.resetPositions();
+    this.lives = 3;
+    this.score = 0;
+    this.pelletStreak = 0;
+    this.streakMultiplier = 1.0;
+    this.currentLevel = 1;
+    this.scaredTimer = 0;
+    this.scaredDuration = 10000;
+    this.gameOver = false;
+    this.modePhase = 0;
+    this.modeTimer = 0;
+    this.ghostMode = 'scatter';
+    this.gameState = 'ready';
+    this.stateTimer = 0;
+    this.gameHistory = [];
+    this.startGameLoop();
+  }
+
   private onKeyDown(e: KeyboardEvent) {
     // Restart bei Game Over
     if (this.gameState === 'gameover') {
-      this.walls.clear();
-      this.foods.clear();
-      this.powerPellets.clear();
-      this.ghosts.clear();
-      this.cherry = null;
-      this.loadMap();
-      this.resetPositions();
-      this.lives = 3;
-      this.score = 0;
-      this.pelletStreak = 0;
-      this.streakMultiplier = 1.0;
-      this.currentLevel = 1;
-      this.scaredTimer = 0;
-      this.scaredDuration = 10000;
-      this.gameOver = false;
-      this.modePhase = 0;
-      this.modeTimer = 0;
-      this.ghostMode = 'scatter';
-      this.gameState = 'ready';
-      this.stateTimer = 0;
-      this.gameHistory = [];
-      this.startGameLoop();
+      this.restartGame();
       return;
     }
 
@@ -1259,25 +1435,35 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     // Turbo Mode: Geschwindigkeits-Multiplikator
     const speedMultiplier = this.turboSpeed ? 2 : 1;
 
+    // Buffer the direction for smoother cornering
     if (e.key === 'ArrowUp') {
-      this.pacman.updateDirection('U', this.CELL_SIZE, this.walls);
+      this.bufferedDirection = 'U';
     } else if (e.key === 'ArrowDown') {
-      this.pacman.updateDirection('D', this.CELL_SIZE, this.walls);
+      this.bufferedDirection = 'D';
     } else if (e.key === 'ArrowLeft') {
-      this.pacman.updateDirection('L', this.CELL_SIZE, this.walls);
+      this.bufferedDirection = 'L';
     } else if (e.key === 'ArrowRight') {
-      this.pacman.updateDirection('R', this.CELL_SIZE, this.walls);
+      this.bufferedDirection = 'R';
     }
 
-    // Update pacman image
-    if (this.pacman.direction === 'U') {
-      this.pacman.image = this.pacmanUpImage;
-    } else if (this.pacman.direction === 'D') {
-      this.pacman.image = this.pacmanDownImage;
-    } else if (this.pacman.direction === 'L') {
-      this.pacman.image = this.pacmanLeftImage;
-    } else if (this.pacman.direction === 'R') {
-      this.pacman.image = this.pacmanRightImage;
+    // Try to apply immediately if possible
+    if (this.bufferedDirection) {
+      const canTurn = this.canChangeTo(this.bufferedDirection);
+      if (canTurn) {
+        this.pacman.updateDirection(this.bufferedDirection, this.CELL_SIZE, this.walls);
+        // Update pacman image
+        if (this.bufferedDirection === 'U') {
+          this.pacman.image = this.pacmanUpImage;
+        } else if (this.bufferedDirection === 'D') {
+          this.pacman.image = this.pacmanDownImage;
+        } else if (this.bufferedDirection === 'L') {
+          this.pacman.image = this.pacmanLeftImage;
+        } else if (this.bufferedDirection === 'R') {
+          this.pacman.image = this.pacmanRightImage;
+        }
+        this.bufferedDirection = null; // Clear buffer on successful turn
+      }
+      // Otherwise keep buffered for next frame
     }
   }
 
