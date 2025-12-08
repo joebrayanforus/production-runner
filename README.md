@@ -1,5 +1,5 @@
 
-# 🏭 Production Runner - Industrial Pac-Man Game.
+# 🏭 Production Runner - Industrial Pac-Man Game
 
 **Ein ifm statmath Gamification-Projekt**
 
@@ -171,7 +171,7 @@ production-runner/
 
 ## 🏆 Highscore Leaderboard
 
-Die Top 10 Highscores werden in Echtzeit auf dem Arcade-Automaten angezeigt!
+**Die Top 10 Highscores werden in Echtzeit auf dem Arcade-Automaten angezeigt!**
 
 ```
 🏆 PRODUCTION RUNNER - LEADERBOARD
