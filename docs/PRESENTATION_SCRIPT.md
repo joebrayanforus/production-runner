@@ -515,7 +515,7 @@ if (gamepad) {
 #### **Q15: "Was kommt nach Phase 3?"**
 
 **Antwort:**
-> "Nach Abschlusspräsentation haben wir einige Ideen: 1) Mehrere Spielmodi (Endless, Time-Attack, Multiplayer), 2) Achievement-System, 3) Saisonale Themes (Weihnachten, Ostern), 4) Mobile Version (Touch-Controls), 5) Integration in echte ifm Produkte. Das Spiel ist so strukturiert, dass es erweiterbar ist."
+> "Nach Abschlusspräsentation haben wir einige Ideen: 1) Mehrere Spielmodi (Endless, Time-Attack, Multiplayer), 2) Achievement-System, 3) Saisonale Themes (Weihnachten, Ostern), 4) das Spielfür 02 spielbar zu machen, 5) Integration in echte ifm Produkte. Das Spiel ist so strukturiert, dass es erweiterbar ist."
 
 ---
 
