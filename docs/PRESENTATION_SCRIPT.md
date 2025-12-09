@@ -332,6 +332,7 @@
 > **"Für die finale Phase 3 planen wir folgende Ergänzungen:"**
 
 **Features:**
+- Das Spiel für 02 gleichzeitig spielbar zu machen
 - 🎵 Sound-Effekte (Pellet-Collection, Power-Up, Death)
 - 🎶 Hintergrundmusik (GEMA-freie 8-Bit Chiptune)
 - 🎨 Finale Pixel-Art Assets (AGV, Sensoren, Fabrik-Elemente)
