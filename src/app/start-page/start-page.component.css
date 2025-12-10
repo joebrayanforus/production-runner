@@ -399,6 +399,157 @@ section h2 {
   50% { transform: scale(1.05); }
 }
 
+/* === VIRTUAL KEYBOARD === */
+.arcade-screen.keyboard-active {
+  padding: 20px !important;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.input-cursor.active {
+  animation: cursorBlink 0.5s step-end infinite;
+}
+
+.virtual-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 15px;
+  border: 2px solid #FF00FF;
+  border-radius: 8px;
+  box-shadow: inset 0 0 20px rgba(255, 0, 255, 0.2);
+}
+
+.keyboard-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: #FF00FF;
+  text-align: center;
+  text-shadow: 0 0 10px #FF00FF;
+  animation: keyboardPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes keyboardPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.keyboard-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.keyboard-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(35px, 1fr));
+  gap: 6px;
+}
+
+.keyboard-key {
+  padding: 8px 6px;
+  background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
+  border: 2px solid #00FF88;
+  border-radius: 4px;
+  color: #00FF88;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 5px rgba(0, 255, 136, 0.5);
+  text-shadow: 0 0 5px #00FF88;
+  user-select: none;
+}
+
+.keyboard-key:hover {
+  background: linear-gradient(145deg, #0a0a0a, #1a1a1a);
+  border-color: #FFD700;
+  color: #FFD700;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+  text-shadow: 0 0 8px #FFD700;
+  transform: scale(1.05);
+}
+
+.keyboard-key.selected {
+  background: linear-gradient(145deg, #FFD700, #FF8C00);
+  border-color: #FFFFFF;
+  color: #000000;
+  box-shadow:
+    0 0 15px rgba(255, 215, 0, 1),
+    0 0 25px rgba(255, 140, 0, 0.8),
+    inset 0 0 20px rgba(255, 255, 255, 0.3);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  transform: scale(1.15);
+  font-weight: bold;
+  animation: keyboardKeySelected 0.3s ease;
+}
+
+@keyframes keyboardKeySelected {
+  0% { transform: scale(1.05); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1.15); }
+}
+
+.keyboard-controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.control-button {
+  padding: 10px 15px;
+  background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
+  border: 2px solid #00FF88;
+  border-radius: 4px;
+  color: #00FF88;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+  text-shadow: 0 0 5px #00FF88;
+  user-select: none;
+}
+
+.control-button:hover {
+  background: linear-gradient(145deg, #0a0a0a, #1a1a1a);
+  border-color: #FFD700;
+  color: #FFD700;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+  text-shadow: 0 0 8px #FFD700;
+  transform: scale(1.05);
+}
+
+.delete-btn {
+  border-color: #FF0000;
+  color: #FF0000;
+  box-shadow: 0 0 10px rgba(255, 0, 0, 0.6);
+  text-shadow: 0 0 5px #FF0000;
+}
+
+.delete-btn:hover {
+  border-color: #FF6666;
+  color: #FF6666;
+  box-shadow: 0 0 15px rgba(255, 102, 102, 0.8);
+  text-shadow: 0 0 8px #FF6666;
+}
+
+.keyboard-hint {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  color: #FFD700;
+  text-align: center;
+  text-shadow: 0 0 5px #FFD700;
+  margin: 5px 0 0 0;
+  opacity: 0.8;
+}
+
 .mode-icon {
   font-size: 40px;
   margin-bottom: 12px;

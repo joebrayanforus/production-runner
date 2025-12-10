@@ -65,7 +65,7 @@
 
   <!-- Player Name Input -->
   <div class="player-name-container">
-    <div class="arcade-screen">
+    <div class="arcade-screen" [class.keyboard-active]="keyboardVisible">
       <label class="player-label">
         <span class="label-icon">👾</span>
         <span class="label-text">ENTER PLAYER NAME</span>
@@ -75,19 +75,58 @@
         <input
           [(ngModel)]="playerName"
           type="text"
-          placeholder="TYPE YOUR NAME..."
+          placeholder="DRUCK A UM ZU SCHREIBEN..."
           maxlength="20"
           class="arcade-input"
           [class.invalid]="!isPlayerNameValid() && playerName.length > 0"
+          (click)="focusNameInput()"
+          [disabled]="keyboardVisible"
         >
-        <div class="input-cursor"></div>
+        <div class="input-cursor" [class.active]="keyboardVisible"></div>
       </div>
       <p class="error-message" *ngIf="!isPlayerNameValid() && playerName.length > 0">
-        ⚠ NAME REQUIRED
+        ⚠ NAME ERFORDERLICH
       </p>
       <p class="name-preview" *ngIf="isPlayerNameValid()">
         PLAYER: <span class="preview-name">{{ playerName.toUpperCase() }}</span>
       </p>
+
+      <!-- Virtual Keyboard -->
+      <div class="virtual-keyboard" *ngIf="keyboardVisible">
+        <div class="keyboard-title">
+          🎮 VERWENDE STEUERKREUZ ODER PFEILTASTEN 🎮
+        </div>
+
+        <div class="keyboard-grid">
+          <div
+            *ngFor="let row of keyboardRows; let rowIndex = index"
+            class="keyboard-row"
+          >
+            <button
+              *ngFor="let key of row; let keyIndex = index"
+              class="keyboard-key"
+              [class.selected]="rowIndex === selectedRowIndex && keyIndex === selectedKeyIndex"
+              (click)="addCharacter(key)"
+              type="button"
+            >
+              <span class="key-text">{{ key }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="keyboard-controls">
+          <button class="control-button delete-btn" (click)="deleteCharacter()" type="button">
+            🔙 LÖSCHEN
+          </button>
+          <button class="control-button" (click)="closeKeyboard()" type="button">
+            ✓ FERTIG
+          </button>
+        </div>
+
+        <p class="keyboard-hint">
+          ↑↓←→ NAVIGIEREN | ENTER / A WÄHLEN | ESC / B ZURÜCK
+        </p>
+      </div>
     </div>
   </div>
 
