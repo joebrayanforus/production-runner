@@ -63,41 +63,10 @@
     </div>
   </section>
 
-  <!-- Player Name Input -->
-  <div class="player-name-container">
-    <div class="arcade-screen">
-      <label class="player-label">
-        <span class="label-icon">👾</span>
-        <span class="label-text">ENTER PLAYER NAME</span>
-        <span class="label-icon">👾</span>
-      </label>
-      <div class="input-wrapper">
-        <input
-          [(ngModel)]="playerName"
-          type="text"
-          placeholder="TYPE YOUR NAME..."
-          maxlength="20"
-          class="arcade-input"
-          [class.invalid]="!isPlayerNameValid() && playerName.length > 0"
-        >
-        <div class="input-cursor"></div>
-      </div>
-      <p class="error-message" *ngIf="!isPlayerNameValid() && playerName.length > 0">
-        ⚠ NAME REQUIRED
-      </p>
-      <p class="name-preview" *ngIf="isPlayerNameValid()">
-        PLAYER: <span class="preview-name">{{ playerName.toUpperCase() }}</span>
-      </p>
-    </div>
-  </div>
-
   <!-- Start Button -->
   <button
     class="start-button"
-    style="max-width:500px;width:100%;margin:0 auto;display:flex;justify-content:center;align-items:center"
-    [routerLink]="['/game']"
-    [queryParams]="{mode: selectedMode, playerName: playerName.trim()}"
-    [disabled]="!isPlayerNameValid()"
+    (click)="startGame()"
   >
     <span class="play-icon">▶</span>
     SPIEL STARTEN

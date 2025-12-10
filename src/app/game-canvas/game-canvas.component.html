@@ -14,6 +14,19 @@
       </div>
       <canvas #gameCanvas></canvas>
       <div class="scanline-overlay"></div>
+
+      <!-- Game Over Overlay -->
+      <div class="overlay" *ngIf="gameState === 'gameover'">
+        <div class="overlay-panel">
+          <h2>GAME OVER</h2>
+          <p>Score: {{ score }}</p>
+          <div class="overlay-actions">
+            <button class="btn primary" (click)="restartGame()">Restart</button>
+            <button class="btn ghost" (click)="exitGame()">Quitter le jeu</button>
+          </div>
+          <p class="overlay-hint">(A) pour rejouer • (Start/Menu) pour quitter</p>
+        </div>
+      </div>
     </div>
   </div>
 </div>

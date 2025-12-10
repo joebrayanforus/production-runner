@@ -1,0 +1,86 @@
+<div class="player-name-container">
+  <!-- Header -->
+  <header class="header">
+    <div class="title-section">
+      <span class="logo-icon">🏭</span>
+      <h1>PRODUCTION RUNNER</h1>
+      <span class="logo-icon">🏭</span>
+    </div>
+    <p class="subtitle">{{ gameMode === 'classic' ? 'CLASSIC MODE' : 'TRAININGS MODUS' }}</p>
+  </header>
+
+  <!-- Main Screen -->
+  <div class="arcade-screen">
+    <label class="player-label">
+      <span class="label-icon">👾</span>
+      <span class="label-text">ENTER PLAYER NAME</span>
+      <span class="label-icon">👾</span>
+    </label>
+
+    <!-- Player Name Display -->
+    <div class="input-wrapper">
+      <div class="arcade-input">
+        {{ playerName.toUpperCase() || 'TIPPE DEINEN NAMEN...' }}
+      </div>
+      <div class="input-cursor active"></div>
+    </div>
+
+    <!-- Current Input Display -->
+    <p class="name-preview" *ngIf="isPlayerNameValid()">
+      SPIELER: <span class="preview-name">{{ playerName.toUpperCase() }}</span>
+    </p>
+    <p class="hint-text" *ngIf="!isPlayerNameValid()">
+      TIPPE EINEN NAMEN ZUM STARTEN (MAX 20 ZEICHEN)
+    </p>
+
+    <!-- Virtual Keyboard -->
+    <div class="virtual-keyboard">
+      <div class="keyboard-title">
+        🎮 STEUERKREUZ ODER PFEILTASTEN ZUR NAVIGATION 🎮
+      </div>
+
+      <div class="keyboard-grid">
+        <div
+          *ngFor="let row of keyboardRows; let rowIndex = index"
+          class="keyboard-row"
+        >
+          <button
+            *ngFor="let key of row; let keyIndex = index"
+            class="keyboard-key"
+            [class.selected]="rowIndex === selectedRowIndex && keyIndex === selectedKeyIndex"
+            (click)="addCharacter(key)"
+            type="button"
+          >
+            <span class="key-text">{{ key }}</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="keyboard-controls">
+        <button class="control-button delete-btn" (click)="deleteCharacter()" type="button">
+          🔙 LÖSCHEN
+        </button>
+        <button
+          class="control-button play-btn"
+          (click)="startGame()"
+          [disabled]="!isPlayerNameValid()"
+          type="button"
+        >
+          ▶ SPIEL STARTEN
+        </button>
+        <button class="control-button back-btn" (click)="goBack()" type="button">
+          ◄ ZURÜCK
+        </button>
+      </div>
+
+      <p class="keyboard-hint">
+        ↑↓←→ NAV. | ENTER/A WÄHLEN | ESC/B ZURÜCK | START/SHIFT SPIEL STARTEN
+      </p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>Dein Name wird auf der Leaderboard angezeigt</p>
+  </footer>
+</div>
