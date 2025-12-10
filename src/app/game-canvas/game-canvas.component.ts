@@ -1,5 +1,6 @@
 import { Component, ElementRef, OnInit, OnDestroy, ViewChild, AfterViewInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { HttpClientModule } from '@angular/common/http';
 import { GameManager } from '../models/game-manager';
@@ -12,7 +13,7 @@ export type GameMode = 'classic' | 'practice';
 @Component({
   selector: 'app-game-canvas',
   standalone: true,
-  imports: [HttpClientModule],
+  imports: [HttpClientModule, CommonModule],
   templateUrl: './game-canvas.component.html',
   styleUrls: ['./game-canvas.component.css']
 })
@@ -70,7 +71,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Ghost House Release Timer
   private ghostReleaseTimer = 0;
-  private readonly GHOST_RELEASE_INTERVAL = 2000; // Release a ghost every 2 seconds
+  private readonly GHOST_RELEASE_INTERVAL = 800; // Release a ghost roughly every 0.8s
   private ghostsReleased = 0;
 
   // Scatter/Chase Mode (authentisches Pac-Man Verhalten)
@@ -95,7 +96,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private powerPelletBlinkTimer = 0;
 
   // Ready/Game Over Screen
-  private gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' = 'ready';
+  gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' = 'ready';
   private stateTimer = 0;
   private readonly READY_DURATION = 2000; // 2 Sekunden "READY!"
   private readonly DEATH_DURATION = 1500; // 1.5 Sekunden Todesanimation
@@ -561,7 +562,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     private audioService: AudioService,
     private route: ActivatedRoute,
     private http: HttpClient,
-    private inputService: InputService
+    private inputService: InputService,
+    private router: Router
   ) {
     this.initAssets();
   }
@@ -606,14 +608,14 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly tileMap: string[] = [
     "XXXXXXXXXXXXXXXXXXXXXXXXXXXX",  // 0
     "X            XX            X",  // 1
-    "X XXXX XXXXX XX XXXXX XXXX X",  // 2
-    "XO     XXXXX XX XXXXX  XX OX",  // 3
-    "X XXXX XXXXX XX XXXXX XXXX X",  // 4
+    "X XXXX XXX   XX   XXX XXXX X",  // 2 (more loops, wider mid-corridors)
+    "XO  X  XXX   XX   XXX  XX OX",  // 3 (power corner, added side bypass)
+    "X XXXX XXX   XX   XXX XXXX X",  // 4
     "X                          X",  // 5
-    "X XXXX XX XXXXXXXX XX XXXX X",  // 6
-    "X XXXX XX XXXXXXXX XX XXXX X",  // 7
+    "X XXXX XX XX  XXXX XX XXXX X",  // 6 (added mid shortcuts)
+    "X XXXX XX XX  XXXX XX XXXX X",  // 7
     "X      XX    XX    XX      X",  // 8
-    "XXXXXX XXXXX XX XXXXX XXXXXX",  // 9
+    "XXXXXX XXX   XX   XXX XXXXXX",  // 9 (opened central ring)
     "X    X XXXXX XX XXXXX X    X",  // 10
     "X    X XX          XX X    X",  // 11
     "X    X XX XXX--XXX XX X    X",  // 12
@@ -625,8 +627,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     "X    X XX XXXXXXXX XX X    X",  // 18
     "XXXXXX XX XXXXXXXX XX XXXXXX",  // 19
     "X            XX            X",  // 20
-    "X XXXX XXXXX XX XXXXX XXXX X",  // 21
-    "X XXXX XXXXX XX XXXXX XXXX X",  // 22
+    "X XXXX XXX   XX   XXX XXXX X",  // 21 (more branching)
+    "X XXXX XXX   XX   XXX XXXX X",  // 22
     "XO  XX       P        XX  OX",  // 23 - Pac-Man start
     "XXX XX XX XXXXXXXX XX XX XXX",  // 24
     "XXX XX XX XXXXXXXX XX XX XXX",  // 25
@@ -685,6 +687,19 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       }
     }
+    // Aggressiver (roter) Sensor soll nie in der Ghost-Box starten
+    const aggressiveGhost = [...this.ghosts].find(g => g.type === 'aggressive');
+    if (aggressiveGhost) {
+      const spawnX = 13.5 * this.CELL_SIZE; // direkt vor der Ghost-Tür (außerhalb)
+      const spawnY = 11 * this.CELL_SIZE;
+      aggressiveGhost.x = spawnX;
+      aggressiveGhost.y = spawnY;
+      aggressiveGhost.startX = spawnX;
+      aggressiveGhost.startY = spawnY;
+      aggressiveGhost.direction = 'L';
+      aggressiveGhost.updateVelocity(this.CELL_SIZE);
+    }
+
     // Speichere Gesamtanzahl der Pellets für Cherry-Spawn
     this.totalPellets = this.foods.size + this.powerPellets.size;
   }
@@ -794,9 +809,14 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
-    // Gamepad Restart
-    if (this.gameState === 'gameover' && this.inputService.isActionButtonPressed()) {
-       this.restartGame();
+    // Gamepad Restart / Exit in Game Over
+    if (this.gameState === 'gameover') {
+      if (this.inputService.isActionButtonPressed()) {
+        this.restartGame();
+      }
+      if (this.inputService.isPauseButtonPressed()) {
+        this.exitGame();
+      }
     }
 
     // State Machine
@@ -885,21 +905,28 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
-    // Ghost Release Timer - Force ghosts out of box faster
+    // Ghost Release Timer - force each ghost out of the house quickly
     this.ghostReleaseTimer += deltaTime;
-    if (this.ghostReleaseTimer >= this.GHOST_RELEASE_INTERVAL && this.ghostsReleased < this.ghosts.size) {
-      this.ghostReleaseTimer = 0;
+    while (this.ghostReleaseTimer >= this.GHOST_RELEASE_INTERVAL && this.ghostsReleased < this.ghosts.size) {
+      this.ghostReleaseTimer -= this.GHOST_RELEASE_INTERVAL;
       this.ghostsReleased++;
-      let count = 0;
+      let index = 0;
       for (const ghost of this.ghosts) {
-        count++;
-        if (count === this.ghostsReleased) {
-          // Force ghost out if still in house (center area around y=350-380)
-          if (ghost.y > 340 && ghost.y < 400 && ghost.x > 200 && ghost.x < 360) {
+        if (index === this.ghostsReleased - 1) {
+          // If the ghost is still inside the house, teleport it to the door and push upward
+          const inHouse = ghost.y > 340 && ghost.y < 400 && ghost.x > 200 && ghost.x < 360;
+          if (inHouse) {
+            ghost.x = 13.5 * this.CELL_SIZE;
+            ghost.y = 12 * this.CELL_SIZE;
+            ghost.startX = ghost.x;
+            ghost.startY = ghost.y;
+            ghost.updateDirection('U', this.CELL_SIZE, this.walls);
+          } else {
             ghost.updateDirection('U', this.CELL_SIZE, this.walls);
           }
           break;
         }
+        index++;
       }
     }
   }
@@ -1069,7 +1096,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Ghost House Interior is roughly rows 13-15, cols 11-16
     // Include row 12 (Door) to prevent oscillation when exiting
-    const inGhostHouse = (gridY >= 12 && gridY <= 15 && gridX >= 11 && gridX <= 16);
+    // Aggressive (rot) soll nie in der Box bleiben → ignoriere Ghost-House-Regel
+    const isAggressive = ghost.type === 'aggressive';
+    const inGhostHouse = !isAggressive && (gridY >= 12 && gridY <= 15 && gridX >= 11 && gridX <= 16);
 
     let targetX = this.pacman.x;
     let targetY = this.pacman.y;
@@ -1264,8 +1293,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.score += 500; // 500 Punkte (statt 50)
 
       // Bonus-Effekt: Kurze Unverwundbarkeit (3 Sekunden)
-      // Oder Extraleben bei bestimmten Bedingungen
-      if (this.lives < 5) {
+      // Extraleben nur bis max. 3 (Anforderung)
+      if (this.lives < 3) {
         this.lives += 1; // Extra Leben!
       }
 
@@ -1299,6 +1328,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.gameState = 'levelcomplete';
       this.stateTimer = 0;
     }
+  }
+
+  // Quit to start page
+  exitGame(): void {
+    this.stopGameLoop();
+    this.router.navigate(['/']);
   }
 
   private resetPositions() {
@@ -1359,7 +1394,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private restartGame() {
+  restartGame() {
     this.walls.clear();
     this.foods.clear();
     this.powerPellets.clear();
