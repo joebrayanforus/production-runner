@@ -23,10 +23,12 @@ public class ScoresController : ControllerBase
 
     private async Task<List<LeaderboardEntryDto>> BuildLeaderboardAsync(int top = 10)
     {
+        var boundedTop = Math.Clamp(top, 1, 100);
+
         var scores = await _context.Scores
             .Include(s => s.Player)
             .OrderByDescending(s => s.Points)
-            .Take(top)
+            .Take(boundedTop)
             .ToListAsync();
 
         var result = new List<LeaderboardEntryDto>(scores.Count);
@@ -42,7 +44,7 @@ public class ScoresController : ControllerBase
                 Points = s.Points,
                 Level = s.Level,
                 SensorsRepaired = s.SensorsRepaired,
-                AchievedAt = s.AchievedAt
+                AchievedAt = s.AchievedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
             });
         }
 
@@ -61,14 +63,20 @@ public class ScoresController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Score>> CreateScore([FromBody] CreateScoreDto dto)
     {
+        var username = dto.Username?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            return BadRequest("Username is required.");
+        }
+
         var player = await _context.Players
-            .FirstOrDefaultAsync(p => p.Username == dto.Username);
+            .FirstOrDefaultAsync(p => p.Username == username);
 
         if (player == null)
         {
             player = new Player
             {
-                Username = dto.Username,
+                Username = username,
                 CreatedAt = DateTime.UtcNow
             };
 

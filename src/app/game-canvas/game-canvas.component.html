@@ -1,7 +1,7 @@
 
 <div class="game-container">
   <div class="arcade-cabinet">
-    <div class="arcade-screen-frame">
+      <div class="arcade-screen-frame">
       <div class="game-info-bar">
         <div class="player-badge">
           <span class="player-icon">🎮</span>
@@ -17,15 +17,58 @@
 
       <!-- Game Over Overlay -->
       <div class="overlay" *ngIf="gameState === 'gameover'">
-        <div class="overlay-panel">
+        <div class="overlay-panel wide">
           <h2>GAME OVER</h2>
           <p>Score: {{ score }}</p>
-          <div class="overlay-actions">
-            <button class="btn primary" (click)="restartGame()">Restart</button>
-            <button class="btn ghost" (click)="exitGame()">Quitter le jeu</button>
+
+          <div class="leaderboard-block">
+            <h3>Bestenliste</h3>
+            <table class="overlay-table" *ngIf="leaderboard.length > 0">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Spieler</th>
+                  <th>Punkte</th>
+                  <th>Level</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let entry of leaderboard; let i = index">
+                  <td>{{ entry.rank ?? i + 1 }}</td>
+                  <td>{{ entry.username }}</td>
+                  <td>{{ entry.points }}</td>
+                  <td>{{ entry.level }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="overlay-hint" *ngIf="leaderboard.length === 0">Keine Scores verfügbar.</p>
           </div>
-          <p class="overlay-hint">(A) pour rejouer • (Start/Menu) pour quitter</p>
+
+          <div class="overlay-actions below">
+            <button class="btn primary" (click)="restartGame()">Neues Spiel</button>
+            <button class="btn ghost" (click)="exitGame()">Spiel beenden</button>
+          </div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pause Overlay -->
+<div class="overlay" *ngIf="showPauseOverlay">
+  <div class="overlay-panel">
+    <h2>Pause</h2>
+    <p>Spiel angehalten</p>
+    <div class="overlay-actions">
+      <button class="btn primary" (click)="resumeFromPause()">Weiter</button>
+      <button class="btn ghost" (click)="restartGame()">Neustart</button>
+      <button class="btn ghost" (click)="requestExitToMenu()">Zur Startseite</button>
+    </div>
+    <div *ngIf="showExitConfirm" class="exit-confirm">
+      <p>Wirklich zur Startseite?</p>
+      <div class="overlay-actions">
+        <button class="btn ghost" (click)="cancelExitToMenu()">Nein</button>
+        <button class="btn primary" (click)="confirmExitToMenu()">Ja</button>
       </div>
     </div>
   </div>

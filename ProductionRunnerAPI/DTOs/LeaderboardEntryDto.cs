@@ -7,6 +7,5 @@ public class LeaderboardEntryDto
     public int Points { get; set; }
     public int Level { get; set; }
     public int SensorsRepaired { get; set; }
-     public DateTime AchievedAt { get; set; }
-    
+    public string AchievedAt { get; set; } = string.Empty;
 }

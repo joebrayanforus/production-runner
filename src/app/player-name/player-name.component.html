@@ -57,18 +57,23 @@
       </div>
 
       <div class="keyboard-controls">
-        <button class="control-button delete-btn" (click)="deleteCharacter()" type="button">
+        <button class="control-button delete-btn"
+                [class.selected]="focusArea === 'buttons' && buttonIndex === 0"
+                (click)="deleteCharacter()" type="button">
           🔙 LÖSCHEN
         </button>
         <button
           class="control-button play-btn"
+          [class.selected]="focusArea === 'buttons' && buttonIndex === 1"
           (click)="startGame()"
           [disabled]="!isPlayerNameValid()"
           type="button"
         >
           ▶ SPIEL STARTEN
         </button>
-        <button class="control-button back-btn" (click)="goBack()" type="button">
+        <button class="control-button back-btn"
+                [class.selected]="focusArea === 'buttons' && buttonIndex === 2"
+                (click)="goBack()" type="button">
           ◄ ZURÜCK
         </button>
       </div>

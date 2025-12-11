@@ -1,5 +1,5 @@
 
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import {
@@ -19,7 +19,9 @@ export type GameMode = 'classic' | 'practice';
 export class StartPageComponent implements OnInit, OnDestroy {
   selectedMode: GameMode = 'classic';
   leaderboard: LeaderboardEntry[] = [];
+  topScores: LeaderboardEntry[] = [];
   private gamepadPollInterval: any;
+  private lastKeyboardSelect = 0;
 
   constructor(
     private leaderboardService: LeaderboardService,
@@ -32,6 +34,8 @@ export class StartPageComponent implements OnInit, OnDestroy {
     this.leaderboardService.leaderboard$
       .subscribe(entries => {
         this.leaderboard = entries;
+        // Get only top 3 scores
+        this.topScores = entries.slice(0, 3);
       });
 
     // Start gamepad polling for mode selection
@@ -42,6 +46,24 @@ export class StartPageComponent implements OnInit, OnDestroy {
     this.leaderboardService.stop();
     if (this.gamepadPollInterval) {
       clearInterval(this.gamepadPollInterval);
+    }
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onKeydown(event: KeyboardEvent) {
+    if (['ArrowLeft', 'ArrowUp'].includes(event.key)) {
+      this.selectedMode = 'classic';
+      event.preventDefault();
+    } else if (['ArrowRight', 'ArrowDown'].includes(event.key)) {
+      this.selectedMode = 'practice';
+      event.preventDefault();
+    } else if (event.key === 'Enter') {
+      const now = Date.now();
+      if (now - this.lastKeyboardSelect > 250) {
+        this.startGame();
+        this.lastKeyboardSelect = now;
+      }
+      event.preventDefault();
     }
   }
 

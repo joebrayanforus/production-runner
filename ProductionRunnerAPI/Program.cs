@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using ProductionRunnerAPI.Data;
 using ProductionRunnerAPI.Hubs;
 
@@ -6,37 +7,76 @@ using ProductionRunnerAPI.Hubs;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(); 
+builder.Services.AddSwaggerGen();
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Data Source=productionrunner.db";
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite("Data Source=productionrunner.db")); 
-
-    builder.Services.AddSignalR();
-
-    builder.Services.AddCors(options =>
+{
+    if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase))
     {
-    options.AddPolicy("AllowAll", policy =>
-       { 
-                 policy.AllowAnyOrigin()
+        options.UseNpgsql(connectionString);
+    }
+    else
+    {
+        options.UseSqlite(connectionString);
+    }
+});
+
+builder.Services.AddSignalR();
+
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicy", policy =>
+    {
+        if (allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins)
                   .AllowAnyMethod()
                   .AllowAnyHeader();
-        });
+        }
+        else
+        {
+            // Fallback for unspecified configuration
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        }
     });
-    var app = builder.Build();
-    
-// Configure the HTTP request pipeline.
+});
 
+var app = builder.Build();
+
+// Ensure database is up-to-date (creates and seeds if needed)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    // For Postgres the existing migrations were created for SQLite; ensure schema exists without blocking on provider differences.
+    if (db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true)
+    {
+        db.Database.EnsureCreated();
+    }
+    else
+    {
+        db.Database.Migrate();
+    }
+}
+
+// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-}  
+}
 
-app.UseCors("AllowAll");
+app.UseHttpsRedirection();
+
+app.UseCors("CorsPolicy");
 app.UseAuthorization();
 app.MapControllers();
 

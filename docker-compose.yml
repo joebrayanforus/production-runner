@@ -1,4 +1,5 @@
-eservices:
+services:
+  
   db:
     image: postgres:15-alpine
     environment:
@@ -28,7 +29,7 @@ eservices:
   frontend:
     build:
       context: .
-      dockerfile: src/Dockerfile
+      dockerfile: ./src/Dockerfile
     ports:
       - "80:80"
     depends_on:

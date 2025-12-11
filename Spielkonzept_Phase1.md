@@ -1,37 +1,3 @@
-<<<<<<< HEAD
-# Spielkonzept: Production Runner (Industrial Pac-Man)
-**Projektphase 1** | ifm statmath GmbH | November 2025
-
-## 1. Spielidee
-
-**Production Runner** ist eine industrielle Pac-Man-Adaption für Ladezeiten in ifm statmath Produkten. Ein **AGV** sammelt **Produktionsaufträge** in einer Fabrikhalle, während er **fehlerhafte Sensoren** (Geister) vermeidet.
-
-**Kernmechanik:**
-- Sammle alle Aufträge ohne von Sensoren erfasst zu werden
-- Power-Up "KI-Optimierung" ermöglicht Sensor-Reparatur (200 Punkte)
-- Scoring: Aufträge (10P), Streak-Bonus (bis x3), Level-Bonus (1000P)
-
-**Thematischer Bezug zu ifm statmath:**
-- **s.FOX:** Labyrinth = Produktionsplan, Punkte = optimierte Aufträge
-- **IAIA Smart Limit Watcher:** Sensoren = Anomalien/Alarme
-
-## 2. Technische Umsetzung
-
-**Frontend:** Angular 17+, Canvas API, Gamepad API (USB-Controller)  
-**Backend:** ASP.NET Core 8.0 (C#), SignalR (Echtzeit-Leaderboard)  
-**Datenbank:** PostgreSQL 16 (Highscores, Sessions)  
-**Deployment:** Docker-Compose (debian/x86_64)  
-**Lizenz:** MIT (Angular, ASP.NET Core), GEMA-freie Sounds (CC0/CC-BY)
-
-## 3. Gegner-KI (4 Typen)
-
-| Typ | Farbe | Verhalten |
-|-----|-------|-----------|
-| Aggressive | Rot | Verfolgt AGV direkt |
-| Ambush | Rosa | Lauert voraus |
-| Patrol | Cyan | Feste Routen |
-| Random | Orange | Unberechenbar |
-=======
 # Spielkonzept: Industrial Pac-Man – "Production Runner"
 **Team:** 4 
 **Projektphase 1** | ifm statmath GmbH | November 2025
@@ -81,7 +47,6 @@
 ---
 
 ## 3. Gameplay-Features
->>>>>>> 6cde4d57041a96158bd1e8b99d1c3d76cd930549
 
 ### Projektphase 2 (Prototyp – 12.12.2025):
 - ✅ Grundlegendes Labyrinth-Layout (Fabrikhalle)
@@ -100,21 +65,6 @@
 - ✅ Industrielles Pixel-Art Design (Fabrik, AGV, Sensoren)
 - ✅ Animations-Übergänge (Start, Game Over, Level Complete)
 
-<<<<<<< HEAD
-## 4. Projektphasen
-
-**Phase 2 (Prototyp - 12.12.2025):** Basis-Spielfeld, AGV-Steuerung, einfache Gegner-KI, Kollisionserkennung  
-**Phase 3 (Final):** Grafiken, Sounds, Highscore-System, SignalR-Leaderboard, Docker-Setup
-
-## 5. Skizzen
-
-**Skizze 1:** Spielfeld-Layout (Fabrikhalle als Labyrinth mit 4 Power-Ups in den Ecken)  
-**Skizze 2:** Gegner-Verhalten und Spielzustände (siehe separate Datei `Skizzen_Phase1.md`)
-
----
-
-**GitHub Repository:** https://github.com/joebrayanforus/production-runner
-=======
 ### Besondere Mechanik:
 **"Production Streak Bonus":** Sammelt der Spieler mehrere Aufträge hintereinander ohne Pause, erhält er einen Streak-Multiplikator (analog zur Optimierung in s.FOX)
 
@@ -172,6 +122,22 @@ Ein erfolgreiches Spiel liegt vor, wenn:
 
 ---
 
+## 8. Gegner-KI (4 Typen)
 
+| Typ | Farbe | Verhalten |
+|-----|-------|-----------|
+| Aggressive | Rot | Verfolgt AGV direkt |
+| Ambush | Rosa | Lauert voraus |
+| Patrol | Cyan | Feste Routen |
+| Random | Orange | Unberechenbar |
 
->>>>>>> 6cde4d57041a96158bd1e8b99d1c3d76cd930549
+---
+
+## 9. Skizzen
+
+**Skizze 1:** Spielfeld-Layout (Fabrikhalle als Labyrinth mit 4 Power-Ups in den Ecken)  
+**Skizze 2:** Gegner-Verhalten und Spielzustände (siehe separate Datei `Skizzen_Phase1.md`)
+
+---
+
+**GitHub Repository:** https://github.com/joebrayanforus/production-runner

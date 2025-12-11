@@ -1,5 +1,5 @@
-import { Component, ElementRef, OnInit, OnDestroy, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, ElementRef, OnInit, OnDestroy, ViewChild, AfterViewInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { HttpClientModule } from '@angular/common/http';
@@ -96,7 +96,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private powerPelletBlinkTimer = 0;
 
   // Ready/Game Over Screen
-  gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' = 'ready';
+  gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' | 'paused' = 'ready';
   private stateTimer = 0;
   private readonly READY_DURATION = 2000; // 2 Sekunden "READY!"
   private readonly DEATH_DURATION = 1500; // 1.5 Sekunden Todesanimation
@@ -333,23 +333,23 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private drawUI(ctx: CanvasRenderingContext2D) {
-    // Score oben (avec padding pour éviter overlap)
+    // Score oben - Start bei y=50 um unter der game-info-bar zu bleiben
     ctx.font = 'bold 16px "Press Start 2P", monospace';
     ctx.fillStyle = 'white';
     ctx.textAlign = 'left';
-    ctx.fillText(`SCORE: ${this.score}`, 10, 35);
-    ctx.fillText(`LEVEL: ${this.currentLevel}`, this.CANVAS_WIDTH / 2 - 50, 35);
+    ctx.fillText(`SCORE: ${this.score}`, 10, 50);
+    ctx.fillText(`LEVEL: ${this.currentLevel}`, this.CANVAS_WIDTH / 2 - 50, 50);
 
     // High Score anzeigen
     ctx.textAlign = 'right';
     ctx.font = '14px "Press Start 2P", monospace';
     ctx.fillStyle = '#FFD700';
-    ctx.fillText(`HI: ${this.getHighScore()}`, this.CANVAS_WIDTH - 10, 35);
+    ctx.fillText(`HI: ${this.getHighScore()}`, this.CANVAS_WIDTH - 10, 50);
 
     // Practice Mode Status-Anzeige
     if (this.gameMode === 'practice') {
       ctx.font = '10px monospace';
-      let statusY = 52;
+      let statusY = 67;
       if (this.isInvincible) {
         ctx.fillStyle = '#00FF00';
         ctx.fillText('🛡️ INVINCIBLE', this.CANVAS_WIDTH - 10, statusY);
@@ -376,7 +376,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.debugMode || this.showGhostTargets) {
       ctx.font = '12px monospace';
       ctx.fillStyle = this.ghostMode === 'scatter' ? '#00FF00' : '#FF0000';
-      ctx.fillText(`Mode: ${this.ghostMode}`, 10, 35);
+      ctx.fillText(`Mode: ${this.ghostMode}`, 10, 50);
     }
 
     // Ready Screen
@@ -394,53 +394,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.fillText(`[${modeText}]`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2 + 25);
     }
 
-    // Game Over Screen
-    if (this.gameState === 'gameover') {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-      ctx.fillRect(50, 50, this.CANVAS_WIDTH - 100, this.CANVAS_HEIGHT - 100);
-      ctx.strokeStyle = '#FF0000';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(50, 50, this.CANVAS_WIDTH - 100, this.CANVAS_HEIGHT - 100);
-
-      ctx.font = 'bold 24px "Press Start 2P", monospace';
-      ctx.fillStyle = '#FF0000';
-      ctx.textAlign = 'center';
-      ctx.fillText('GAME OVER', this.CANVAS_WIDTH / 2, 100);
-
-      ctx.font = '14px monospace';
-      ctx.fillStyle = 'white';
-      ctx.fillText(`Final Score: ${this.score}`, this.CANVAS_WIDTH / 2, 130);
-
-      // Leaderboard zeichnen
-      if (this.leaderboard && this.leaderboard.length > 0) {
-        ctx.fillStyle = '#FFD700';
-        ctx.font = '16px "Press Start 2P", monospace';
-        ctx.fillText('TOP SCORES', this.CANVAS_WIDTH / 2, 170);
-
-        ctx.textAlign = 'left';
-        ctx.font = '12px monospace';
-        let yPos = 200;
-        this.leaderboard.slice(0, 5).forEach((entry, index) => {
-          const rank = index + 1;
-          const name = (entry.username || 'Anonymous').substring(0, 10).padEnd(10, ' ');
-          const points = (entry.points || 0).toString().padStart(6, '0');
-
-          ctx.fillStyle = entry.username === this.playerName ? '#00FF00' : '#FFFFFF';
-          ctx.fillText(`${rank}. ${name}  ${points}`, this.CANVAS_WIDTH / 2 - 100, yPos);
-          yPos += 25;
-        });
-        ctx.textAlign = 'center';
-      } else {
-        ctx.fillStyle = '#AAAAAA';
-        ctx.font = '12px monospace';
-        ctx.fillText('No highscores yet...', this.CANVAS_WIDTH / 2, 200);
-        ctx.font = '10px monospace';
-        ctx.fillText('(Backend may not be running)', this.CANVAS_WIDTH / 2, 220);
-      }
-
-      ctx.fillStyle = '#FFFF00';
-      ctx.fillText('Press any key to restart', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT - 80);
-    }
+    // Game Over Screen wird jetzt im HTML-Overlay angezeigt, nicht mehr im Canvas
 
     // Level Complete Screen
     if (this.gameState === 'levelcomplete') {
@@ -551,6 +505,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Leaderboard
   leaderboard: any[] = [];
+
+  // Exit confirmation modal
+  showExitConfirm = false;
+  private pausedForExitConfirm = false;
+  showPauseOverlay = false;
 
   // Get high score from leaderboard
   private getHighScore(): number {
@@ -773,6 +732,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private startGameLoop() {
+    if (this.animationFrameId) {
+      return;
+    }
     this.audioService.playBackgroundMusic();
     const loop = (timestamp: number) => {
       const delta = timestamp - this.lastFrameTime;
@@ -857,6 +819,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
       case 'gameover':
         return; // Warte auf Tastendruck
+      case 'paused':
+        return; // pausiert
 
       case 'playing':
         break; // Weiter mit normalem Update
@@ -1168,11 +1132,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
             ghost.updateDirection(randomDir, this.CELL_SIZE, this.walls);
             return; // Sofort zurück, da bereits Richtung gesetzt
         }
+      }
     }
-
-    const newDir = this.getDirectionToTarget(ghost, targetX, targetY);
-    ghost.updateDirection(newDir, this.CELL_SIZE, this.walls);
-  }
 
     const newDir = this.getDirectionToTarget(ghost, targetX, targetY);
     ghost.updateDirection(newDir, this.CELL_SIZE, this.walls);
@@ -1420,6 +1381,18 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      if (this.gameState === 'paused') {
+        this.resumeFromPause();
+      } else if (this.gameState === 'playing') {
+        this.openPause();
+      } else if (this.gameState === 'gameover') {
+        // allow exit confirm from gameover via pause overlay
+        this.openPause();
+      }
+      return;
+    }
+
     // Restart bei Game Over
     if (this.gameState === 'gameover') {
       this.restartGame();
@@ -1512,5 +1485,34 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         this.slowMotion = 1.0;
       }
     }
+  }
+
+  private openPause() {
+    this.showPauseOverlay = true;
+    this.gameState = 'paused';
+    this.stopGameLoop();
+  }
+
+  resumeFromPause() {
+    this.showPauseOverlay = false;
+    this.showExitConfirm = false;
+    if (!this.gameOver) {
+      this.gameState = 'playing';
+      this.startGameLoop();
+    }
+  }
+
+  requestExitToMenu() {
+    this.showExitConfirm = true;
+  }
+
+  confirmExitToMenu() {
+    this.showExitConfirm = false;
+    this.stopGameLoop();
+    this.router.navigate(['/']);
+  }
+
+  cancelExitToMenu() {
+    this.showExitConfirm = false;
   }
 }

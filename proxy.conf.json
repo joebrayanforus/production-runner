@@ -4,5 +4,11 @@
     "secure": false,
     "changeOrigin": true,
     "logLevel": "debug"
+  },
+  "/leaderboardHub": {
+    "target": "http://localhost:5187",
+    "secure": false,
+    "ws": true,
+    "logLevel": "debug"
   }
 }

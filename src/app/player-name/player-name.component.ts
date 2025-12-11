@@ -26,6 +26,8 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   ];
   selectedKeyIndex = 0;
   selectedRowIndex = 0;
+  focusArea: 'keyboard' | 'buttons' = 'keyboard';
+  buttonIndex = 0; // 0 delete, 1 start, 2 back
 
   private gamepadPollInterval: any;
 
@@ -44,14 +46,17 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
     this.startGamepadPolling();
 
     // Listen to keyboard events
-    window.addEventListener('keydown', (e) => this.handleKeyDown(e));
+    this.boundKeyHandler = (e: KeyboardEvent) => this.handleKeyDown(e);
+    window.addEventListener('keydown', this.boundKeyHandler);
   }
 
   ngOnDestroy(): void {
     if (this.gamepadPollInterval) {
       clearInterval(this.gamepadPollInterval);
     }
-    window.removeEventListener('keydown', (e) => this.handleKeyDown(e));
+    if (this.boundKeyHandler) {
+      window.removeEventListener('keydown', this.boundKeyHandler);
+    }
   }
 
   isPlayerNameValid(): boolean {
@@ -179,33 +184,77 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   private handleKeyDown(event: KeyboardEvent): void {
     const key = event.key.toUpperCase();
 
-    if (key === 'BACKSPACE') {
-      event.preventDefault();
-      this.deleteCharacter();
-    } else if (key === 'ARROWUP') {
-      event.preventDefault();
-      this.navigateKeyboard('U');
-    } else if (key === 'ARROWDOWN') {
-      event.preventDefault();
-      this.navigateKeyboard('D');
-    } else if (key === 'ARROWLEFT') {
-      event.preventDefault();
-      this.navigateKeyboard('L');
-    } else if (key === 'ARROWRIGHT') {
-      event.preventDefault();
-      this.navigateKeyboard('R');
-    } else if (key === 'ENTER') {
-      event.preventDefault();
-      this.selectKey();
-    } else if (key === 'ESCAPE') {
+    if (key === 'ESCAPE') {
       event.preventDefault();
       this.goBack();
-    } else if (key === ' ') {
-      event.preventDefault();
-      this.addCharacter(' ');
-    } else if (/^[A-Z0-9\-_@]$/.test(key)) {
-      event.preventDefault();
-      this.addCharacter(key);
+      return;
+    }
+
+    if (this.focusArea === 'keyboard') {
+      if (key === 'BACKSPACE') {
+        event.preventDefault();
+        this.deleteCharacter();
+      } else if (key === 'ARROWUP') {
+        event.preventDefault();
+        this.navigateKeyboard('U');
+      } else if (key === 'ARROWDOWN') {
+        event.preventDefault();
+        // wenn letzte Zeile -> Buttons fokussieren
+        if (this.selectedRowIndex === this.keyboardRows.length - 1) {
+          this.focusArea = 'buttons';
+          this.buttonIndex = 1; // default auf Start
+        } else {
+          this.navigateKeyboard('D');
+        }
+      } else if (key === 'ARROWLEFT') {
+        event.preventDefault();
+        this.navigateKeyboard('L');
+      } else if (key === 'ARROWRIGHT') {
+        event.preventDefault();
+        this.navigateKeyboard('R');
+      } else if (key === 'ENTER') {
+        event.preventDefault();
+        this.selectKey();
+      } else if (key === ' ') {
+        event.preventDefault();
+        this.addCharacter(' ');
+      } else if (/^[A-Z0-9\-_@]$/.test(key)) {
+        event.preventDefault();
+        this.addCharacter(key);
+      }
+    } else {
+      // Buttons fokussiert
+      if (key === 'ARROWLEFT') {
+        event.preventDefault();
+        this.buttonIndex = Math.max(0, this.buttonIndex - 1);
+      } else if (key === 'ARROWRIGHT') {
+        event.preventDefault();
+        this.buttonIndex = Math.min(2, this.buttonIndex + 1);
+      } else if (key === 'ARROWUP') {
+        event.preventDefault();
+        this.focusArea = 'keyboard';
+      } else if (key === 'ENTER' || key === ' ') {
+        event.preventDefault();
+        this.triggerButton();
+      }
     }
   }
+
+  private triggerButton() {
+    switch (this.buttonIndex) {
+      case 0:
+        this.deleteCharacter();
+        break;
+      case 1:
+        if (this.isPlayerNameValid()) {
+          this.startGame();
+        }
+        break;
+      case 2:
+        this.goBack();
+        break;
+    }
+  }
+
+  boundKeyHandler?: (e: KeyboardEvent) => void;
 }

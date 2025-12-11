@@ -131,7 +131,7 @@ canvas {
   background: #000;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  padding: 30px 15px 15px 15px;
+  padding: 50px 15px 15px 15px;
   box-sizing: content-box;
 }
 
@@ -202,4 +202,159 @@ canvas {
   border-left: none;
   border-top: none;
   box-shadow: 2px 2px 10px rgba(255, 0, 255, 0.5);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.overlay-panel {
+  background: #0b0b0b;
+  border: 2px solid #ffd700;
+  border-radius: 12px;
+  padding: 24px;
+  width: 320px;
+  text-align: center;
+  color: #fff;
+  font-family: 'Press Start 2P', monospace;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+}
+
+.overlay-panel.wide {
+  width: 520px;
+}
+
+.overlay-panel h2 {
+  margin: 0 0 12px 0;
+  color: #ffd700;
+  font-size: 18px;
+}
+
+.overlay-panel p {
+  margin: 0 0 16px 0;
+  font-size: 12px;
+}
+
+.overlay-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.overlay-actions.below {
+  margin-top: 16px;
+}
+
+.overlay-actions .btn {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 11px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.btn.primary {
+  background: #00ffff;
+  color: #000;
+  font-weight: bold;
+}
+
+.btn.ghost {
+  background: #222;
+  color: #fff;
+  border: 1px solid #555;
+}
+
+.leaderboard-block {
+  margin-top: 12px;
+}
+
+.overlay-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.overlay-table th,
+.overlay-table td {
+  border: 1px solid #444;
+  padding: 6px;
+}
+
+.overlay-table th {
+  color: #ffd700;
+}
+
+.exit-confirm {
+  margin-top: 12px;
+}
+
+.exit-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.exit-modal {
+  background: #0b0b0b;
+  border: 2px solid #00ffff;
+  border-radius: 12px;
+  padding: 24px;
+  width: 320px;
+  color: #fff;
+  text-align: center;
+  box-shadow: 0 0 25px rgba(0, 255, 255, 0.4);
+  font-family: 'Press Start 2P', monospace;
+}
+
+.exit-modal h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: #ffd700;
+}
+
+.exit-modal p {
+  margin: 0 0 18px 0;
+  font-size: 12px;
+  color: #cfcfcf;
+}
+
+.exit-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.exit-actions button {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 11px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.btn-secondary {
+  background: #222;
+  color: #fff;
+  border: 1px solid #555;
+}
+
+.btn-primary {
+  background: #00ffff;
+  color: #000;
+  font-weight: bold;
 }

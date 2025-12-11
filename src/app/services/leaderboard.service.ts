@@ -18,7 +18,7 @@ export interface LeaderboardEntry {
 })
 export class LeaderboardService {
 
-  private readonly apiBaseUrl = 'http://localhost:5019';
+  private readonly apiBaseUrl = '/api';
 
   private hubConnection?: signalR.HubConnection;
 
@@ -39,7 +39,7 @@ export class LeaderboardService {
     this.reloadLeaderboard();
 
     this.hubConnection = new signalR.HubConnectionBuilder()
-      .withUrl(`${this.apiBaseUrl}/leaderboardHub`)
+      .withUrl(`/leaderboardHub`)
       .withAutomaticReconnect()
       .build();
 
@@ -62,7 +62,7 @@ export class LeaderboardService {
   private reloadLeaderboard(): void {
     this.http
       .get<LeaderboardEntry[]>(
-        `${this.apiBaseUrl}/api/scores/leaderboard?top=10`
+        `${this.apiBaseUrl}/scores/leaderboard?top=10`
       )
       .subscribe({
         next: entries => this.leaderboardSubject.next(entries),
