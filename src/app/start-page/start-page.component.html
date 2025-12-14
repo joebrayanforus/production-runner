@@ -1,16 +1,16 @@
 <div class="start-container">
-  <!-- Fabrik Logos am oberen Rand -->
+  <!-- IFM Branding -->
   <div class="logo-icon-top logo-icon-left">🏭</div>
-  <div class="logo-icon-top logo-icon-right">🏭</div>
+  <div class="logo-icon-top logo-icon-right">⚙️</div>
 
   <!-- Top 3 Leaderboard -->
   <section class="top-scores" *ngIf="topScores.length > 0">
-    <h3 class="top-scores-title">TOP 3 SCORES</h3>
+    <h3 class="top-scores-title">🏆 TOP PERFORMER</h3>
     <div class="top-scores-list">
       <div class="score-item" *ngFor="let entry of topScores; let i = index">
         <span class="rank">{{ i + 1 }}</span>
         <span class="player-name">{{ entry.username }}</span>
-        <span class="score">{{ entry.points }}</span>
+        <span class="score">{{ entry.points }} Punkte</span>
       </div>
     </div>
   </section>
@@ -18,6 +18,7 @@
   <!-- Hero Section - Game Title -->
   <header class="hero">
     <h1>PRODUCTION RUNNER</h1>
+    <p class="subtitle">IFM AUTOMATION CHALLENGE</p>
   </header>
 
   <!-- Game Modes Section -->

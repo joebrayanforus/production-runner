@@ -3,7 +3,7 @@
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background: radial-gradient(circle, #1a0033, #000000);
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
   position: relative;
   overflow: hidden;
 }
@@ -11,29 +11,29 @@
 .arcade-cabinet {
   position: relative;
   padding: 20px;
-  background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+  background: linear-gradient(145deg, #ffffff, #f0f0f0);
   border-radius: 12px;
   box-shadow:
-    0 0 40px rgba(0, 255, 255, 0.3),
-    inset 0 0 20px rgba(0, 0, 0, 0.5);
+    0 8px 30px rgba(237, 107, 0, 0.2),
+    inset 0 0 20px rgba(255, 255, 255, 0.5);
 }
 
 .arcade-screen-frame {
   position: relative;
-  border: 6px solid #00ffff;
+  border: 6px solid #ED6B00;
   border-radius: 8px;
   box-shadow:
-    0 0 20px rgba(0, 255, 255, 0.6),
-    inset 0 0 30px rgba(0, 255, 255, 0.1),
-    0 0 60px rgba(0, 255, 255, 0.4);
+    0 0 20px rgba(237, 107, 0, 0.5),
+    inset 0 0 30px rgba(237, 107, 0, 0.1),
+    0 0 60px rgba(237, 107, 0, 0.3);
   background: #000;
   overflow: hidden;
   animation: screenGlow 2s ease-in-out infinite alternate;
 }
 
 @keyframes screenGlow {
-  0% { box-shadow: 0 0 20px rgba(0, 255, 255, 0.6), inset 0 0 30px rgba(0, 255, 255, 0.1), 0 0 60px rgba(0, 255, 255, 0.4); }
-  100% { box-shadow: 0 0 30px rgba(0, 255, 255, 0.8), inset 0 0 40px rgba(0, 255, 255, 0.2), 0 0 80px rgba(0, 255, 255, 0.6); }
+  0% { box-shadow: 0 0 20px rgba(237, 107, 0, 0.5), inset 0 0 30px rgba(237, 107, 0, 0.1), 0 0 60px rgba(237, 107, 0, 0.3); }
+  100% { box-shadow: 0 0 30px rgba(237, 107, 0, 0.7), inset 0 0 40px rgba(237, 107, 0, 0.2), 0 0 80px rgba(237, 107, 0, 0.5); }
 }
 
 .game-info-bar {

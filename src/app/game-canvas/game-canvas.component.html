@@ -4,12 +4,12 @@
       <div class="arcade-screen-frame">
       <div class="game-info-bar">
         <div class="player-badge">
-          <span class="player-icon">🎮</span>
-          <span class="player-name-display">{{ playerName || 'PLAYER 1' }}</span>
+          <span class="player-icon">⚙️</span>
+          <span class="player-name-display">{{ playerName || 'IFM OPERATOR' }}</span>
         </div>
         <div class="game-mode-badge">
-          <span class="mode-label">MODE:</span>
-          <span class="mode-value">{{ gameMode.toUpperCase() }}</span>
+          <span class="mode-label">BETRIEB:</span>
+          <span class="mode-value">{{ gameMode.toUpperCase() === 'CLASSIC' ? 'STANDARD' : 'TRAINING' }}</span>
         </div>
       </div>
       <canvas #gameCanvas></canvas>
@@ -18,16 +18,16 @@
       <!-- Game Over Overlay -->
       <div class="overlay" *ngIf="gameState === 'gameover'">
         <div class="overlay-panel wide">
-          <h2>GAME OVER</h2>
-          <p>Score: {{ score }}</p>
+          <h2>⚡ PRODUKTION ABGESCHLOSSEN</h2>
+          <p>Gesamtertrag: <strong>{{ score }} Punkte</strong></p>
 
           <div class="leaderboard-block">
-            <h3>Bestenliste</h3>
+            <h3>🏆 Leistungsranking</h3>
             <table class="overlay-table" *ngIf="leaderboard.length > 0">
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Spieler</th>
+                  <th>Operator</th>
                   <th>Punkte</th>
                   <th>Level</th>
                 </tr>
@@ -41,12 +41,12 @@
                 </tr>
               </tbody>
             </table>
-            <p class="overlay-hint" *ngIf="leaderboard.length === 0">Keine Scores verfügbar.</p>
+            <p class="overlay-hint" *ngIf="leaderboard.length === 0">Keine Ergebnisse verfügbar.</p>
           </div>
 
           <div class="overlay-actions below">
-            <button class="btn primary" (click)="restartGame()">Neues Spiel</button>
-            <button class="btn ghost" (click)="exitGame()">Spiel beenden</button>
+            <button class="btn primary" (click)="restartGame()">🔄 Neuer Zyklus</button>
+            <button class="btn ghost" (click)="exitGame()">❌ Werk beenden</button>
           </div>
         </div>
       </div>
@@ -57,15 +57,15 @@
 <!-- Pause Overlay -->
 <div class="overlay" *ngIf="showPauseOverlay">
   <div class="overlay-panel">
-    <h2>Pause</h2>
-    <p>Spiel angehalten</p>
+    <h2>⏸️ PRODUKTIONSLINIE GESTOPPT</h2>
+    <p>Betrieb angehalten</p>
     <div class="overlay-actions">
-      <button class="btn primary" (click)="resumeFromPause()">Weiter</button>
-      <button class="btn ghost" (click)="restartGame()">Neustart</button>
-      <button class="btn ghost" (click)="requestExitToMenu()">Zur Startseite</button>
+      <button class="btn primary" (click)="resumeFromPause()">▶️ Fortsetzen</button>
+      <button class="btn ghost" (click)="restartGame()">🔄 Neustart</button>
+      <button class="btn ghost" (click)="requestExitToMenu()">🏠 Zur Startseite</button>
     </div>
     <div *ngIf="showExitConfirm" class="exit-confirm">
-      <p>Wirklich zur Startseite?</p>
+      <p>Werkstatt wirklich schließen?</p>
       <div class="overlay-actions">
         <button class="btn ghost" (click)="cancelExitToMenu()">Nein</button>
         <button class="btn primary" (click)="confirmExitToMenu()">Ja</button>
