@@ -50,6 +50,53 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   robot: Block | null = null;
   cherry: Block | null = null;
 
+  // Legacy aliases for compatibility during migration
+  get pacman() { return this.robot; }
+  set pacman(value: Block | null) { this.robot = value; }
+  get foods() { return this.sensorData; }
+  get powerPellets() { return this.maintenanceStations; }
+  get ghosts() { return this.malfunctions; }
+  get lives() { return this.systemHealth; }
+  set lives(value: number) { this.systemHealth = value; }
+  get score() { return this.efficiency; }
+  set score(value: number) { this.efficiency = value; }
+  get currentLevel() { return this.productionLevel; }
+  set currentLevel(value: number) { this.productionLevel = value; }
+  get scaredTimer() { return this.maintenanceTimer; }
+  set scaredTimer(value: number) { this.maintenanceTimer = value; }
+  get scaredDuration() { return this.maintenanceDuration; }
+  set scaredDuration(value: number) { this.maintenanceDuration = value; }
+
+  // Missing image properties for compatibility
+  private blueGhostImage = new Image();
+  private orangeGhostImage = new Image();
+  private pinkGhostImage = new Image();
+  private redGhostImage = new Image();
+  private powerFoodImage = new Image();
+  private scaredGhostImage = new Image();
+
+  // Missing variables
+  private totalPellets = 0;
+  private ghostMode: 'scatter' | 'chase' | 'frightened' = 'scatter';
+  private showMalfunctionTargets = false;
+  get showGhostTargets() { return this.showMalfunctionTargets; }
+  set showGhostTargets(value: boolean) { this.showMalfunctionTargets = value; }
+  private debugMode = false;
+
+  // Missing streak system
+  private pelletStreak = 0;
+  private streakMultiplier = 1.0;
+  private cherrySpawnCooldown = 0;
+  private ghostReleaseTimer = 0;
+  private ghostsReleased = 0;
+  private readonly GHOST_RELEASE_INTERVAL = 4000;
+
+  // Legacy image getters for compatibility
+  get pacmanUpImage() { return this.robotUpImage; }
+  get pacmanDownImage() { return this.robotDownImage; }
+  get pacmanLeftImage() { return this.robotLeftImage; }
+  get pacmanRightImage() { return this.robotRightImage; }
+
   // Buffered input for smoother corner turning
   private bufferedDirection: string | null = null;
 
@@ -106,15 +153,20 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private getGhostSpeed(): number {
     const baseSpeed = this.CELL_SIZE / 4;
     // Höhere Grundgeschwindigkeit: +15% pro Level (statt 5%)
-    const speedMultiplier = 1.1 + (this.currentLevel - 1) * 0.15;
+    const speedMultiplier = 1.1 + (this.productionLevel - 1) * 0.15;
     return Math.min(baseSpeed * speedMultiplier, baseSpeed * 2.0); // Max 200%
   }
 
-  private getFrightenedDuration(): number {
-    // Kürzere Frighten-Zeit: Start mit 6s (statt 10s), -1.5s pro Level
+  private getMaintenanceDuration(): number {
+    // Kürzere Maintenance-Zeit: Start mit 6s (statt 10s), -1.5s pro Level
     const baseDuration = 6000;
-    const reduction = (this.currentLevel - 1) * 1500;
+    const reduction = (this.productionLevel - 1) * 1500;
     return Math.max(baseDuration - reduction, 1000); // Minimum 1 Sekunde
+  }
+
+  // Legacy function for compatibility
+  private getFrightenedDuration(): number {
+    return this.getMaintenanceDuration();
   }
 
   // CYAN (Inky) Patrol-Route: Feste Waypoints entlang der Korridore
@@ -155,7 +207,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Sensordaten zeichnen (kleine ifm-Symbole)
     ctx.fillStyle = '#00FF88';
-    this.foods.forEach(food => {
+    this.sensorData.forEach(food => {
       // Draw small sensor data icon
       ctx.fillRect(food.x + 1, food.y + 1, 3, 3);
       ctx.strokeStyle = '#ffffff';
@@ -166,7 +218,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     // Wartungsstationen zeichnen (blinkend)
     if (this.powerPelletVisible) {
       ctx.fillStyle = '#ED6B00';
-      this.powerPellets.forEach(pellet => {
+      this.maintenanceStations.forEach(pellet => {
         // Draw maintenance station as orange square with wrench symbol
         ctx.fillRect(pellet.x + 2, pellet.y + 2, pellet.width - 4, pellet.height - 4);
         ctx.strokeStyle = '#ffffff';
@@ -185,16 +237,16 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.drawImage(this.cherry.image, this.cherry.x, this.cherry.y, this.cherry.width, this.cherry.height);
     }
 
-    // Pac-Man mit Mundanimation zeichnen
-    if (this.pacman && this.gameState !== 'dying') {
-      this.drawPacman(ctx);
-    } else if (this.pacman && this.gameState === 'dying') {
-      this.drawDyingPacman(ctx);
+    // Robot mit Animation zeichnen
+    if (this.robot && this.gameState !== 'dying') {
+      this.drawRobot(ctx);
+    } else if (this.robot && this.gameState === 'dying') {
+      this.drawDyingRobot(ctx);
     }
 
-    // Geister zeichnen
-    this.ghosts.forEach(ghost => {
-      this.drawGhost(ctx, ghost);
+    // Störungen zeichnen
+    this.malfunctions.forEach(malfunction => {
+      this.drawMalfunction(ctx, malfunction);
     });
 
     // Ghost-Ziele (Learn/Practice Mode)
@@ -204,12 +256,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.drawUI(ctx);
   }
 
-  private drawPacman(ctx: CanvasRenderingContext2D) {
-    if (!this.pacman) return;
+  private drawRobot(ctx: CanvasRenderingContext2D) {
+    if (!this.robot) return;
 
-    const centerX = this.pacman.x + this.pacman.width / 2;
-    const centerY = this.pacman.y + this.pacman.height / 2;
-    const size = this.pacman.width - 2;
+    const centerX = this.robot.x + this.robot.width / 2;
+    const centerY = this.robot.y + this.robot.height / 2;
+    const size = this.robot.width - 2;
 
     ctx.save();
     ctx.translate(centerX, centerY);
@@ -226,10 +278,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     const headSize = size * 0.6;
     let headX = 0, headY = 0;
 
-    if (this.pacman.direction === 'U') { headX = 0; headY = -size * 0.3; }
-    else if (this.pacman.direction === 'D') { headX = 0; headY = size * 0.3; }
-    else if (this.pacman.direction === 'L') { headX = -size * 0.3; headY = 0; }
-    else if (this.pacman.direction === 'R') { headX = size * 0.3; headY = 0; }
+    if (this.robot.direction === 'U') { headX = 0; headY = -size * 0.3; }
+    else if (this.robot.direction === 'D') { headX = 0; headY = size * 0.3; }
+    else if (this.robot.direction === 'L') { headX = -size * 0.3; headY = 0; }
+    else if (this.robot.direction === 'R') { headX = size * 0.3; headY = 0; }
 
     ctx.fillStyle = '#ED6B00';
     ctx.fillRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
@@ -237,7 +289,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Robot eyes (sensors)
     ctx.fillStyle = '#1a1a1a';
-    if (this.pacman.direction === 'U' || this.pacman.direction === 'D') {
+    if (this.robot.direction === 'U' || this.robot.direction === 'D') {
       ctx.beginPath();
       ctx.arc(headX - 2, headY, 1.5, 0, Math.PI * 2);
       ctx.fill();
@@ -264,12 +316,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  private drawDyingPacman(ctx: CanvasRenderingContext2D) {
-    if (!this.pacman) return;
+  private drawDyingRobot(ctx: CanvasRenderingContext2D) {
+    if (!this.robot) return;
 
-    const centerX = this.pacman.x + this.pacman.width / 2;
-    const centerY = this.pacman.y + this.pacman.height / 2;
-    const size = this.pacman.width - 2;
+    const centerX = this.robot.x + this.robot.width / 2;
+    const centerY = this.robot.y + this.robot.height / 2;
+    const size = this.robot.width - 2;
 
     // Robot "malfunction" animation: flickering and shrinking
     const progress = this.stateTimer / this.DEATH_DURATION;
@@ -297,7 +349,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  private drawGhost(ctx: CanvasRenderingContext2D, ghost: Block) {
+  private drawMalfunction(ctx: CanvasRenderingContext2D, ghost: Block) {
     const x = ghost.x;
     const y = ghost.y;
     const size = ghost.width;
@@ -368,6 +420,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!ghost.scared && Math.sin(Date.now() * 0.01) > 0.5) {
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(x + size - 6, y + 2, 4, 4);
+    }
 
     ctx.restore();
   }
@@ -447,32 +500,32 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Zeichnet Ghost-Ziele (Learn/Practice Mode)
   private drawGhostTargets(ctx: CanvasRenderingContext2D) {
-    if (!this.showGhostTargets || !this.pacman) return;
+    if (!this.showGhostTargets || !this.robot) return;
 
-    this.ghosts.forEach(ghost => {
+    this.malfunctions.forEach(malfunction => {
       let targetX = 0, targetY = 0;
       let color = '#FF0000';
 
       // Berechne Ziel basierend auf Ghost-Typ
-      switch (ghost.type) {
+      switch (malfunction.type) {
         case 'aggressive':
-          targetX = this.pacman!.x;
-          targetY = this.pacman!.y;
+          targetX = this.robot!.x;
+          targetY = this.robot!.y;
           color = 'rgba(255, 0, 0, 0.5)';
           break;
         case 'ambush':
-          if (this.pacman!.direction === 'U') {
-            targetX = this.pacman!.x;
-            targetY = this.pacman!.y - 4 * this.CELL_SIZE;
-          } else if (this.pacman!.direction === 'D') {
-            targetX = this.pacman!.x;
-            targetY = this.pacman!.y + 4 * this.CELL_SIZE;
-          } else if (this.pacman!.direction === 'L') {
-            targetX = this.pacman!.x - 4 * this.CELL_SIZE;
-            targetY = this.pacman!.y;
+          if (this.robot!.direction === 'U') {
+            targetX = this.robot!.x;
+            targetY = this.robot!.y - 4 * this.CELL_SIZE;
+          } else if (this.robot!.direction === 'D') {
+            targetX = this.robot!.x;
+            targetY = this.robot!.y + 4 * this.CELL_SIZE;
+          } else if (this.robot!.direction === 'L') {
+            targetX = this.robot!.x - 4 * this.CELL_SIZE;
+            targetY = this.robot!.y;
           } else {
-            targetX = this.pacman!.x + 4 * this.CELL_SIZE;
-            targetY = this.pacman!.y;
+            targetX = this.robot!.x + 4 * this.CELL_SIZE;
+            targetY = this.robot!.y;
           }
           color = 'rgba(255,184,255,0.5)';
           break;
@@ -486,8 +539,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           break;
         case 'random':
           color = 'rgba(255, 184, 82, 0.3)';
-          targetX = ghost.x;
-          targetY = ghost.y;
+          targetX = malfunction.x;
+          targetY = malfunction.y;
           break;
       }
 
@@ -500,7 +553,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.lineWidth = 2;
       ctx.setLineDash([5, 5]);
       ctx.beginPath();
-      ctx.moveTo(ghost.x + ghost.width / 2, ghost.y + ghost.height / 2);
+      ctx.moveTo(malfunction.x + malfunction.width / 2, malfunction.y + malfunction.height / 2);
       ctx.lineTo(targetX + this.CELL_SIZE / 2, targetY + this.CELL_SIZE / 2);
       ctx.stroke();
       ctx.setLineDash([]);
@@ -534,13 +587,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private game: GameManager | null = null;
 
   // Modi-spezifische Einstellungen
-  showGhostTargets = false;  // Learn Mode: Zeige Sensor-Ziele
   isInvincible = false;      // Practice Mode: Unverwundbarkeit
   slowMotion = 1.0;          // Practice Mode: Zeitlupe (1.0 = normal)
   turboSpeed = false;        // Turbo Mode: 2x Geschwindigkeit
-
-  // Debug-Modus
-  debugMode = false;
 
   // Practice Mode: Zeit-Rückspulung
   private gameHistory: Array<{
@@ -601,10 +650,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.pinkGhostImage.src = 'assets/pinkGhost.png';
     this.redGhostImage.src = 'assets/redGhost.png';
     // Use robot images instead of pacman
-    this.pacmanUpImage.src = 'assets/robot-up.svg';
-    this.pacmanDownImage.src = 'assets/robot-down.svg';
-    this.pacmanLeftImage.src = 'assets/robot-left.svg';
-    this.pacmanRightImage.src = 'assets/robot-right.svg';
+    this.robotUpImage.src = 'assets/robot-up.svg';
+    this.robotDownImage.src = 'assets/robot-down.svg';
+    this.robotLeftImage.src = 'assets/robot-left.svg';
+    this.robotRightImage.src = 'assets/robot-right.svg';
     this.wallImage.src = 'assets/wall.png';
     this.powerFoodImage.src = 'assets/powerFood.png';
     this.scaredGhostImage.src = 'assets/scaredGhost.png';
@@ -679,14 +728,14 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           ghost.type = 'aggressive'; // Red - AGGRESSIVE: Verfolgt direkt
           this.ghosts.add(ghost);
         } else if (tileMapChar === 'P') {
-          this.pacman = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.pacmanRightImage);
+          this.robot = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.robotRightImage);
         } else if (tileMapChar === ' ') {
           // kleines Pellet in der Mitte der Zelle - Produktionsauftrag
-          this.foods.add(new Block(x + this.CELL_SIZE / 2 - 2, y + this.CELL_SIZE / 2 - 2, 4, 4, null));
+          this.sensorData.add(new Block(x + this.CELL_SIZE / 2 - 2, y + this.CELL_SIZE / 2 - 2, 4, 4, null));
         } else if (tileMapChar === 'O') {
           // Power Pellet - KI-Optimierung
           const powerPellet = new Block(x + this.CELL_SIZE / 2 - 4, y + this.CELL_SIZE / 2 - 4, 8, 8, null);
-          this.powerPellets.add(powerPellet);
+          this.maintenanceStations.add(powerPellet);
         } else if (tileMapChar === 'T') {
           // Tunnel - kein Pellet, aber passierbar (Wraparound)
           // Nichts hinzufügen - bleibt leer
@@ -921,7 +970,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Ghost Release Timer - force each ghost out of the house quickly
     this.ghostReleaseTimer += deltaTime;
-    while (this.ghostReleaseTimer >= this.GHOST_RELEASE_INTERVAL && this.ghostsReleased < this.ghosts.size) {
+    while (this.ghostReleaseTimer >= this.GHOST_RELEASE_INTERVAL && this.ghostsReleased < this.malfunctions.size) {
       this.ghostReleaseTimer -= this.GHOST_RELEASE_INTERVAL;
       this.ghostsReleased++;
       let index = 0;
@@ -947,10 +996,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private reverseGhostDirections() {
     const opposites: { [key: string]: string } = { 'U': 'D', 'D': 'U', 'L': 'R', 'R': 'L' };
-    this.ghosts.forEach(ghost => {
-      const opposite = opposites[ghost.direction];
+    this.malfunctions.forEach(malfunction => {
+      const opposite = opposites[malfunction.direction];
       if (opposite) {
-        ghost.updateDirection(opposite, this.CELL_SIZE, this.walls);
+        malfunction.updateDirection(opposite, this.CELL_SIZE, this.walls);
       }
     });
   }
