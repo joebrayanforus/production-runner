@@ -200,26 +200,57 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const centerX = this.pacman.x + this.pacman.width / 2;
     const centerY = this.pacman.y + this.pacman.height / 2;
-    const radius = this.pacman.width / 2 - 1;
-
-    // Berechne Rotation basierend auf Richtung
-    let rotation = 0;
-    if (this.pacman.direction === 'R') rotation = 0;
-    else if (this.pacman.direction === 'D') rotation = Math.PI / 2;
-    else if (this.pacman.direction === 'L') rotation = Math.PI;
-    else if (this.pacman.direction === 'U') rotation = -Math.PI / 2;
+    const size = this.pacman.width - 2;
 
     ctx.save();
     ctx.translate(centerX, centerY);
-    ctx.rotate(rotation);
 
-    // Pac-Man Körper (gelb)
-    ctx.fillStyle = '#FFFF00';
+    // Draw ifm robot instead of pacman
+    // Robot body (orange square)
+    ctx.fillStyle = '#ED6B00';
+    ctx.fillRect(-size/2, -size/2, size, size);
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-size/2, -size/2, size, size);
+
+    // Robot head (smaller square, positioned based on direction)
+    const headSize = size * 0.6;
+    let headX = 0, headY = 0;
+
+    if (this.pacman.direction === 'U') { headX = 0; headY = -size * 0.3; }
+    else if (this.pacman.direction === 'D') { headX = 0; headY = size * 0.3; }
+    else if (this.pacman.direction === 'L') { headX = -size * 0.3; headY = 0; }
+    else if (this.pacman.direction === 'R') { headX = size * 0.3; headY = 0; }
+
+    ctx.fillStyle = '#ED6B00';
+    ctx.fillRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
+    ctx.strokeRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
+
+    // Robot eyes (sensors)
+    ctx.fillStyle = '#1a1a1a';
+    if (this.pacman.direction === 'U' || this.pacman.direction === 'D') {
+      ctx.beginPath();
+      ctx.arc(headX - 2, headY, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(headX + 2, headY, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(headX, headY - 2, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(headX, headY + 2, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Central ifm indicator
+    ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(0, 0, radius, this.pacmanMouthAngle, Math.PI * 2 - this.pacmanMouthAngle);
-    ctx.lineTo(0, 0);
-    ctx.closePath();
+    ctx.arc(0, 0, 3, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.stroke();
 
     ctx.restore();
   }
@@ -229,21 +260,32 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const centerX = this.pacman.x + this.pacman.width / 2;
     const centerY = this.pacman.y + this.pacman.height / 2;
-    const radius = this.pacman.width / 2 - 1;
+    const size = this.pacman.width - 2;
 
-    // Todesanimation: Pac-Man "schrumpft" von oben
+    // Robot "malfunction" animation: flickering and shrinking
     const progress = this.stateTimer / this.DEATH_DURATION;
-    const startAngle = -Math.PI / 2 + progress * Math.PI;
-    const endAngle = -Math.PI / 2 - progress * Math.PI + Math.PI * 2;
+    const flickerAlpha = Math.sin(progress * 20) * 0.3 + 0.7; // Flickering effect
+    const shrinkFactor = 1 - (progress * 0.8); // Shrink to 20% of original size
 
-    ctx.fillStyle = '#FFFF00';
-    ctx.beginPath();
-    if (progress < 1) {
-      ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-      ctx.lineTo(centerX, centerY);
-      ctx.closePath();
-      ctx.fill();
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.scale(shrinkFactor, shrinkFactor);
+    ctx.globalAlpha = flickerAlpha;
+
+    // Robot body (orange, flickering)
+    ctx.fillStyle = '#ED6B00';
+    ctx.fillRect(-size/2, -size/2, size, size);
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-size/2, -size/2, size, size);
+
+    // "Error" indicators (red flashing)
+    if (Math.sin(progress * 30) > 0) {
+      ctx.fillStyle = '#FF0000';
+      ctx.fillRect(-2, -2, 4, 4);
     }
+
+    ctx.restore();
   }
 
   private drawGhost(ctx: CanvasRenderingContext2D, ghost: Block) {
@@ -468,12 +510,21 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private drawPacmanIcon(ctx: CanvasRenderingContext2D, x: number, y: number) {
-    ctx.fillStyle = '#FFFF00';
-    ctx.beginPath();
-    ctx.arc(x, y, 8, 0.2, Math.PI * 2 - 0.2);
-    ctx.lineTo(x, y);
-    ctx.closePath();
-    ctx.fill();
+    // Draw small ifm robot icon for lives indicator
+    ctx.fillStyle = '#ED6B00';
+    ctx.fillRect(x - 6, y - 6, 12, 8);
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(x - 6, y - 6, 12, 8);
+
+    // Small head
+    ctx.fillRect(x - 3, y - 8, 6, 4);
+    ctx.strokeRect(x - 3, y - 8, 6, 4);
+
+    // Eyes
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(x - 2, y - 7, 1, 1);
+    ctx.fillRect(x + 1, y - 7, 1, 1);
   }  //Grid-System(wie klassiches Pac-Man: 28x31 Felder)
   readonly GRID_WIDTH = 28;
   readonly GRID_HEIGHT = 31;
@@ -551,10 +602,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.orangeGhostImage.src = 'assets/orangeGhost.png';
     this.pinkGhostImage.src = 'assets/pinkGhost.png';
     this.redGhostImage.src = 'assets/redGhost.png';
-    this.pacmanUpImage.src = 'assets/pacmanUp.png';
-    this.pacmanDownImage.src = 'assets/pacmanDown.png';
-    this.pacmanLeftImage.src = 'assets/pacmanLeft.png';
-    this.pacmanRightImage.src = 'assets/pacmanRight.png';
+    // Use robot images instead of pacman
+    this.pacmanUpImage.src = 'assets/robot-up.svg';
+    this.pacmanDownImage.src = 'assets/robot-down.svg';
+    this.pacmanLeftImage.src = 'assets/robot-left.svg';
+    this.pacmanRightImage.src = 'assets/robot-right.svg';
     this.wallImage.src = 'assets/wall.png';
     this.powerFoodImage.src = 'assets/powerFood.png';
     this.scaredGhostImage.src = 'assets/scaredGhost.png';
