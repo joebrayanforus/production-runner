@@ -7,12 +7,12 @@
   position: relative;
   overflow: hidden;
 }
-
 /* IFM Logo in Game */
 .game-ifm-logo {
   position: absolute;
   top: 20px;
-  right: 30px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 100;
   background: rgba(255, 255, 255, 0.95);
   padding: 8px 12px;
