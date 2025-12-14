@@ -28,54 +28,54 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private lastFrameTime = 0;
   private readonly FPS = 30;
   private onKeyDownBound = (e: KeyboardEvent) => this.onKeyDown(e);
-  // Assets
-  private blueGhostImage = new Image();
-  private orangeGhostImage = new Image();
-  private pinkGhostImage = new Image();
-  private redGhostImage = new Image();
-  private pacmanUpImage = new Image();
-  private pacmanDownImage = new Image();
-  private pacmanLeftImage = new Image();
-  private pacmanRightImage = new Image();
+  // Assets - Industrial Equipment
+  private malfunctionBlueImage = new Image();
+  private malfunctionOrangeImage = new Image();
+  private malfunctionPinkImage = new Image();
+  private malfunctionRedImage = new Image();
+  private robotUpImage = new Image();
+  private robotDownImage = new Image();
+  private robotLeftImage = new Image();
+  private robotRightImage = new Image();
   private wallImage = new Image();
-  private powerFoodImage = new Image();
-  private scaredGhostImage = new Image();
+  private maintenanceStationImage = new Image();
+  private repairModeImage = new Image();
   private cherryImage = new Image();
 
-  // Game objects collections
+  // Industrial Equipment Collections
   walls: Set<Block> = new Set<Block>();
-  foods: Set<Block> = new Set<Block>();
-  powerPellets: Set<Block> = new Set<Block>();
-  ghosts: Set<Block> = new Set<Block>();
-  pacman: Block | null = null;
+  sensorData: Set<Block> = new Set<Block>();
+  maintenanceStations: Set<Block> = new Set<Block>();
+  malfunctions: Set<Block> = new Set<Block>();
+  robot: Block | null = null;
   cherry: Block | null = null;
 
   // Buffered input for smoother corner turning
   private bufferedDirection: string | null = null;
 
-  // Basic game state
-  lives = 3;
-  score = 0;
+  // Basic system state
+  systemHealth = 3;
+  efficiency = 0;
   gameOver = false;
   playerName = ''; // Player name for leaderboard
   gameMode: GameMode = 'classic'; // Make gameMode accessible in template
-  scaredTimer = 0;
-  scaredDuration = 10000; // 10 seconds in ms
-  pelletStreak = 0;
-  streakMultiplier = 1.0;
-  currentLevel = 1;
+  maintenanceTimer = 0;
+  maintenanceDuration = 10000; // 10 seconds in ms
+  dataStreak = 0;
+  efficiencyMultiplier = 1.0;
+  productionLevel = 1;
 
-  // Cherry System
-  private cherrySpawnCooldown = 0;
-  private totalPellets = 0; // Wird beim Laden der Map gesetzt
+  // Bonus System
+  private bonusSpawnCooldown = 0;
+  private totalSensorData = 0; // Wird beim Laden der Map gesetzt
 
-  // Ghost House Release Timer
-  private ghostReleaseTimer = 0;
-  private readonly GHOST_RELEASE_INTERVAL = 800; // Release a ghost roughly every 0.8s
-  private ghostsReleased = 0;
+  // Malfunction Spawning Timer
+  private malfunctionSpawnTimer = 0;
+  private readonly MALFUNCTION_SPAWN_INTERVAL = 800; // Spawn a malfunction roughly every 0.8s
+  private malfunctionsActive = 0;
 
   // Scatter/Chase Mode (authentisches Pac-Man Verhalten)
-  private ghostMode: 'scatter' | 'chase' | 'frightened' = 'scatter';
+  private malfunctionMode: 'random' | 'aggressive' | 'maintenance' = 'random';
   private modeTimer = 0;
   private modePhase = 0; // Aktuelle Phase im Scatter/Chase Zyklus
   // Schwierigere Timings: Kürzere Scatter, längere Chase-Phasen
@@ -153,21 +153,30 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     });
 
-    // Foods zeichnen (weiße Punkte - Produktionsaufträge)
-    ctx.fillStyle = 'white';
+    // Sensordaten zeichnen (kleine ifm-Symbole)
+    ctx.fillStyle = '#00FF88';
     this.foods.forEach(food => {
-      ctx.beginPath();
-      ctx.arc(food.x + 2, food.y + 2, 2, 0, Math.PI * 2);
-      ctx.fill();
+      // Draw small sensor data icon
+      ctx.fillRect(food.x + 1, food.y + 1, 3, 3);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(food.x + 1, food.y + 1, 3, 3);
     });
 
-    // Power Pellets zeichnen (blinkend)
+    // Wartungsstationen zeichnen (blinkend)
     if (this.powerPelletVisible) {
-      ctx.fillStyle = '#FFD700';
+      ctx.fillStyle = '#ED6B00';
       this.powerPellets.forEach(pellet => {
-        ctx.beginPath();
-        ctx.arc(pellet.x + pellet.width / 2, pellet.y + pellet.height / 2, pellet.width / 2, 0, Math.PI * 2);
-        ctx.fill();
+        // Draw maintenance station as orange square with wrench symbol
+        ctx.fillRect(pellet.x + 2, pellet.y + 2, pellet.width - 4, pellet.height - 4);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(pellet.x + 2, pellet.y + 2, pellet.width - 4, pellet.height - 4);
+        // Add wrench symbol
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '8px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('🔧', pellet.x + pellet.width / 2, pellet.y + pellet.height / 2 + 2);
       });
     }
 
@@ -293,85 +302,74 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     const y = ghost.y;
     const size = ghost.width;
 
-    // Farbe basierend auf Status
+    // Maschinenstörung-Farben und Symbole
     let color = '#FF0000';
+    let symbol = '⚠️';
+    let errorText = '';
+
     if (ghost.scared) {
-      // Blinken wenn Frightened fast vorbei
+      // Reparatur im Gange (blinkend)
       if (this.scaredTimer < 2000 && Math.floor(this.scaredTimer / 200) % 2 === 0) {
-        color = '#FFFFFF';
+        color = '#00FF00';
+        symbol = '🔧';
       } else {
-        color = '#2121FF';
+        color = '#FFFF00';
+        symbol = '⚡';
       }
     } else {
       switch (ghost.type) {
-        case 'aggressive': color = '#FF0000'; break; // Rot - AGGRESSIVE
-        case 'ambush': color = '#FFB8FF'; break;     // Pink - AMBUSH
-        case 'patrol': color = '#00FFFF'; break;     // Cyan - PATROL
-        case 'random': color = '#FFB852'; break;     // Orange - RANDOM
+        case 'aggressive':
+          color = '#FF0000';
+          symbol = '🌡️';
+          errorText = 'TEMP';
+          break; // Überhitzung
+        case 'ambush':
+          color = '#FF69B4';
+          symbol = '💨';
+          errorText = 'DRUCK';
+          break; // Druckabfall
+        case 'patrol':
+          color = '#00FFFF';
+          symbol = '⚡';
+          errorText = 'VIBR';
+          break; // Vibration
+        case 'random':
+          color = '#FFA500';
+          symbol = '🔧';
+          errorText = 'VERSCH';
+          break; // Verschleiß
       }
     }
 
-    // Ghost Körper
+    // Maschinenstörung als Warn-Symbol darstellen
+    ctx.save();
+
+    // Hauptkörper (Warnschild)
     ctx.fillStyle = color;
-    ctx.beginPath();
-    // Oberer Halbkreis
-    ctx.arc(x + size / 2, y + size / 2, size / 2, Math.PI, 0);
-    // Unterer Teil mit Wellen
-    ctx.lineTo(x + size, y + size);
-    const waveCount = 3;
-    const waveWidth = size / waveCount;
-    for (let i = waveCount; i > 0; i--) {
-      ctx.quadraticCurveTo(
-        x + (i - 0.5) * waveWidth, y + size - 4,
-        x + (i - 1) * waveWidth, y + size
-      );
+    ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 2, y + 2, size - 4, size - 4);
+
+    // Error-Symbol
+    ctx.font = `${size * 0.4}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(symbol, x + size / 2, y + size / 2 + 2);
+
+    // Error-Text (klein)
+    if (errorText) {
+      ctx.font = `${size * 0.2}px Arial`;
+      ctx.fillStyle = '#000000';
+      ctx.fillText(errorText, x + size / 2, y + size - 3);
     }
-    ctx.closePath();
-    ctx.fill();
 
-    // Augen (wenn nicht scared)
-    if (!ghost.scared) {
-      // Weiße Augäpfel
-      ctx.fillStyle = 'white';
-      ctx.beginPath();
-      ctx.ellipse(x + size * 0.3, y + size * 0.4, size * 0.15, size * 0.2, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(x + size * 0.7, y + size * 0.4, size * 0.15, size * 0.2, 0, 0, Math.PI * 2);
-      ctx.fill();
+    // Blinking error indicator
+    if (!ghost.scared && Math.sin(Date.now() * 0.01) > 0.5) {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(x + size - 6, y + 2, 4, 4);
 
-      // Pupillen (zeigen in Bewegungsrichtung)
-      ctx.fillStyle = '#2121DE';
-      let pupilOffsetX = 0, pupilOffsetY = 0;
-      if (ghost.direction === 'L') pupilOffsetX = -2;
-      else if (ghost.direction === 'R') pupilOffsetX = 2;
-      else if (ghost.direction === 'U') pupilOffsetY = -2;
-      else if (ghost.direction === 'D') pupilOffsetY = 2;
-
-      ctx.beginPath();
-      ctx.arc(x + size * 0.3 + pupilOffsetX, y + size * 0.4 + pupilOffsetY, size * 0.08, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(x + size * 0.7 + pupilOffsetX, y + size * 0.4 + pupilOffsetY, size * 0.08, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      // Scared Face
-      ctx.fillStyle = 'white';
-      // Augen
-      ctx.beginPath();
-      ctx.arc(x + size * 0.35, y + size * 0.4, 3, 0, Math.PI * 2);
-      ctx.arc(x + size * 0.65, y + size * 0.4, 3, 0, Math.PI * 2);
-      ctx.fill();
-      // Zickzack Mund
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(x + size * 0.2, y + size * 0.7);
-      for (let i = 1; i <= 4; i++) {
-        ctx.lineTo(x + size * (0.2 + i * 0.15), y + size * (i % 2 === 0 ? 0.7 : 0.6));
-      }
-      ctx.stroke();
-    }
+    ctx.restore();
   }
 
   private drawUI(ctx: CanvasRenderingContext2D) {
@@ -379,8 +377,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.font = 'bold 16px "Press Start 2P", monospace';
     ctx.fillStyle = 'white';
     ctx.textAlign = 'left';
-    ctx.fillText(`SCORE: ${this.score}`, 10, 50);
-    ctx.fillText(`LEVEL: ${this.currentLevel}`, this.CANVAS_WIDTH / 2 - 50, 50);
+    ctx.fillText(`EFFIZIENZ: ${this.efficiency}`, 10, 50);
+    ctx.fillText(`PROD-LVL: ${this.productionLevel}`, this.CANVAS_WIDTH / 2 - 50, 50);
 
     // High Score anzeigen
     ctx.textAlign = 'right';
@@ -409,24 +407,24 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     ctx.textAlign = 'left';
 
-    // Lives unten links
-    for (let i = 0; i < this.lives; i++) {
-      this.drawPacmanIcon(ctx, 20 + i * 25, this.CANVAS_HEIGHT - 15);
+    // System Health unten links
+    for (let i = 0; i < this.systemHealth; i++) {
+      this.drawRobotIcon(ctx, 20 + i * 25, this.CANVAS_HEIGHT - 15);
     }
 
-    // Ghost Mode Indicator (Debug oder Learn Mode)
-    if (this.debugMode || this.showGhostTargets) {
+    // Malfunction Status Indicator (Debug oder Learn Mode)
+    if (this.debugMode || this.showMalfunctionTargets) {
       ctx.font = '12px monospace';
-      ctx.fillStyle = this.ghostMode === 'scatter' ? '#00FF00' : '#FF0000';
-      ctx.fillText(`Mode: ${this.ghostMode}`, 10, 50);
+      ctx.fillStyle = this.malfunctionMode === 'random' ? '#00FF00' : '#FF0000';
+      ctx.fillText(`STATUS: ${this.malfunctionMode.toUpperCase()}`, 10, 70);
     }
 
     // Ready Screen
     if (this.gameState === 'ready') {
       ctx.font = 'bold 24px "Press Start 2P", monospace';
-      ctx.fillStyle = '#FFFF00';
+      ctx.fillStyle = '#ED6B00';
       ctx.textAlign = 'center';
-      ctx.fillText('READY!', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      ctx.fillText('SYSTEM BEREIT!', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
 
       // Zeige Modus-Info
       ctx.font = '12px monospace';
@@ -509,7 +507,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private drawPacmanIcon(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  private drawRobotIcon(ctx: CanvasRenderingContext2D, x: number, y: number) {
     // Draw small ifm robot icon for lives indicator
     ctx.fillStyle = '#ED6B00';
     ctx.fillRect(x - 6, y - 6, 12, 8);
@@ -1215,18 +1213,18 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     for (const ghost of this.ghosts) {
       if (this.collision(ghost, this.pacman)) {
         if (ghost.scared) {
-          // Reparatur: Ghost "reparieren" (+200 Punkte)
-          this.audioService.play('eatghost');
-          this.score += 200;
+          // Reparatur: Störung "reparieren" (+200 Effizienz)
+          this.audioService.play('eatghost'); // TODO: Replace with repair sound
+          this.efficiency += 200;
           // Respawn ghost at starting position
           ghost.reset();
           ghost.scared = false;
           ghost.updateVelocity(this.CELL_SIZE); // Reset to normal speed
           continue;
         } else {
-          // Normaler Ghost-Kontakt: Leben verlieren
-          this.audioService.play('die');
-          this.lives -= 1;
+          // Systemfehler: Health verlieren
+          this.audioService.play('die'); // TODO: Replace with system error sound
+          this.systemHealth -= 1;
           this.gameState = 'dying';
           this.stateTimer = 0;
           return; // Stoppe weitere Bewegung
@@ -1302,13 +1300,13 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Check cherry collision (Bonus-Frucht)
     if (this.cherry && this.collision(this.pacman, this.cherry)) {
-      this.audioService.play('eatghost'); // Bonus-Sound
-      this.score += 500; // 500 Punkte (statt 50)
+      this.audioService.play('eatghost'); // TODO: Replace with bonus collection sound
+      this.efficiency += 500; // 500 Effizienz-Einheiten
 
-      // Bonus-Effekt: Kurze Unverwundbarkeit (3 Sekunden)
-      // Extraleben nur bis max. 3 (Anforderung)
-      if (this.lives < 3) {
-        this.lives += 1; // Extra Leben!
+      // Bonus-Effekt: System-Boost
+      // System Health nur bis max. 3 (Anforderung)
+      if (this.systemHealth < 3) {
+        this.systemHealth += 1; // Extra Health!
       }
 
       this.cherry = null;

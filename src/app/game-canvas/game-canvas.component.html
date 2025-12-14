@@ -24,7 +24,7 @@
       <div class="overlay" *ngIf="gameState === 'gameover'">
         <div class="overlay-panel wide">
           <h2>⚡ PRODUKTION ABGESCHLOSSEN</h2>
-          <p>Gesamtertrag: <strong>{{ score }} Punkte</strong></p>
+          <p>Produktionseffizienz: <strong>{{ efficiency }} Einheiten</strong></p>
 
           <div class="leaderboard-block">
             <h3>🏆 Leistungsranking</h3>
@@ -33,7 +33,7 @@
                 <tr>
                   <th>#</th>
                   <th>Operator</th>
-                  <th>Punkte</th>
+                  <th>Effizienz</th>
                   <th>Level</th>
                 </tr>
               </thead>
