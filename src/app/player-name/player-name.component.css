@@ -1,25 +1,22 @@
-/* === PLAYER NAME PAGE === */
+/* === PLAYER NAME PAGE - IFM EDITION === */
 
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Press+Start+2P&display=swap');
 
 .player-name-container {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 30px;
+  gap: 20px;
   padding: 20px;
-  background: #000000;
-  background-image:
-    repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, transparent 1px, transparent 2px, rgba(255,255,255,0.03) 3px),
-    radial-gradient(ellipse at center, #1a1a2e 0%, #000000 100%);
-  color: #ffffff;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  color: #1a1a1a;
+  font-family: 'Roboto', 'Segoe UI', sans-serif;
   position: relative;
   overflow-x: hidden;
 }
 
-/* Scanline overlay */
+/* IFM Orange accent overlay */
 .player-name-container::before {
   content: '';
   position: fixed;
@@ -29,19 +26,38 @@
   height: 100%;
   background: repeating-linear-gradient(
     0deg,
-    rgba(0, 255, 0, 0.03) 0px,
+    rgba(237, 107, 0, 0.02) 0px,
     transparent 1px,
     transparent 2px,
-    rgba(0, 255, 0, 0.03) 3px
+    rgba(237, 107, 0, 0.02) 3px
   );
   pointer-events: none;
   z-index: 10;
 }
 
+/* === IFM LOGO SECTION === */
+.ifm-logo-section {
+  padding: 15px 0;
+  text-align: center;
+  z-index: 5;
+}
+
+.ifm-logo-img {
+  height: 80px;
+  width: auto;
+  filter: drop-shadow(0 2px 8px rgba(237, 107, 0, 0.2));
+  animation: logoFloat 3s ease-in-out infinite;
+}
+
+@keyframes logoFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
 /* === HEADER === */
 .header {
   text-align: center;
-  padding: 20px 0;
+  padding: 15px 0;
   position: relative;
   z-index: 1;
 }
@@ -56,57 +72,54 @@
 
 .logo-icon {
   font-size: 50px;
-  filter: drop-shadow(0 0 20px #FFD700) drop-shadow(0 0 40px #FF6B00);
-  animation: pulse 2s ease-in-out infinite;
+  filter: none;
+  animation: none;
+  display: none;
 }
 
 @keyframes pulse {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
+  50% { transform: scale(1.05); }
 }
 
 .header h1 {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 24px;
-  font-weight: 400;
-  color: #FFD700;
+  font-family: 'Roboto', sans-serif;
+  font-size: 48px;
+  font-weight: 700;
+  color: #1a1a1a;
   margin: 0;
   letter-spacing: 2px;
-  text-shadow:
-    0 0 10px #FFD700,
-    0 0 20px #FFD700,
-    0 0 30px #FF6B00,
-    2px 2px 0px #000;
+  text-shadow: 2px 2px 4px rgba(237, 107, 0, 0.15);
 }
 
 .subtitle {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 12px;
-  color: #00FFFF;
-  text-shadow: 0 0 10px #00FFFF;
-  margin: 10px 0 0 0;
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  color: #ED6B00;
+  text-shadow: none;
+  margin: 8px 0 0 0;
   letter-spacing: 1px;
+  font-weight: 600;
 }
 
 /* === ARCADE SCREEN === */
 .arcade-screen {
   width: 100%;
   max-width: 800px;
-  background: #000;
-  border: 6px solid #00FFFF;
+  background: #ffffff;
+  border: 4px solid #ED6B00;
   border-radius: 12px;
-  padding: 25px;
+  padding: 30px;
   position: relative;
   box-shadow:
-    0 0 20px rgba(0, 255, 255, 0.6),
-    0 0 40px rgba(0, 255, 255, 0.4),
-    inset 0 0 30px rgba(0, 255, 255, 0.1);
+    0 4px 20px rgba(237, 107, 0, 0.3),
+    inset 0 0 20px rgba(237, 107, 0, 0.05);
   animation: screenGlow 3s ease-in-out infinite;
 }
 
 @keyframes screenGlow {
-  0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 255, 0.6), 0 0 40px rgba(0, 255, 255, 0.4), inset 0 0 30px rgba(0, 255, 255, 0.1); }
-  50% { box-shadow: 0 0 30px rgba(0, 255, 255, 0.8), 0 0 60px rgba(0, 255, 255, 0.6), inset 0 0 40px rgba(0, 255, 255, 0.2); }
+  0%, 100% { box-shadow: 0 4px 20px rgba(237, 107, 0, 0.3), inset 0 0 20px rgba(237, 107, 0, 0.05); }
+  50% { box-shadow: 0 6px 30px rgba(237, 107, 0, 0.5), inset 0 0 20px rgba(237, 107, 0, 0.08); }
 }
 
 .player-label {
@@ -114,16 +127,17 @@
   justify-content: center;
   align-items: center;
   gap: 15px;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 11px;
-  color: #00FF88;
-  text-shadow: 0 0 10px #00FF88;
-  margin-bottom: 15px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  color: #ED6B00;
+  text-shadow: none;
+  margin-bottom: 20px;
   letter-spacing: 1px;
+  font-weight: 700;
 }
 
 .label-icon {
-  font-size: 24px;
+  font-size: 28px;
   animation: bounce 2s ease-in-out infinite;
 }
 
@@ -134,29 +148,28 @@
 
 .input-wrapper {
   position: relative;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 .arcade-input {
   width: 100%;
-  padding: 12px;
-  background: linear-gradient(to bottom, #1a1a1a, #0a0a0a);
-  border: 2px solid #00FF88;
-  border-radius: 4px;
-  color: #00FF88;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 14px;
+  padding: 15px;
+  background: #f5f5f5;
+  border: 2px solid #ED6B00;
+  border-radius: 6px;
+  color: #1a1a1a;
+
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
   text-align: center;
   text-transform: uppercase;
-  letter-spacing: 2px;
-  box-shadow:
-    0 0 15px rgba(0, 255, 136, 0.5),
-    inset 0 0 20px rgba(0, 0, 0, 0.8),
-    inset 0 2px 5px rgba(0, 255, 136, 0.2);
-  min-height: 40px;
+  letter-spacing: 1px;
+  box-shadow: 0 2px 8px rgba(237, 107, 0, 0.15);
+  min-height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-weight: 500;
 }
 
 .input-cursor {
@@ -164,10 +177,10 @@
   right: 15px;
   top: 50%;
   transform: translateY(-50%);
-  width: 3px;
-  height: 20px;
-  background: #00FF88;
-  box-shadow: 0 0 10px #00FF88;
+  width: 2px;
+  height: 24px;
+  background: #ED6B00;
+  box-shadow: none;
 }
 
 .input-cursor.active {
@@ -180,33 +193,36 @@
 }
 
 .hint-text {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 9px;
-  color: #FF6600;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  color: #ED6B00;
   text-align: center;
-  text-shadow: 0 0 5px #FF6600;
-  margin: 10px 0;
-  opacity: 0.8;
+  text-shadow: none;
+  margin: 12px 0;
+  opacity: 0.9;
+  font-weight: 600;
 }
 
 .name-preview {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 11px;
-  color: #00FF88;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #1a1a1a;
   text-align: center;
-  margin: 10px 0;
-  text-shadow: 0 0 10px #00FF88;
-  padding: 10px;
-  background: rgba(0, 255, 136, 0.1);
-  border: 2px solid #00FF88;
-  border-radius: 4px;
-  box-shadow: inset 0 0 20px rgba(0, 255, 136, 0.2);
+  margin: 15px 0;
+  text-shadow: none;
+  padding: 12px;
+  background: rgba(237, 107, 0, 0.08);
+  border: 2px solid #ED6B00;
+  border-radius: 6px;
+  box-shadow: inset 0 0 10px rgba(237, 107, 0, 0.05);
+  font-weight: 600;
 }
 
 .preview-name {
-  color: #FFD700;
-  text-shadow: 0 0 10px #FFD700;
-  letter-spacing: 1px;
+  color: #ED6B00;
+  text-shadow: none;
+  letter-spacing: 0.5px;
+  font-weight: 700;
 }
 
 /* === VIRTUAL KEYBOARD === */
@@ -214,26 +230,28 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 15px;
-  border: 2px solid #FF00FF;
+  background: #f5f5f5;
+  padding: 18px;
+  border: 2px solid #ED6B00;
   border-radius: 8px;
-  box-shadow: inset 0 0 20px rgba(255, 0, 255, 0.2);
-  margin-top: 15px;
+  box-shadow: inset 0 0 10px rgba(237, 107, 0, 0.05);
+  margin-top: 20px;
 }
 
 .keyboard-title {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 9px;
-  color: #FF00FF;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  color: #ED6B00;
   text-align: center;
-  text-shadow: 0 0 10px #FF00FF;
+  text-shadow: none;
   animation: keyboardPulse 1.5s ease-in-out infinite;
+  font-weight: 600;
+  letter-spacing: 1px;
 }
 
 @keyframes keyboardPulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  50% { opacity: 0.8; }
 }
 
 .keyboard-grid {
@@ -244,53 +262,52 @@
 
 .keyboard-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(32px, 1fr));
-  gap: 5px;
+  grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+  gap: 6px;
 }
 
 .keyboard-key {
-  padding: 6px 4px;
-  background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
-  border: 2px solid #00FF88;
-  border-radius: 3px;
-  color: #00FF88;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 8px;
+  padding: 8px 6px;
+  background: #ffffff;
+  border: 2px solid #ED6B00;
+  border-radius: 4px;
+  color: #ED6B00;
+  font-family: 'Roboto', sans-serif;
+  font-size: 11px;
   font-weight: bold;
   cursor: pointer;
   transition: all 0.15s ease;
-  box-shadow: 0 0 5px rgba(0, 255, 136, 0.5);
-  text-shadow: 0 0 5px #00FF88;
+  box-shadow: 0 2px 6px rgba(237, 107, 0, 0.1);
+  text-shadow: none;
   user-select: none;
 }
 
 .keyboard-key:hover {
-  background: linear-gradient(145deg, #0a0a0a, #1a1a1a);
-  border-color: #FFD700;
-  color: #FFD700;
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
-  text-shadow: 0 0 8px #FFD700;
-  transform: scale(1.05);
+  background: #FFF5E6;
+  border-color: #ED6B00;
+  color: #ED6B00;
+  box-shadow: 0 4px 12px rgba(237, 107, 0, 0.25);
+  text-shadow: none;
+  transform: scale(1.08);
 }
 
 .keyboard-key.selected {
-  background: linear-gradient(145deg, #FFD700, #FF8C00);
-  border-color: #FFFFFF;
-  color: #000000;
+  background: linear-gradient(135deg, #ED6B00 0%, #CC5500 100%);
+  border-color: #ffffff;
+  color: #ffffff;
   box-shadow:
-    0 0 15px rgba(255, 215, 0, 1),
-    0 0 25px rgba(255, 140, 0, 0.8),
-    inset 0 0 20px rgba(255, 255, 255, 0.3);
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-  transform: scale(1.2);
+    0 4px 12px rgba(237, 107, 0, 0.5),
+    inset 0 0 10px rgba(255, 255, 255, 0.2);
+  text-shadow: none;
+  transform: scale(1.15);
   font-weight: bold;
   animation: keySelected 0.3s ease;
 }
 
 @keyframes keySelected {
-  0% { transform: scale(1.05); }
-  50% { transform: scale(1.25); }
-  100% { transform: scale(1.2); }
+  0% { transform: scale(1.08); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1.15); }
 }
 
 .keyboard-controls {

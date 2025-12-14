@@ -1,42 +1,45 @@
 <div class="player-name-container">
+  <!-- IFM Logo Header -->
+  <div class="ifm-logo-section">
+    <img src="assets/ifm1.webp" alt="ifm" class="ifm-logo-img">
+  </div>
+
   <!-- Header -->
   <header class="header">
     <div class="title-section">
-      <span class="logo-icon">🏭</span>
       <h1>PRODUCTION RUNNER</h1>
-      <span class="logo-icon">🏭</span>
     </div>
-    <p class="subtitle">{{ gameMode === 'classic' ? 'CLASSIC MODE' : 'TRAININGS MODUS' }}</p>
+    <p class="subtitle">{{ gameMode === 'classic' ? 'STANDARD BETRIEB' : 'TRAININGSMODUS' }}</p>
   </header>
 
   <!-- Main Screen -->
   <div class="arcade-screen">
     <label class="player-label">
-      <span class="label-icon">👾</span>
-      <span class="label-text">ENTER PLAYER NAME</span>
-      <span class="label-icon">👾</span>
+      <span class="label-icon">⚙️</span>
+      <span class="label-text">OPERATOR IDENTIFIKATION</span>
+      <span class="label-icon">⚙️</span>
     </label>
 
     <!-- Player Name Display -->
     <div class="input-wrapper">
       <div class="arcade-input">
-        {{ playerName.toUpperCase() || 'TIPPE DEINEN NAMEN...' }}
+        {{ playerName.toUpperCase() || 'GEBEN SIE IHREN NAMEN EIN...' }}
       </div>
       <div class="input-cursor active"></div>
     </div>
 
     <!-- Current Input Display -->
     <p class="name-preview" *ngIf="isPlayerNameValid()">
-      SPIELER: <span class="preview-name">{{ playerName.toUpperCase() }}</span>
+      OPERATOR: <span class="preview-name">{{ playerName.toUpperCase() }}</span>
     </p>
     <p class="hint-text" *ngIf="!isPlayerNameValid()">
-      TIPPE EINEN NAMEN ZUM STARTEN (MAX 20 ZEICHEN)
+      NAMEN EINGEBEN ZUM STARTEN (MAX 20 ZEICHEN)
     </p>
 
     <!-- Virtual Keyboard -->
     <div class="virtual-keyboard">
       <div class="keyboard-title">
-        🎮 STEUERKREUZ ODER PFEILTASTEN ZUR NAVIGATION 🎮
+        ⌨️ NAVIGATIONSTASTEN ODER GAMEPAD ⌨️
       </div>
 
       <div class="keyboard-grid">
