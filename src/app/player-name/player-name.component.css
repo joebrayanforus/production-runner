@@ -174,9 +174,9 @@
 
 .input-cursor {
   position: absolute;
-  right: 15px;
+  left: 50%;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
   width: 2px;
   height: 24px;
   background: #ED6B00;
