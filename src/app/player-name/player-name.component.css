@@ -131,7 +131,9 @@
   font-size: 16px;
   color: #ED6B00;
   text-shadow: none;
-  margin-bottom: 20px;
+  margin: 0 auto 20px auto;
+  max-width: 400px;
+  width: 100%;
   letter-spacing: 1px;
   font-weight: 700;
 }
@@ -148,12 +150,14 @@
 
 .input-wrapper {
   position: relative;
-  margin-bottom: 20px;
+  margin: 0 auto 20px auto;
+  width: 100%;
+  max-width: 400px;
 }
 
 .arcade-input {
   width: 100%;
-  padding: 15px;
+  padding: 15px 20px;
   background: #f5f5f5;
   border: 2px solid #ED6B00;
   border-radius: 6px;
@@ -169,6 +173,7 @@
   align-items: center;
   justify-content: center;
   font-weight: 500;
+  box-sizing: border-box;
 }
 
 .input-cursor {
