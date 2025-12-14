@@ -171,6 +171,26 @@
   font-weight: 500;
 }
 
+.input-cursor {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 24px;
+  background: #ED6B00;
+  box-shadow: none;
+}
+
+.input-cursor.active {
+  animation: cursorBlink 0.7s step-end infinite;
+}
+
+@keyframes cursorBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
 .input-cursor.active {
   animation: cursorBlink 0.7s step-end infinite;
 }
