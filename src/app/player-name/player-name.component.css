@@ -158,7 +158,6 @@
   border: 2px solid #ED6B00;
   border-radius: 6px;
   color: #1a1a1a;
-
   font-family: 'Roboto', sans-serif;
   font-size: 16px;
   text-align: center;
@@ -170,15 +169,6 @@
   align-items: center;
   justify-content: center;
   font-weight: 500;
-}
-
-.input-cursor {
-  display: inline-block;
-  width: 2px;
-  height: 20px;
-  background: #ED6B00;
-  margin-left: 3px;
-  vertical-align: middle;
 }
 
 .input-cursor.active {
