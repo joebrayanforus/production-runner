@@ -23,9 +23,8 @@
     <!-- Player Name Display -->
     <div class="input-wrapper">
       <div class="arcade-input">
-        {{ playerName.toUpperCase() || 'GEBEN SIE IHREN NAMEN EIN...' }}
+        {{ playerName.toUpperCase() || 'GEBEN SIE IHREN NAMEN EIN...' }}<span class="input-cursor active" *ngIf="playerName"></span>
       </div>
-      <div class="input-cursor active"></div>
     </div>
 
     <!-- Current Input Display -->

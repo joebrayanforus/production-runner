@@ -173,14 +173,12 @@
 }
 
 .input-cursor {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  display: inline-block;
   width: 2px;
-  height: 24px;
+  height: 20px;
   background: #ED6B00;
-  box-shadow: none;
+  margin-left: 3px;
+  vertical-align: middle;
 }
 
 .input-cursor.active {
