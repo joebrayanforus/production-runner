@@ -186,49 +186,49 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ];
   }
   private draw(ctx: CanvasRenderingContext2D) {
-    // Wände zeichnen (optimiert sans shadow)
+    // Wände zeichnen (Gantt-Chart Balken in verschiedenen Farben)
     this.walls.forEach(wall => {
       if (wall.type === 'ghost-door') {
         // Ghost Door als pinke Linie
         ctx.fillStyle = '#FFB8FF';
         ctx.fillRect(wall.x, wall.y + wall.height / 2 - 2, wall.width, 4);
+      } else if (wall.color) {
+        // Gantt-Chart Balken mit spezifischer Farbe (Orange, Lila, Rot)
+        ctx.fillStyle = wall.color;
+        ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+        // Leichter Schatten für Tiefe
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.fillRect(wall.x, wall.y + wall.height - 2, wall.width, 2);
       } else if (wall.image && wall.image.complete) {
-        // Walls drawing
+        // Walls drawing mit Bild
         ctx.drawImage(wall.image, wall.x, wall.y, wall.width, wall.height);
       } else {
-        // Fallback: Blaue Wände mit 3D-Effekt
-        ctx.fillStyle = '#2121DE';
+        // Fallback: Graue Wände für Rahmen
+        ctx.fillStyle = '#666666';
         ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
-        // Inner highlight für 3D-Effekt
-        ctx.fillStyle = '#4A4AFF';
-        ctx.fillRect(wall.x + 2, wall.y + 2, wall.width - 4, wall.height - 4);
       }
     });
 
-    // Sensordaten zeichnen (kleine ifm-Symbole)
-    ctx.fillStyle = '#00FF88';
+    // Sensordaten zeichnen (Pellets wie im Original - gelb)
+    ctx.fillStyle = '#FFFF00'; // Gelb wie im Original Pac-Man
     this.sensorData.forEach(food => {
-      // Draw small sensor data icon
-      ctx.fillRect(food.x + 1, food.y + 1, 3, 3);
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(food.x + 1, food.y + 1, 3, 3);
+      // Draw pellet as small circle (wie im Original)
+      // food.x und food.y sind bereits die korrekten Positionen (mit -2 Offset für Zentrierung)
+      const centerX = food.x + 2; // +2 weil width/2 = 2
+      const centerY = food.y + 2; // +2 weil height/2 = 2
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 2, 0, Math.PI * 2);
+      ctx.fill();
     });
 
-    // Wartungsstationen zeichnen (blinkend)
+    // Wartungsstationen zeichnen (Power Pellets - blinkend weiß wie im Original)
     if (this.powerPelletVisible) {
-      ctx.fillStyle = '#ED6B00';
+      ctx.fillStyle = '#FFFFFF'; // Weiß wie im Original
       this.maintenanceStations.forEach(pellet => {
-        // Draw maintenance station as orange square with wrench symbol
-        ctx.fillRect(pellet.x + 2, pellet.y + 2, pellet.width - 4, pellet.height - 4);
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(pellet.x + 2, pellet.y + 2, pellet.width - 4, pellet.height - 4);
-        // Add wrench symbol
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '8px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('🔧', pellet.x + pellet.width / 2, pellet.y + pellet.height / 2 + 2);
+        // Draw power pellet as larger circle (wie im Original)
+        ctx.beginPath();
+        ctx.arc(pellet.x + pellet.width / 2, pellet.y + pellet.height / 2, 6, 0, Math.PI * 2);
+        ctx.fill();
       });
     }
 
@@ -266,52 +266,185 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.save();
     ctx.translate(centerX, centerY);
 
-    // Draw ifm robot instead of pacman
-    // Robot body (orange square)
-    ctx.fillStyle = '#ED6B00';
-    ctx.fillRect(-size/2, -size/2, size, size);
+    // Rotate based on direction (Fuchs schaut in Bewegungsrichtung)
+    let rotation = 0;
+    let scaleX = 1; // Für horizontale Spiegelung bei Linksbewegung
+    
+    if (this.robot.direction === 'U') {
+      rotation = -Math.PI / 2;  // Nach oben
+    } else if (this.robot.direction === 'D') {
+      rotation = Math.PI / 2;  // Nach unten
+    } else if (this.robot.direction === 'L') {
+      scaleX = -1;  // Horizontal spiegeln für Linksbewegung
+    } else if (this.robot.direction === 'R') {
+      // Standard: nach rechts (keine Rotation/Spiegelung)
+    }
+    
+    ctx.scale(scaleX, 1);
+    ctx.rotate(rotation);
+
+    // Robot Platform Base (darker blue/teal bottom section)
+    const platformWidth = size * 0.9;
+    const platformHeight = size * 0.4;
+    const baseHeight = size * 0.15;
+    
+    // Main platform body (light grey/off-white)
+    ctx.fillStyle = '#E8E8E8';
+    ctx.fillRect(-platformWidth/2, -platformHeight/2 + baseHeight, platformWidth, platformHeight - baseHeight);
     ctx.strokeStyle = '#1a1a1a';
     ctx.lineWidth = 1;
-    ctx.strokeRect(-size/2, -size/2, size, size);
+    ctx.strokeRect(-platformWidth/2, -platformHeight/2 + baseHeight, platformWidth, platformHeight - baseHeight);
 
-    // Robot head (smaller square, positioned based on direction)
-    const headSize = size * 0.6;
-    let headX = 0, headY = 0;
+    // Base section (darker blue/teal)
+    ctx.fillStyle = '#2E7D8F';
+    ctx.fillRect(-platformWidth/2, platformHeight/2 - baseHeight, platformWidth, baseHeight);
+    ctx.strokeRect(-platformWidth/2, platformHeight/2 - baseHeight, platformWidth, baseHeight);
 
-    if (this.robot.direction === 'U') { headX = 0; headY = -size * 0.3; }
-    else if (this.robot.direction === 'D') { headX = 0; headY = size * 0.3; }
-    else if (this.robot.direction === 'L') { headX = -size * 0.3; headY = 0; }
-    else if (this.robot.direction === 'R') { headX = size * 0.3; headY = 0; }
-
-    ctx.fillStyle = '#ED6B00';
-    ctx.fillRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
-    ctx.strokeRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
-
-    // Robot eyes (sensors)
-    ctx.fillStyle = '#1a1a1a';
-    if (this.robot.direction === 'U' || this.robot.direction === 'D') {
-      ctx.beginPath();
-      ctx.arc(headX - 2, headY, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(headX + 2, headY, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.arc(headX, headY - 2, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(headX, headY + 2, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Central ifm indicator
-    ctx.fillStyle = '#ffffff';
+    // Glowing blue lights on front corners
+    const lightSize = 3;
+    const lightGlow = Math.sin(Date.now() * 0.005) * 0.3 + 0.7; // Pulsing effect
+    ctx.fillStyle = `rgba(0, 150, 255, ${lightGlow})`;
     ctx.beginPath();
-    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+    ctx.arc(-platformWidth/2 + 3, platformHeight/2 - baseHeight/2, lightSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(platformWidth/2 - 3, platformHeight/2 - baseHeight/2, lightSize, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Small blue square on top (label/QR code area)
+    ctx.fillStyle = '#2E7D8F';
+    ctx.fillRect(-platformWidth/4, -platformHeight/2 + baseHeight + 2, platformWidth/4, platformWidth/4);
+    ctx.strokeRect(-platformWidth/4, -platformHeight/2 + baseHeight + 2, platformWidth/4, platformWidth/4);
+
+    // Fox sitting on the platform
+    const foxSize = size * 0.55;
+    const foxY = -platformHeight/2 - foxSize * 0.25; // Position fox on top of platform
+
+    // Fox body (orange-red)
+    ctx.fillStyle = '#FF6B35';
+    ctx.beginPath();
+    ctx.ellipse(0, foxY, foxSize * 0.35, foxSize * 0.4, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 0.5;
     ctx.stroke();
+
+    // White chest
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.ellipse(0, foxY + foxSize * 0.1, foxSize * 0.2, foxSize * 0.25, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Fox head
+    const headSize = foxSize * 0.45;
+    ctx.fillStyle = '#FF6B35';
+    ctx.beginPath();
+    ctx.arc(0, foxY - foxSize * 0.25, headSize * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // White muzzle
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.ellipse(0, foxY - foxSize * 0.15, headSize * 0.15, headSize * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Black nose
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(0, foxY - foxSize * 0.1, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Large expressive eyes with white highlights
+    const eyeSize = 4;
+    const eyeY = foxY - foxSize * 0.3;
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(-headSize * 0.15, eyeY, eyeSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(headSize * 0.15, eyeY, eyeSize, 0, Math.PI * 2);
+    ctx.fill();
+
+    // White eye highlights (prominent)
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(-headSize * 0.15 - 1.5, eyeY - 1.5, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(headSize * 0.15 - 1.5, eyeY - 1.5, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ears
+    const earSize = headSize * 0.3;
+    // Left ear
+    ctx.fillStyle = '#FF6B35';
+    ctx.beginPath();
+    ctx.moveTo(-headSize * 0.2, foxY - foxSize * 0.4);
+    ctx.lineTo(-headSize * 0.35, foxY - foxSize * 0.55);
+    ctx.lineTo(-headSize * 0.1, foxY - foxSize * 0.45);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // White inner ear
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.moveTo(-headSize * 0.2, foxY - foxSize * 0.42);
+    ctx.lineTo(-headSize * 0.28, foxY - foxSize * 0.52);
+    ctx.lineTo(-headSize * 0.12, foxY - foxSize * 0.44);
+    ctx.closePath();
+    ctx.fill();
+    // Black ear tip
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(-headSize * 0.35, foxY - foxSize * 0.55, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Right ear
+    ctx.fillStyle = '#FF6B35';
+    ctx.beginPath();
+    ctx.moveTo(headSize * 0.2, foxY - foxSize * 0.4);
+    ctx.lineTo(headSize * 0.35, foxY - foxSize * 0.55);
+    ctx.lineTo(headSize * 0.1, foxY - foxSize * 0.45);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // White inner ear
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.moveTo(headSize * 0.2, foxY - foxSize * 0.42);
+    ctx.lineTo(headSize * 0.28, foxY - foxSize * 0.52);
+    ctx.lineTo(headSize * 0.12, foxY - foxSize * 0.44);
+    ctx.closePath();
+    ctx.fill();
+    // Black ear tip
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(headSize * 0.35, foxY - foxSize * 0.55, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Front paws (black)
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(-foxSize * 0.15, foxY + foxSize * 0.2, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(foxSize * 0.15, foxY + foxSize * 0.2, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bushy tail with white tip (curled to the right)
+    const tailStartX = foxSize * 0.2;
+    const tailStartY = foxY;
+    ctx.fillStyle = '#FF6B35';
+    ctx.beginPath();
+    ctx.ellipse(tailStartX + foxSize * 0.2, tailStartY - foxSize * 0.1, foxSize * 0.25, foxSize * 0.15, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // White tail tip
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(tailStartX + foxSize * 0.35, tailStartY - foxSize * 0.15, foxSize * 0.08, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.restore();
   }
@@ -333,17 +466,63 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.scale(shrinkFactor, shrinkFactor);
     ctx.globalAlpha = flickerAlpha;
 
-    // Robot body (orange, flickering)
-    ctx.fillStyle = '#ED6B00';
-    ctx.fillRect(-size/2, -size/2, size, size);
+    // Robot Platform Base (darker blue/teal bottom section)
+    const platformWidth = size * 0.9;
+    const platformHeight = size * 0.4;
+    const baseHeight = size * 0.15;
+    
+    // Main platform body (light grey/off-white)
+    ctx.fillStyle = '#E8E8E8';
+    ctx.fillRect(-platformWidth/2, -platformHeight/2 + baseHeight, platformWidth, platformHeight - baseHeight);
     ctx.strokeStyle = '#1a1a1a';
     ctx.lineWidth = 1;
-    ctx.strokeRect(-size/2, -size/2, size, size);
+    ctx.strokeRect(-platformWidth/2, -platformHeight/2 + baseHeight, platformWidth, platformHeight - baseHeight);
 
-    // "Error" indicators (red flashing)
+    // Base section (darker blue/teal)
+    ctx.fillStyle = '#2E7D8F';
+    ctx.fillRect(-platformWidth/2, platformHeight/2 - baseHeight, platformWidth, baseHeight);
+    ctx.strokeRect(-platformWidth/2, platformHeight/2 - baseHeight, platformWidth, baseHeight);
+
+    // Fox sitting on the platform (simplified for death animation)
+    const foxSize = size * 0.5;
+    const foxY = -platformHeight/2 - foxSize * 0.3;
+
+    // Fox body (orange-red)
+    ctx.fillStyle = '#FF6B35';
+    ctx.beginPath();
+    ctx.ellipse(0, foxY, foxSize * 0.35, foxSize * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // Fox head
+    const headSize = foxSize * 0.4;
+    ctx.fillStyle = '#FF6B35';
+    ctx.beginPath();
+    ctx.arc(0, foxY - foxSize * 0.25, headSize * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Eyes (simplified)
+    const eyeY = foxY - foxSize * 0.3;
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(-headSize * 0.15, eyeY, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(headSize * 0.15, eyeY, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // "Error" indicators (red flashing lights on platform)
     if (Math.sin(progress * 30) > 0) {
       ctx.fillStyle = '#FF0000';
-      ctx.fillRect(-2, -2, 4, 4);
+      ctx.beginPath();
+      ctx.arc(-platformWidth/2 + 2, platformHeight/2 - baseHeight/2, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(platformWidth/2 - 2, platformHeight/2 - baseHeight/2, 2, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     ctx.restore();
@@ -576,13 +755,13 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.fillStyle = '#1a1a1a';
     ctx.fillRect(x - 2, y - 7, 1, 1);
     ctx.fillRect(x + 1, y - 7, 1, 1);
-  }  //Grid-System(wie klassiches Pac-Man: 28x31 Felder)
-  readonly GRID_WIDTH = 28;
-  readonly GRID_HEIGHT = 31;
-  readonly CELL_SIZE = 20; // Pixel pro Feld
+  }  //Grid-System für Gantt-Chart Layout (breiter für horizontale Balken)
+  readonly GRID_WIDTH = 40;  // Breiter für Gantt-Chart
+  readonly GRID_HEIGHT = 26;  // Angepasst an Tile-Map (26 Zeilen)
+  readonly CELL_SIZE = 30; // Pixel pro Feld
   // Canvas-Dimensionen
-  readonly CANVAS_WIDTH = this.GRID_WIDTH * this.CELL_SIZE;  // 560px
-  readonly CANVAS_HEIGHT = this.GRID_HEIGHT * this.CELL_SIZE; // 620px
+  readonly CANVAS_WIDTH = this.GRID_WIDTH * this.CELL_SIZE;  // 1200px
+  readonly CANVAS_HEIGHT = this.GRID_HEIGHT * this.CELL_SIZE; // 780px
   // Game Manager
   private game: GameManager | null = null;
 
@@ -659,103 +838,217 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.scaredGhostImage.src = 'assets/scaredGhost.png';
     this.cherryImage.src = 'assets/cherry.png';
   }
-  // Klassisches Pac-Man 28x31 Labyrinth (authentisches Arcade-Layout)
-  // X = Wall, ' ' = Pellet, O = Power Pellet, - = Ghost House Door
-  // P = Pac-Man Start, r/p/b/o = Ghosts (red/pink/blue/orange)
-  // T = Tunnel (Wraparound), G = Ghost House Interior (no pellet)
-  private readonly tileMap: string[] = [
-    "XXXXXXXXXXXXXXXXXXXXXXXXXXXX",  // 0
-    "X            XX            X",  // 1
-    "X XXXX XXX   XX   XXX XXXX X",  // 2 (more loops, wider mid-corridors)
-    "XO  X  XXX   XX   XXX  XX OX",  // 3 (power corner, added side bypass)
-    "X XXXX XXX   XX   XXX XXXX X",  // 4
-    "X                          X",  // 5
-    "X XXXX XX XX  XXXX XX XXXX X",  // 6 (added mid shortcuts)
-    "X XXXX XX XX  XXXX XX XXXX X",  // 7
-    "X      XX    XX    XX      X",  // 8
-    "XXXXXX XXX   XX   XXX XXXXXX",  // 9 (opened central ring)
-    "X    X XXXXX XX XXXXX X    X",  // 10
-    "X    X XX          XX X    X",  // 11
-    "X    X XX XXX--XXX XX X    X",  // 12
-    "XXXXXX XX XGrGGGGX XX XXXXXX",  // 13 - Ghost house with red ghost
-    "T         XGbGpGoX         T",  // 14 - Tunnel + ghosts
-    "XXXXXX XX XGGGGGGX XX XXXXXX",  // 15
-    "X    X XX XXXXXXXX XX X    X",  // 16
-    "X    X XX          XX X    X",  // 17
-    "X    X XX XXXXXXXX XX X    X",  // 18
-    "XXXXXX XX XXXXXXXX XX XXXXXX",  // 19
-    "X            XX            X",  // 20
-    "X XXXX XXX   XX   XXX XXXX X",  // 21 (more branching)
-    "X XXXX XXX   XX   XXX XXXX X",  // 22
-    "XO  XX       P        XX  OX",  // 23 - Pac-Man start
-    "XXX XX XX XXXXXXXX XX XX XXX",  // 24
-    "XXX XX XX XXXXXXXX XX XX XXX",  // 25
-    "X      XX    XX    XX      X",  // 26
-    "X XXXXXXXXXX XX XXXXXXXXXX X",  // 27
-    "X XXXXXXXXXX XX XXXXXXXXXX X",  // 28
-    "X                          X",  // 29
-    "XXXXXXXXXXXXXXXXXXXXXXXXXXXX"   // 30
+  // Gantt-Chart Tile-Map als String-Array
+  // Zeichen-Bedeutung:
+  // X = Wand (Rahmen)
+  // O = Orange Balken (Task)
+  // P = Lila Balken (Task)
+  // R = Roter Balken (Task)
+  // ' ' = Freier Bereich (Pellet wird automatisch platziert)
+  // . = Pellet (explizit)
+  // * = Power Pellet
+  // G = Ghost House
+  // - = Ghost Door
+  // r/p/b/o = Geister (red/pink/blue/orange)
+  // M = Pacman Start
+  // | = Vertikale Verbindung (frei für Bewegung)
+  private readonly ganttTileMap: string[] = [
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",  // 0 - Obere Wand
+    "X M                                    X",  // 1 - Erste Reihe (E01) - Pacman Start
+    "X  OOOOOOOO      PPPPPP      OOOO      X",  // 2 - Orange/Lila Balken
+    "X  OOOOOOOO      PPPPPP      OOOO      X",  // 3
+    "X                                      X",  // 4
+    "X  OO  PP  OO  PP  OO  PP  OO  PP  OO  X",  // 5 - Zweite Reihe (STEW)
+    "X  OO  PP  OO  PP  OO  PP  OO  PP  OO  X",  // 6
+    "X                                      X",  // 7
+    "X  OOOOO  PPPPP  OOOOO  PPP            X",  // 8 - Dritte Reihe (LF1)
+    "X                                      X",  // 9
+    "X                                      X",  // 10 - Vierte Reihe (RH) - leer
+    "X                                      X",  // 11
+    "X                                      X",  // 12
+    "X  OOOOOOOOOO    PPPPPPPPPP            X",  // 13 - Fünfte Reihe (FT1)
+    "X                                      X",  // 14
+    "X                                      X",  // 15
+    "X  P  P  P  P  P  P                    X",  // 16 - Sechste Reihe (LF2)
+    "X                                      X",  // 17
+    "X                                      X",  // 18
+    "X  OO  OO  OO  OO  OO  OO              X",  // 19 - Siebte Reihe (ASM)
+    "X                                      X",  // 20
+    "X                                      X",  // 21
+    "X  OOOOOOO  RRRRRRR  OOOOOO            X",  // 22 - Achte Reihe (VOD1)
+    "X                                      X",  // 23
+    "X                                      X",  // 24
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"   // 25 - Untere Wand
   ];
-  private loadMap() {
-    for (let r = 0; r < this.tileMap.length; r++) {
-      const row = this.tileMap[r];
-      for (let c = 0; c < row.length; c++) {
-        const tileMapChar = row[c];
-        const x = c * this.CELL_SIZE;
-        const y = r * this.CELL_SIZE;
 
-        if (tileMapChar === 'X') {
-          this.walls.add(new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.wallImage));
-        } else if (tileMapChar === '-') {
-          // Ghost House Door - wird wie Wand behandelt, aber Geister können durch
-          const door = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.wallImage);
-          door.type = 'ghost-door';
-          this.walls.add(door);
-        } else if (tileMapChar === 'b') {
-          const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.blueGhostImage);
-          ghost.type = 'patrol'; // Cyan/Blue - PATROL: Feste Route entlang Korridoren
-          this.ghosts.add(ghost);
-        } else if (tileMapChar === 'o') {
-          const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.orangeGhostImage);
-          ghost.type = 'random'; // Orange - RANDOM: Zufällige Bewegung
-          this.ghosts.add(ghost);
-        } else if (tileMapChar === 'p') {
-          const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.pinkGhostImage);
-          ghost.type = 'ambush'; // Pink - AMBUSH: Lauert voraus
-          this.ghosts.add(ghost);
-        } else if (tileMapChar === 'r') {
-          const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.redGhostImage);
-          ghost.type = 'aggressive'; // Red - AGGRESSIVE: Verfolgt direkt
-          this.ghosts.add(ghost);
-        } else if (tileMapChar === 'P') {
-          this.robot = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.robotRightImage);
-        } else if (tileMapChar === ' ') {
-          // kleines Pellet in der Mitte der Zelle - Produktionsauftrag
-          this.sensorData.add(new Block(x + this.CELL_SIZE / 2 - 2, y + this.CELL_SIZE / 2 - 2, 4, 4, null));
-        } else if (tileMapChar === 'O') {
-          // Power Pellet - KI-Optimierung
-          const powerPellet = new Block(x + this.CELL_SIZE / 2 - 4, y + this.CELL_SIZE / 2 - 4, 8, 8, null);
-          this.maintenanceStations.add(powerPellet);
-        } else if (tileMapChar === 'T') {
-          // Tunnel - kein Pellet, aber passierbar (Wraparound)
-          // Nichts hinzufügen - bleibt leer
-        } else if (tileMapChar === 'G') {
-          // Ghost House Interior - kein Pellet
-          // Nichts hinzufügen - bleibt leer
+  // Gantt-Chart-ähnliches Layout: Horizontale Balken als Wände
+  // Jede Reihe repräsentiert eine Produktionseinheit mit horizontalen Task-Balken
+  private loadMap() {
+    // Parse Tile-Map String-Array
+    // Zuerst: Erkenne horizontale Balken (O, P, R) und erstelle sie als zusammenhängende Blöcke
+    const processedTiles = new Set<string>(); // Speichert bereits verarbeitete Positionen
+    
+    for (let row = 0; row < this.ganttTileMap.length; row++) {
+      const mapRow = this.ganttTileMap[row];
+      let col = 0;
+      
+      while (col < mapRow.length) {
+        const tileChar = mapRow[col];
+        const tileKey = `${row},${col}`;
+        
+        // Überspringe bereits verarbeitete Tiles
+        if (processedTiles.has(tileKey)) {
+          col++;
+          continue;
         }
+        
+        const x = col * this.CELL_SIZE;
+        const y = row * this.CELL_SIZE;
+
+        // Erkenne horizontale Balken (O, P, R) und erstelle sie als zusammenhängende Blöcke
+        if (tileChar === 'O' || tileChar === 'P' || tileChar === 'R') {
+          // Finde die Länge des Balkens
+          let barLength = 0;
+          let currentCol = col;
+          while (currentCol < mapRow.length && mapRow[currentCol] === tileChar) {
+            processedTiles.add(`${row},${currentCol}`);
+            barLength++;
+            currentCol++;
+          }
+          
+          // Bestimme Farbe basierend auf Zeichen
+          let color = '#FF8C00'; // Orange (Standard)
+          if (tileChar === 'P') color = '#9370DB'; // Lila
+          if (tileChar === 'R') color = '#FF4444'; // Rot
+          
+          // Erstelle horizontalen Balken (nur 40% der Zellenhöhe, zentriert)
+          const barHeight = this.CELL_SIZE * 0.4;
+          const barY = y + (this.CELL_SIZE - barHeight) / 2;
+          const bar = new Block(x, barY, barLength * this.CELL_SIZE, barHeight, null, color);
+          this.walls.add(bar);
+          
+          col = currentCol;
+          continue;
+        }
+
+        // Normale Tile-Verarbeitung
+        switch (tileChar) {
+          case 'X':
+            // Wand (Rahmen)
+            this.walls.add(new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.wallImage));
+            processedTiles.add(tileKey);
+            break;
+
+          case ' ':
+            // Freier Bereich - Pellet wird automatisch platziert
+            this.sensorData.add(new Block(
+              x + this.CELL_SIZE / 2 - 2,
+              y + this.CELL_SIZE / 2 - 2,
+              4, 4, null
+            ));
+            processedTiles.add(tileKey);
+            break;
+
+          case '.':
+            // Explizites Pellet
+            this.sensorData.add(new Block(
+              x + this.CELL_SIZE / 2 - 2,
+              y + this.CELL_SIZE / 2 - 2,
+              4, 4, null
+            ));
+            processedTiles.add(tileKey);
+            break;
+
+          case '*':
+            // Power Pellet
+            const powerPellet = new Block(
+              x + this.CELL_SIZE / 2 - 4,
+              y + this.CELL_SIZE / 2 - 4,
+              8, 8, null
+            );
+            this.maintenanceStations.add(powerPellet);
+            processedTiles.add(tileKey);
+            break;
+
+          case 'G':
+            // Ghost House Interior (kein Pellet, aber passierbar für Geister)
+            // Wird später als Ghost House Wände gezeichnet
+            processedTiles.add(tileKey);
+            break;
+
+          case '-':
+            // Ghost Door
+            const door = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.wallImage);
+            door.type = 'ghost-door';
+            this.walls.add(door);
+            processedTiles.add(tileKey);
+            break;
+
+          case 'M':
+            // Pacman Startposition
+            this.robot = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.robotRightImage);
+            this.robot.direction = 'R';
+            this.robot.startX = x;
+            this.robot.startY = y;
+            this.robot.updateVelocity(this.CELL_SIZE);
+            processedTiles.add(tileKey);
+            break;
+
+          case 'r':
+            // Roter Geist (aggressive)
+            const redGhost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.redGhostImage);
+            redGhost.type = 'aggressive';
+            this.ghosts.add(redGhost);
+            processedTiles.add(tileKey);
+            break;
+
+          case 'p':
+            // Pinker Geist (ambush)
+            const pinkGhost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.pinkGhostImage);
+            pinkGhost.type = 'ambush';
+            this.ghosts.add(pinkGhost);
+            processedTiles.add(tileKey);
+            break;
+
+          case 'b':
+            // Blauer Geist (patrol)
+            const blueGhost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.blueGhostImage);
+            blueGhost.type = 'patrol';
+            this.ghosts.add(blueGhost);
+            processedTiles.add(tileKey);
+            break;
+
+          case 'o':
+            // Oranger Geist (random)
+            const orangeGhost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.orangeGhostImage);
+            orangeGhost.type = 'random';
+            this.ghosts.add(orangeGhost);
+            processedTiles.add(tileKey);
+            break;
+
+          case '|':
+            // Vertikale Verbindung (frei für Bewegung, Pellet wird platziert)
+            this.sensorData.add(new Block(
+              x + this.CELL_SIZE / 2 - 2,
+              y + this.CELL_SIZE / 2 - 2,
+              4, 4, null
+            ));
+            processedTiles.add(tileKey);
+            break;
+        }
+        
+        col++;
       }
     }
-    // Aggressiver (roter) Sensor soll nie in der Ghost-Box starten
-    const aggressiveGhost = [...this.ghosts].find(g => g.type === 'aggressive');
-    if (aggressiveGhost) {
-      const spawnX = 13.5 * this.CELL_SIZE; // direkt vor der Ghost-Tür (außerhalb)
-      const spawnY = 11 * this.CELL_SIZE;
-      aggressiveGhost.x = spawnX;
-      aggressiveGhost.y = spawnY;
-      aggressiveGhost.startX = spawnX;
-      aggressiveGhost.startY = spawnY;
-      aggressiveGhost.direction = 'L';
-      aggressiveGhost.updateVelocity(this.CELL_SIZE);
+
+    // Stelle sicher, dass Pacman initialisiert wurde
+    if (!this.robot) {
+      // Fallback: Spawne Pacman an Position (1, 1)
+      this.robot = new Block(1 * this.CELL_SIZE, 1 * this.CELL_SIZE, this.CELL_SIZE, this.CELL_SIZE, this.robotRightImage);
+      this.robot.direction = 'R';
+      this.robot.startX = 1 * this.CELL_SIZE;
+      this.robot.startY = 1 * this.CELL_SIZE;
+      this.robot.updateVelocity(this.CELL_SIZE);
     }
 
     // Speichere Gesamtanzahl der Pellets für Cherry-Spawn
@@ -977,10 +1270,20 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       for (const ghost of this.ghosts) {
         if (index === this.ghostsReleased - 1) {
           // If the ghost is still inside the house, teleport it to the door and push upward
-          const inHouse = ghost.y > 340 && ghost.y < 400 && ghost.x > 200 && ghost.x < 360;
+          // Ghost House Koordinaten basierend auf Gantt-Chart Layout
+          const rowHeight = 3 * this.CELL_SIZE;
+          const rowSpacing = 1 * this.CELL_SIZE;
+          const startY = 2 * this.CELL_SIZE;
+          const ghostHouseX = 12 * this.CELL_SIZE;
+          const ghostHouseY = startY + 5 * (rowHeight + rowSpacing);
+          const ghostHouseWidth = 4 * this.CELL_SIZE;
+          const ghostHouseHeight = 2 * this.CELL_SIZE;
+          
+          const inHouse = ghost.y >= ghostHouseY && ghost.y < ghostHouseY + ghostHouseHeight && 
+                         ghost.x >= ghostHouseX && ghost.x < ghostHouseX + ghostHouseWidth;
           if (inHouse) {
-            ghost.x = 13.5 * this.CELL_SIZE;
-            ghost.y = 12 * this.CELL_SIZE;
+            ghost.x = ghostHouseX + 1.5 * this.CELL_SIZE;
+            ghost.y = ghostHouseY - this.CELL_SIZE;
             ghost.startX = ghost.x;
             ghost.startY = ghost.y;
             ghost.updateDirection('U', this.CELL_SIZE, this.walls);
@@ -1049,9 +1352,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.stateTimer = 0;
   }  private render() {
     if (!this.ctx) return;
-    // Fill with black background
-    this.ctx.fillStyle = '#000000';
+    // Fill with dark gray background (wie im Gantt-Chart)
+    this.ctx.fillStyle = '#1a1a1a';
     this.ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+    
     this.draw(this.ctx);
   }
 
@@ -1153,23 +1457,28 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.pacman) return;
 
     // Check if ghost is inside the ghost house (Box)
-    // House area approx: X [10..17]*CELL_SIZE, Y [12..16]*CELL_SIZE
-    const gridX = Math.floor(ghost.x / this.CELL_SIZE);
-    const gridY = Math.floor(ghost.y / this.CELL_SIZE);
-
-    // Ghost House Interior is roughly rows 13-15, cols 11-16
-    // Include row 12 (Door) to prevent oscillation when exiting
+    // Ghost House Koordinaten basierend auf Gantt-Chart Layout
+    const rowHeight = 3 * this.CELL_SIZE;
+    const rowSpacing = 1 * this.CELL_SIZE;
+    const startY = 2 * this.CELL_SIZE;
+    const ghostHouseX = 12 * this.CELL_SIZE;
+    const ghostHouseY = startY + 5 * (rowHeight + rowSpacing);
+    const ghostHouseWidth = 4 * this.CELL_SIZE;
+    const ghostHouseHeight = 2 * this.CELL_SIZE;
+    
     // Aggressive (rot) soll nie in der Box bleiben → ignoriere Ghost-House-Regel
     const isAggressive = ghost.type === 'aggressive';
-    const inGhostHouse = !isAggressive && (gridY >= 12 && gridY <= 15 && gridX >= 11 && gridX <= 16);
+    const inGhostHouse = !isAggressive && 
+                        ghost.y >= ghostHouseY && ghost.y < ghostHouseY + ghostHouseHeight &&
+                        ghost.x >= ghostHouseX && ghost.x < ghostHouseX + ghostHouseWidth;
 
     let targetX = this.pacman.x;
     let targetY = this.pacman.y;
 
     if (inGhostHouse) {
-      // Force target to be outside the door (Row 11, Col 13.5) to exit the box
-      targetX = 13.5 * this.CELL_SIZE;
-      targetY = 11 * this.CELL_SIZE;
+      // Force target to be outside the door to exit the box
+      targetX = ghostHouseX + 1.5 * this.CELL_SIZE;
+      targetY = ghostHouseY - this.CELL_SIZE;
     } else {
       // Frightened Mode: Zufällige Richtung bei Kreuzungen
       if (ghost.scared || this.ghostMode === 'frightened') {

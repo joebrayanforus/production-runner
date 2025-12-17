@@ -11,8 +11,9 @@ export class Block {
   velocityY: number = 0;
   scared: boolean = false;
   type: string = ''; // 'aggressive', 'ambush', 'patrol', 'random'
+  color?: string; // Farbe für Gantt-Chart Balken
 
-  constructor(x: number, y: number, width: number, height: number, image: HTMLImageElement | null) {
+  constructor(x: number, y: number, width: number, height: number, image: HTMLImageElement | null, color?: string) {
     this.x = x;
     this.y = y;
     this.width = width;
@@ -20,6 +21,7 @@ export class Block {
     this.image = image;
     this.startX = x;
     this.startY = y;
+    this.color = color;
   }
 
   updateDirection(newDirection: string, tileSize: number, walls: Set<Block>) {
