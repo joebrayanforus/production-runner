@@ -131,63 +131,6 @@ export class AudioService {
     return `data:audio/wav;base64,${btoa(String.fromCharCode(...wavData))}`;
   }
 
-  private createIndustrialBackgroundMusic() {
-    // Create ifm industrial ambient background music
-    const audio = new Audio();
-    audio.src = this.generateIndustrialAmbientDataURL();
-    audio.loop = true;
-    audio.volume = 0.3; // Keep it subtle
-    this.sounds.set('backgroundMusic', audio);
-  }
-
-  private generateIndustrialAmbientDataURL(): string {
-    // Generate 8-second industrial ambient loop
-    const sampleRate = 8000;
-    const duration = 8; // 8 seconds loop
-    const samples = Math.floor(sampleRate * duration);
-    const buffer = new Int16Array(samples);
-
-    for (let i = 0; i < samples; i++) {
-      const t = i / sampleRate;
-      let signal = 0;
-
-      // Base industrial hum (50Hz + harmonics)
-      signal += Math.sin(2 * Math.PI * 50 * t) * 0.1;
-      signal += Math.sin(2 * Math.PI * 100 * t) * 0.05;
-      signal += Math.sin(2 * Math.PI * 150 * t) * 0.03;
-
-      // Machinery rhythmic pulses (every 2 seconds)
-      const pulseTime = t % 2;
-      if (pulseTime < 0.1) {
-        signal += Math.sin(2 * Math.PI * 200 * t) * Math.exp(-pulseTime * 10) * 0.2;
-      }
-
-      // Air pressure sounds (every 4 seconds)
-      const airTime = t % 4;
-      if (airTime > 3.5 && airTime < 3.8) {
-        const noisePhase = (airTime - 3.5) * 10;
-        signal += (Math.random() - 0.5) * Math.exp(-noisePhase * 3) * 0.15;
-      }
-
-      // Conveyor belt rhythm (subtle, continuous)
-      signal += Math.sin(2 * Math.PI * 2.5 * t) * 0.02; // 2.5Hz rhythm
-
-      // ifm sensor beeps (every 6 seconds)
-      const sensorTime = t % 6;
-      if (sensorTime > 5.8 && sensorTime < 5.9) {
-        signal += Math.sin(2 * Math.PI * 800 * t) * 0.3;
-      }
-
-      // Apply subtle filtering and limiting
-      signal = Math.max(-1, Math.min(1, signal));
-      buffer[i] = signal * 8000; // Scale for 16-bit
-    }
-
-    // Create WAV data URL
-    const wavData = this.createWAV(buffer, sampleRate);
-    return `data:audio/wav;base64,${btoa(String.fromCharCode(...wavData))}`;
-  }
-
   private generateBeepDataURL(frequency: number, duration: number): string {
     // Generate a simple sine wave beep as data URL
     const sampleRate = 8000;

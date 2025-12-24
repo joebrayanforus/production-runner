@@ -1,0 +1,13 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Hazard warning tile -->
+  <rect x="0" y="0" width="32" height="32" fill="#1a1a2e"/>
+
+  <!-- Diagonal warning stripes -->
+  <path d="M 0 16 L 16 0 L 32 0 L 32 16 Z" fill="#FFD700"/>
+  <path d="M 0 32 L 0 16 L 16 32 Z" fill="#FFD700"/>
+  <path d="M 16 32 L 32 16 L 32 32 Z" fill="#FFD700"/>
+
+  <!-- Warning symbol -->
+  <path d="M 16 8 L 12 16 L 20 16 Z" fill="#1a1a2e"/>
+  <circle cx="16" cy="18" r="1.5" fill="#1a1a2e"/>
+</svg>

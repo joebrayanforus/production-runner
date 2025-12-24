@@ -1,0 +1,170 @@
+<svg width="800" height="900" viewBox="0 0 800 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Maze Preview Card -->
+  <rect width="800" height="900" fill="#1a1a2e"/>
+
+  <!-- Title -->
+  <text x="400" y="40" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#ED6B00" text-anchor="middle">
+    PRODUCTION RUNNER MAZES
+  </text>
+
+  <!-- Map 1: Factory -->
+  <g transform="translate(50, 80)">
+    <rect width="330" height="180" fill="#2d3142" stroke="#ED6B00" stroke-width="2" rx="5"/>
+    <text x="165" y="25" font-family="Arial" font-size="18" font-weight="bold" fill="#00FF88" text-anchor="middle">
+      MAP 1: FACTORY
+    </text>
+    <text x="165" y="50" font-family="monospace" font-size="12" fill="#FFFFFF" text-anchor="middle">
+      Difficulty: ⭐⭐ MEDIUM
+    </text>
+
+    <!-- Simplified maze representation -->
+    <rect x="20" y="60" width="290" height="100" fill="#000000" opacity="0.5"/>
+    <path d="M 30 70 L 300 70 M 30 150 L 300 150 M 30 70 L 30 150 M 300 70 L 300 150"
+          stroke="#4a5568" stroke-width="3" fill="none"/>
+    <path d="M 50 90 L 100 90 L 100 130 M 200 90 L 250 90 L 250 130"
+          stroke="#4a5568" stroke-width="3" fill="none"/>
+    <circle cx="165" cy="110" r="8" fill="#FFD700"/>
+    <text x="165" y="115" font-size="10" fill="#000" text-anchor="middle">⚡</text>
+  </g>
+
+  <!-- Map 2: Production Line -->
+  <g transform="translate(420, 80)">
+    <rect width="330" height="180" fill="#2d3142" stroke="#ED6B00" stroke-width="2" rx="5"/>
+    <text x="165" y="25" font-family="Arial" font-size="18" font-weight="bold" fill="#00FF88" text-anchor="middle">
+      MAP 2: PRODUCTION LINE
+    </text>
+    <text x="165" y="50" font-family="monospace" font-size="12" fill="#FFFFFF" text-anchor="middle">
+      Difficulty: ⭐⭐⭐ HARD
+    </text>
+
+    <!-- Production line visualization -->
+    <rect x="20" y="60" width="290" height="100" fill="#000000" opacity="0.5"/>
+    <path d="M 30 80 L 300 80 M 30 100 L 300 100 M 30 120 L 300 120 M 30 140 L 300 140"
+          stroke="#FF8800" stroke-width="2" fill="none" opacity="0.6"/>
+    <rect x="40" y="75" width="60" height="70" fill="none" stroke="#4a5568" stroke-width="3"/>
+    <rect x="230" y="75" width="60" height="70" fill="none" stroke="#4a5568" stroke-width="3"/>
+    <circle cx="165" cy="110" r="8" fill="#FFD700"/>
+  </g>
+
+  <!-- Map 3: Assembly Hub -->
+  <g transform="translate(50, 290)">
+    <rect width="330" height="180" fill="#2d3142" stroke="#ED6B00" stroke-width="2" rx="5"/>
+    <text x="165" y="25" font-family="Arial" font-size="18" font-weight="bold" fill="#00FF88" text-anchor="middle">
+      MAP 3: ASSEMBLY HUB
+    </text>
+    <text x="165" y="50" font-family="monospace" font-size="12" fill="#FFFFFF" text-anchor="middle">
+      Difficulty: ⭐⭐ MEDIUM-EASY
+    </text>
+
+    <!-- Circular hub design -->
+    <rect x="20" y="60" width="290" height="100" fill="#000000" opacity="0.5"/>
+    <circle cx="165" cy="110" r="40" fill="none" stroke="#4a5568" stroke-width="3"/>
+    <circle cx="165" cy="110" r="20" fill="none" stroke="#4a5568" stroke-width="3"/>
+    <line x1="125" y1="110" x2="145" y2="110" stroke="#4a5568" stroke-width="3"/>
+    <line x1="185" y1="110" x2="205" y2="110" stroke="#4a5568" stroke-width="3"/>
+    <line x1="165" y1="70" x2="165" y2="90" stroke="#4a5568" stroke-width="3"/>
+    <line x1="165" y1="130" x2="165" y2="150" stroke="#4a5568" stroke-width="3"/>
+    <circle cx="165" cy="110" r="8" fill="#FFD700"/>
+  </g>
+
+  <!-- Map 4: Quality Control -->
+  <g transform="translate(420, 290)">
+    <rect width="330" height="180" fill="#2d3142" stroke="#ED6B00" stroke-width="2" rx="5"/>
+    <text x="165" y="25" font-family="Arial" font-size="18" font-weight="bold" fill="#00FF88" text-anchor="middle">
+      MAP 4: QUALITY CONTROL
+    </text>
+    <text x="165" y="50" font-family="monospace" font-size="12" fill="#FFFFFF" text-anchor="middle">
+      Difficulty: ⭐⭐⭐⭐ VERY HARD
+    </text>
+
+    <!-- Complex maze pattern -->
+    <rect x="20" y="60" width="290" height="100" fill="#000000" opacity="0.5"/>
+    <path d="M 30 70 L 100 70 L 100 100 L 70 100 L 70 140 M 200 70 L 130 70 L 130 100 L 160 100 L 160 140"
+          stroke="#4a5568" stroke-width="3" fill="none"/>
+    <path d="M 230 90 L 280 90 L 280 120 L 250 120 L 250 150 M 50 90 L 80 90 L 80 120"
+          stroke="#4a5568" stroke-width="3" fill="none"/>
+    <circle cx="165" cy="110" r="8" fill="#FFD700"/>
+    <rect x="145" y="92" width="40" height="36" fill="none" stroke="#FF3333" stroke-width="2" stroke-dasharray="4,2"/>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(50, 500)">
+    <text x="0" y="0" font-family="Arial" font-size="24" font-weight="bold" fill="#ED6B00">
+      LEGEND
+    </text>
+
+    <g transform="translate(0, 30)">
+      <rect width="20" height="20" fill="#4a5568"/>
+      <text x="30" y="15" font-family="Arial" font-size="16" fill="#FFFFFF">Walls (Industrial Metal)</text>
+    </g>
+
+    <g transform="translate(0, 65)">
+      <circle cx="10" cy="10" r="8" fill="#00FF88"/>
+      <text x="30" y="15" font-family="Arial" font-size="16" fill="#FFFFFF">Sensor Data (Collectibles)</text>
+    </g>
+
+    <g transform="translate(0, 100)">
+      <circle cx="10" cy="10" r="8" fill="#FFD700"/>
+      <text x="30" y="15" font-family="Arial" font-size="16" fill="#FFFFFF">Maintenance Station (Power-up)</text>
+    </g>
+
+    <g transform="translate(0, 135)">
+      <rect width="20" height="20" fill="#FF3333" opacity="0.3" stroke="#FF3333" stroke-width="2"/>
+      <text x="30" y="15" font-family="Arial" font-size="16" fill="#FFFFFF">Malfunction Zone (Danger)</text>
+    </g>
+
+    <g transform="translate(0, 170)">
+      <rect width="20" height="20" fill="#ED6B00"/>
+      <circle cx="10" cy="10" r="5" fill="#00FF88"/>
+      <text x="30" y="15" font-family="Arial" font-size="16" fill="#FFFFFF">Robot (Player)</text>
+    </g>
+  </g>
+
+  <!-- Features -->
+  <g transform="translate(420, 500)">
+    <text x="0" y="0" font-family="Arial" font-size="24" font-weight="bold" fill="#ED6B00">
+      FEATURES
+    </text>
+
+    <text x="0" y="35" font-family="Arial" font-size="14" fill="#00FF88">
+      ✓ 4 Unique Industrial Mazes
+    </text>
+    <text x="0" y="60" font-family="Arial" font-size="14" fill="#00FF88">
+      ✓ Progressive Difficulty
+    </text>
+    <text x="0" y="85" font-family="Arial" font-size="14" fill="#00FF88">
+      ✓ Auto-Rotation Every Level
+    </text>
+    <text x="0" y="110" font-family="Arial" font-size="14" fill="#00FF88">
+      ✓ Symmetrical Tunnels
+    </text>
+    <text x="0" y="135" font-family="Arial" font-size="14" fill="#00FF88">
+      ✓ Strategic Power-up Placement
+    </text>
+    <text x="0" y="160" font-family="Arial" font-size="14" fill="#00FF88">
+      ✓ Ghost House Central
+    </text>
+    <text x="0" y="185" font-family="Arial" font-size="14" fill="#00FF88">
+      ✓ ifm Industrial Theme
+    </text>
+  </g>
+
+  <!-- Footer -->
+  <rect x="50" y="720" width="700" height="120" fill="#2d3142" stroke="#00FF88" stroke-width="2" rx="5"/>
+  <text x="400" y="760" font-family="Arial" font-size="18" font-weight="bold" fill="#ED6B00" text-anchor="middle">
+    MAZE ROTATION SYSTEM
+  </text>
+  <text x="400" y="790" font-family="monospace" font-size="14" fill="#FFFFFF" text-anchor="middle">
+    Level 1-4: Maps 1-4 | Level 5-8: Maps 1-4 (harder) | Level 9+: Cycle continues
+  </text>
+  <text x="400" y="820" font-family="Arial" font-size="12" fill="#00FF88" text-anchor="middle">
+    Each map offers unique challenges and requires different strategies to master!
+  </text>
+
+  <!-- ifm branding -->
+  <circle cx="400" cy="870" r="15" fill="#00FF88"/>
+  <circle cx="400" cy="870" r="10" fill="#FFFFFF"/>
+  <text x="420" y="877" font-family="Arial" font-size="14" fill="#00FF88">
+    ifm Industrial Automation Theme
+  </text>
+</svg>

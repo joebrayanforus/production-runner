@@ -1,0 +1,11 @@
+<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+  <!-- Quality checkpoint - special bonus -->
+  <circle cx="8" cy="8" r="7" fill="#4169E1" stroke="#1E40AF" stroke-width="2"/>
+  <circle cx="8" cy="8" r="5" fill="#6495ED"/>
+
+  <!-- Checkmark -->
+  <path d="M 5 8 L 7 10 L 11 6" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Glow -->
+  <circle cx="8" cy="8" r="8" fill="none" stroke="#4169E1" stroke-width="1" opacity="0.4"/>
+</svg>

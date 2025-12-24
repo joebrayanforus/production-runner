@@ -1,0 +1,25 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Pressure malfunction - PINK/MAGENTA theme -->
+
+  <!-- Wavy body (ghost-like) -->
+  <path d="M 8 16 Q 8 10 12 8 T 20 8 T 24 16 L 24 26 Q 23 24 22 26 Q 21 24 20 26 Q 19 24 18 26 Q 17 24 16 26 Q 15 24 14 26 Q 13 24 12 26 Q 11 24 10 26 L 10 16 Z"
+        fill="#FF66FF" stroke="#FF00FF" stroke-width="1.5"/>
+
+  <!-- Inner gradient effect -->
+  <path d="M 10 16 Q 10 12 14 10 T 18 10 T 22 16 L 22 24 Q 21 23 20 24 Q 19 23 18 24 Q 17 23 16 24 Q 15 23 14 24 Q 13 23 12 24 L 12 16 Z"
+        fill="#FFAAFF" opacity="0.6"/>
+
+  <!-- Eyes - worried -->
+  <ellipse cx="13" cy="14" rx="2.5" ry="3" fill="#FFFFFF"/>
+  <ellipse cx="19" cy="14" rx="2.5" ry="3" fill="#FFFFFF"/>
+  <circle cx="13" cy="15" r="1.5" fill="#000000"/>
+  <circle cx="19" cy="15" r="1.5" fill="#000000"/>
+
+  <!-- Pressure gauge symbol -->
+  <circle cx="16" cy="21" r="3.5" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+  <line x1="16" y1="21" x2="18" y2="19" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="16" cy="21" r="0.8" fill="#FFFFFF"/>
+
+  <!-- Danger glow -->
+  <circle cx="16" cy="16" r="14" fill="none" stroke="#FF66FF" stroke-width="0.5" opacity="0.3"/>
+</svg>

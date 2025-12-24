@@ -10,6 +10,17 @@ import { InputService } from '../services/input.service';
 
 export type GameMode = 'classic' | 'practice';
 
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  color: string;
+  size: number;
+}
+
 @Component({
   selector: 'app-game-canvas',
   standalone: true,
@@ -41,6 +52,20 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private maintenanceStationImage = new Image();
   private repairModeImage = new Image();
   private cherryImage = new Image();
+  private sensorDataImage = new Image();
+  private ghostDoorImage = new Image();
+  private lifeIconImage = new Image();
+
+  // Additional industrial elements
+  private wallCornerImage = new Image();
+  private conveyorBeltImage = new Image();
+  private pipeJunctionImage = new Image();
+  private hazardTileImage = new Image();
+  private controlPanelImage = new Image();
+  private qualityCheckpointImage = new Image();
+  private bonusIoTSensorImage = new Image();
+  private bonusSpeedImage = new Image();
+  private bonusShieldImage = new Image();
 
   // Industrial Equipment Collections
   walls: Set<Block> = new Set<Block>();
@@ -112,12 +137,46 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   efficiencyMultiplier = 1.0;
   productionLevel = 1;
 
-  // Bonus System
+  // Bonus System - Enhanced with multiple bonus types
   private bonusSpawnCooldown = 0;
+  private currentBonusType: 'iot-sensor' | 'shield' | 'diagnostic' = 'diagnostic';
+  private bonusEffectTimer = 0;
+  private shieldActive = false;
+  private qualityCheckpoints: Set<Block> = new Set<Block>();
+  private controlPanels: Set<Block> = new Set<Block>();
+  private readonly BONUS_ROTATION_INTERVAL = 15000; // Change bonus type every 15s
+  private bonusRotationTimer = 0;
   private totalSensorData = 0; // Wird beim Laden der Map gesetzt
+
+  // Checkpoint system
+  private checkpointsCollected = 0;
+  private pelletCountingEnabled = false;
+
+  // Animation effects
+  private robotRotation = 0;
+  private bonusBounce = 0;
+  private maintenancePulse = 0;
+  private ledBlinkTimer = 0;
+
+  // Visual feedback effects
+  private damageFlash = 0;
+  private successBurst = 0;
+  private shieldRipples: Array<{radius: number, alpha: number}> = [];
+  private comboDisplayTimer = 0;
+
+  // Death animation - maze destruction
+  private mazeDestruction: Map<Block, {offsetY: number, rotation: number, speed: number}> = new Map();
+  private mazeRedIntensity = 0;
+
+  // Particle System for visual effects
+  private particles: Particle[] = [];
 
   // Malfunction Spawning Timer
   private malfunctionSpawnTimer = 0;
+
+  // Track time spent in ghost house for each malfunction
+  private ghostHouseTimer: Map<Block, number> = new Map();
+  private readonly MAX_HOUSE_TIME = 20000; // 20 seconds max in house
   private readonly MALFUNCTION_SPAWN_INTERVAL = 800; // Spawn a malfunction roughly every 0.8s
   private malfunctionsActive = 0;
 
@@ -143,10 +202,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private powerPelletBlinkTimer = 0;
 
   // Ready/Game Over Screen
-  gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' | 'paused' = 'ready';
+  gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' | 'paused' | 'finalexplosion' = 'ready';
   private stateTimer = 0;
   private readonly READY_DURATION = 2000; // 2 Sekunden "READY!"
   private readonly DEATH_DURATION = 1500; // 1.5 Sekunden Todesanimation
+  private readonly FINAL_EXPLOSION_DURATION = 3000; // 3 seconds final explosion
   private readonly LEVELCOMPLETE_DURATION = 2000; // 2 Sekunden Level-Übergang
 
   // Level-Progression: Geschwindigkeit und Frighten-Dauer pro Level
@@ -186,58 +246,166 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ];
   }
   private draw(ctx: CanvasRenderingContext2D) {
+    // Industrial grid background
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+
+    // Subtle grid pattern
+    ctx.strokeStyle = 'rgba(0, 255, 136, 0.05)';
+    ctx.lineWidth = 0.5;
+    for (let x = 0; x < this.CANVAS_WIDTH; x += this.CELL_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, this.CANVAS_HEIGHT);
+      ctx.stroke();
+    }
+    for (let y = 0; y < this.CANVAS_HEIGHT; y += this.CELL_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(this.CANVAS_WIDTH, y);
+      ctx.stroke();
+    }
+
     // Wände zeichnen (optimiert sans shadow)
     this.walls.forEach(wall => {
+      ctx.save();
+
+      // Apply death animation if in dying state
+      if ((this.gameState === 'dying' || this.gameState === 'finalexplosion') && this.mazeDestruction.has(wall)) {
+        const destruction = this.mazeDestruction.get(wall)!;
+        ctx.translate(wall.x + wall.width / 2, wall.y + wall.height / 2 + destruction.offsetY);
+        ctx.rotate(destruction.rotation);
+        ctx.translate(-wall.width / 2, -wall.height / 2);
+        ctx.globalAlpha = Math.max(0, 1 - destruction.offsetY / 200);
+      } else {
+        ctx.translate(wall.x, wall.y);
+      }
+
       if (wall.type === 'ghost-door') {
-        // Ghost Door als pinke Linie
-        ctx.fillStyle = '#FFB8FF';
-        ctx.fillRect(wall.x, wall.y + wall.height / 2 - 2, wall.width, 4);
+        // Ghost Door with energy barrier effect
+        if (this.ghostDoorImage.complete) {
+          ctx.drawImage(this.ghostDoorImage, 0, 0, wall.width, wall.height);
+        } else {
+          // Fallback: pinke Linie
+          ctx.fillStyle = '#FFB8FF';
+          ctx.fillRect(0, wall.height / 2 - 2, wall.width, 4);
+        }
       } else if (wall.image && wall.image.complete) {
         // Walls drawing
-        ctx.drawImage(wall.image, wall.x, wall.y, wall.width, wall.height);
+        if ((this.gameState === 'dying' || this.gameState === 'finalexplosion') && this.mazeRedIntensity > 0) {
+          // Red tint overlay
+          ctx.globalCompositeOperation = 'source-over';
+          if (this.mazeDestruction.has(wall)) {
+            ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
+          } else {
+            ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
+          }
+          ctx.fillStyle = `rgba(255, 0, 0, ${this.mazeRedIntensity * 0.5})`;
+          ctx.fillRect(0, 0, wall.width, wall.height);
+        } else {
+          if (this.mazeDestruction.has(wall)) {
+            ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
+          } else {
+            ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
+          }
+        }
       } else {
         // Fallback: Blaue Wände mit 3D-Effekt
         ctx.fillStyle = '#2121DE';
-        ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+        ctx.fillRect(0, 0, wall.width, wall.height);
         // Inner highlight für 3D-Effekt
         ctx.fillStyle = '#4A4AFF';
-        ctx.fillRect(wall.x + 2, wall.y + 2, wall.width - 4, wall.height - 4);
+        ctx.fillRect(2, 2, wall.width - 4, wall.height - 4);
       }
+
+      ctx.restore();
     });
 
     // Sensordaten zeichnen (kleine ifm-Symbole)
-    ctx.fillStyle = '#00FF88';
     this.sensorData.forEach(food => {
-      // Draw small sensor data icon
-      ctx.fillRect(food.x + 1, food.y + 1, 3, 3);
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(food.x + 1, food.y + 1, 3, 3);
+      // Draw sensor data pellet (small green dot)
+      if (this.sensorDataImage.complete) {
+        ctx.drawImage(this.sensorDataImage, food.x, food.y, 8, 8);
+      } else {
+        // Fallback
+        ctx.fillStyle = '#00FF88';
+        ctx.fillRect(food.x + 1, food.y + 1, 3, 3);
+      }
     });
 
     // Wartungsstationen zeichnen (blinkend)
     if (this.powerPelletVisible) {
-      ctx.fillStyle = '#ED6B00';
       this.maintenanceStations.forEach(pellet => {
-        // Draw maintenance station as orange square with wrench symbol
-        ctx.fillRect(pellet.x + 2, pellet.y + 2, pellet.width - 4, pellet.height - 4);
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(pellet.x + 2, pellet.y + 2, pellet.width - 4, pellet.height - 4);
-        // Add wrench symbol
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '8px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('🔧', pellet.x + pellet.width / 2, pellet.y + pellet.height / 2 + 2);
+        if (this.maintenanceStationImage.complete) {
+          // Pulse animation
+          const scale = 1 + Math.sin(this.maintenancePulse) * 0.15;
+          const offset = (pellet.width * (1 - scale)) / 2;
+
+          // Orange glow
+          ctx.shadowColor = '#ED6B00';
+          ctx.shadowBlur = 12;
+          ctx.drawImage(this.maintenanceStationImage,
+            pellet.x + offset, pellet.y + offset,
+            pellet.width * scale, pellet.height * scale);
+          ctx.shadowBlur = 0;
+        } else {
+          // Fallback: orange square
+          ctx.fillStyle = '#ED6B00';
+          ctx.fillRect(pellet.x + 2, pellet.y + 2, pellet.width - 4, pellet.height - 4);
+        }
       });
     }
 
-    // Cherry zeichnen
-    if (this.cherry && this.cherry.image && this.cherry.image.complete) {
-      ctx.drawImage(this.cherry.image, this.cherry.x, this.cherry.y, this.cherry.width, this.cherry.height);
+    // Control Panels zeichnen (decorative)
+    this.controlPanels.forEach(panel => {
+      if (this.controlPanelImage.complete) {
+        ctx.drawImage(this.controlPanelImage, panel.x, panel.y, this.CELL_SIZE, this.CELL_SIZE);
+
+        // LED indicator (blinking) - simplified
+        if (Math.floor(this.ledBlinkTimer / 500) % 2 === 0) {
+          ctx.fillStyle = '#00FF88';
+          ctx.beginPath();
+          ctx.arc(panel.x + this.CELL_SIZE - 5, panel.y + 5, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    });    // Quality Checkpoints zeichnen (blinkend)
+    const checkpointVisible = Math.floor(Date.now() / 300) % 2 === 0;
+    if (checkpointVisible) {
+      this.qualityCheckpoints.forEach(checkpoint => {
+        if (this.qualityCheckpointImage.complete) {
+          ctx.drawImage(this.qualityCheckpointImage, checkpoint.x + 8, checkpoint.y + 8, 16, 16);
+          // Glow effect
+          ctx.strokeStyle = '#4169E1';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(checkpoint.x + 16, checkpoint.y + 16, 12, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      });
     }
 
-    // Robot mit Animation zeichnen
+    // Cherry/Bonus zeichnen mit aktuellem Bonus-Typ
+    if (this.cherry) {
+      let bonusImage = this.cherryImage;
+      switch (this.currentBonusType) {
+        case 'iot-sensor':
+          bonusImage = this.bonusIoTSensorImage;
+          break;
+        case 'shield':
+          bonusImage = this.bonusShieldImage;
+          break;
+        case 'diagnostic':
+          bonusImage = this.cherryImage;
+          break;
+      }
+      if (bonusImage.complete) {
+        // Bounce animation
+        const bounceOffset = Math.sin(this.bonusBounce) * 3;
+
+        ctx.drawImage(bonusImage, this.cherry.x + 4, this.cherry.y + 4 + bounceOffset, 24, 24);
+      }
+    }    // Robot mit Animation zeichnen
     if (this.robot && this.gameState !== 'dying') {
       this.drawRobot(ctx);
     } else if (this.robot && this.gameState === 'dying') {
@@ -265,6 +433,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     ctx.save();
     ctx.translate(centerX, centerY);
+
+    // Smooth rotation based on direction
+    const targetRotation = this.getTargetRotation(this.robot.direction);
+    this.robotRotation += (targetRotation - this.robotRotation) * 0.2;
+    ctx.rotate(this.robotRotation);
 
     // Draw ifm robot instead of pacman
     // Robot body (orange square)
@@ -314,6 +487,16 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.stroke();
 
     ctx.restore();
+  }
+
+  private getTargetRotation(direction: string): number {
+    switch (direction) {
+      case 'U': return -Math.PI / 2;
+      case 'D': return Math.PI / 2;
+      case 'L': return Math.PI;
+      case 'R': return 0;
+      default: return 0;
+    }
   }
 
   private drawDyingRobot(ctx: CanvasRenderingContext2D) {
@@ -460,10 +643,97 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     ctx.textAlign = 'left';
 
+    // Combo counter display
+    if (this.pelletStreak >= 10 && this.comboDisplayTimer > 0) {
+      ctx.save();
+      ctx.font = 'bold 20px monospace';
+      ctx.textAlign = 'center';
+      const comboAlpha = this.comboDisplayTimer / 1000;
+      ctx.fillStyle = `rgba(255, 215, 0, ${comboAlpha})`;
+      ctx.fillText(`${this.pelletStreak}x COMBO!`, this.CANVAS_WIDTH / 2, 100);
+      ctx.restore();
+    }
+
+    // Draw particles
+    this.drawParticles(ctx);
+
     // System Health unten links
     for (let i = 0; i < this.systemHealth; i++) {
       this.drawRobotIcon(ctx, 20 + i * 25, this.CANVAS_HEIGHT - 15);
     }
+
+    // Active bonus effects display with circular progress
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'right';
+    let effectY = this.CANVAS_HEIGHT - 40;
+
+    if (this.shieldActive) {
+      // Shield text
+      ctx.fillStyle = '#4169E1';
+      ctx.fillText('🛡️ SHIELD', this.CANVAS_WIDTH - 50, effectY);
+
+      // Circular progress bar
+      const progress = this.bonusEffectTimer / 10000; // 10 seconds max
+      const centerX = this.CANVAS_WIDTH - 20;
+      const centerY = effectY - 5;
+      const radius = 8;
+
+      // Background circle
+      ctx.strokeStyle = 'rgba(65, 105, 225, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Progress arc
+      ctx.strokeStyle = '#4169E1';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * progress));
+      ctx.stroke();
+
+      effectY -= 25;
+    }
+
+    ctx.textAlign = 'left';
+
+    // Draw particles on top of everything
+    this.drawParticles(ctx);
+
+    // Damage flash effect
+    if (this.damageFlash > 0) {
+      ctx.fillStyle = `rgba(255, 0, 0, ${this.damageFlash})`;
+      ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+    }
+
+    // Success burst effect for checkpoints
+    if (this.successBurst > 0) {
+      ctx.save();
+      ctx.globalAlpha = this.successBurst;
+      ctx.strokeStyle = '#4169E1';
+      ctx.lineWidth = 3;
+      for (let i = 0; i < 3; i++) {
+        const radius = 50 + (1 - this.successBurst) * 100 + i * 20;
+        ctx.beginPath();
+        ctx.arc(this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Shield ripple effect
+    this.shieldRipples.forEach(ripple => {
+      if (this.robot) {
+        ctx.save();
+        ctx.globalAlpha = ripple.alpha;
+        ctx.strokeStyle = '#4169E1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(this.robot.x + this.robot.width / 2, this.robot.y + this.robot.height / 2, ripple.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    });
 
     // Malfunction Status Indicator (Debug oder Learn Mode)
     if (this.debugMode || this.showMalfunctionTargets) {
@@ -488,6 +758,23 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Game Over Screen wird jetzt im HTML-Overlay angezeigt, nicht mehr im Canvas
+
+    // Final explosion screen
+    if (this.gameState === 'finalexplosion') {
+      ctx.save();
+      const explosionProgress = this.stateTimer / this.FINAL_EXPLOSION_DURATION;
+      ctx.font = 'bold 32px "Press Start 2P", monospace';
+      ctx.fillStyle = `rgba(255, 0, 0, ${explosionProgress})`;
+      ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+
+      // Flickering effect
+      if (Math.floor(Date.now() / 100) % 2 === 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${explosionProgress * 0.5})`;
+        ctx.fillText('GAME OVER', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      }
+      ctx.restore();
+    }
 
     // Level Complete Screen
     if (this.gameState === 'levelcomplete') {
@@ -561,21 +848,70 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private drawRobotIcon(ctx: CanvasRenderingContext2D, x: number, y: number) {
-    // Draw small ifm robot icon for lives indicator
-    ctx.fillStyle = '#ED6B00';
-    ctx.fillRect(x - 6, y - 6, 12, 8);
-    ctx.strokeStyle = '#1a1a1a';
-    ctx.lineWidth = 0.5;
-    ctx.strokeRect(x - 6, y - 6, 12, 8);
+    // Draw life icon using SVG
+    if (this.lifeIconImage.complete) {
+      const size = 20; // Size of the life icon
+      ctx.drawImage(this.lifeIconImage, x - size / 2, y - size / 2, size, size);
+    } else {
+      // Fallback: Draw small ifm robot icon
+      ctx.fillStyle = '#ED6B00';
+      ctx.fillRect(x - 6, y - 6, 12, 8);
+      ctx.strokeStyle = '#1a1a1a';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(x - 6, y - 6, 12, 8);
 
-    // Small head
-    ctx.fillRect(x - 3, y - 8, 6, 4);
-    ctx.strokeRect(x - 3, y - 8, 6, 4);
+      // Small head
+      ctx.fillRect(x - 3, y - 8, 6, 4);
+      ctx.strokeRect(x - 3, y - 8, 6, 4);
 
-    // Eyes
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(x - 2, y - 7, 1, 1);
-    ctx.fillRect(x + 1, y - 7, 1, 1);
+      // Eyes
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(x - 2, y - 7, 1, 1);
+      ctx.fillRect(x + 1, y - 7, 1, 1);
+    }
+  }
+
+  private createParticles(x: number, y: number, color: string, count: number = 8) {
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+      const speed = 2 + Math.random() * 3;
+      this.particles.push({
+        x: x,
+        y: y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1.0,
+        maxLife: 1.0,
+        color: color,
+        size: 2 + Math.random() * 2
+      });
+    }
+  }
+
+  private updateParticles() {
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.2; // Gravity
+      p.life -= 0.02;
+
+      if (p.life <= 0) {
+        this.particles.splice(i, 1);
+      }
+    }
+  }
+
+  private drawParticles(ctx: CanvasRenderingContext2D) {
+    this.particles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
   }  //Grid-System(wie klassiches Pac-Man: 28x31 Felder)
   readonly GRID_WIDTH = 28;
   readonly GRID_HEIGHT = 31;
@@ -645,49 +981,69 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
     }
   }  private initAssets() {
-    this.blueGhostImage.src = 'assets/blueGhost.png';
-    this.orangeGhostImage.src = 'assets/orangeGhost.png';
-    this.pinkGhostImage.src = 'assets/pinkGhost.png';
-    this.redGhostImage.src = 'assets/redGhost.png';
-    // Use robot images instead of pacman
-    this.robotUpImage.src = 'assets/robot-up.svg';
-    this.robotDownImage.src = 'assets/robot-down.svg';
-    this.robotLeftImage.src = 'assets/robot-left.svg';
-    this.robotRightImage.src = 'assets/robot-right.svg';
-    this.wallImage.src = 'assets/wall.png';
-    this.powerFoodImage.src = 'assets/powerFood.png';
-    this.scaredGhostImage.src = 'assets/scaredGhost.png';
-    this.cherryImage.src = 'assets/cherry.png';
+    // Malfunction images (ghost equivalents)
+    this.blueGhostImage.src = 'assets/svg/malfunction-vibration.svg';  // Cyan = Vibration
+    this.orangeGhostImage.src = 'assets/svg/malfunction-wear.svg';     // Orange = Wear
+    this.pinkGhostImage.src = 'assets/svg/malfunction-pressure.svg';   // Pink = Pressure
+    this.redGhostImage.src = 'assets/svg/malfunction-temperature.svg'; // Red = Temperature
+
+    // Robot directional sprites
+    this.robotUpImage.src = 'assets/svg/robot-up.svg';
+    this.robotDownImage.src = 'assets/svg/robot-down.svg';
+    this.robotLeftImage.src = 'assets/svg/robot-left.svg';
+    this.robotRightImage.src = 'assets/svg/robot-right.svg';
+
+    // Game elements
+    this.wallImage.src = 'assets/svg/wall.svg';
+    this.sensorDataImage.src = 'assets/svg/sensor-data.svg';
+    this.maintenanceStationImage.src = 'assets/svg/maintenance-station.svg';
+    this.ghostDoorImage.src = 'assets/svg/ghost-door.svg';
+    this.lifeIconImage.src = 'assets/svg/life-icon.svg';
+    this.powerFoodImage.src = 'assets/svg/maintenance-station.svg';
+    this.scaredGhostImage.src = 'assets/svg/malfunction-temperature.svg';
+    this.cherryImage.src = 'assets/svg/bonus-diagnostic.svg';
+
+    // Additional industrial elements
+    this.wallCornerImage.src = 'assets/svg/wall-corner.svg';
+    this.conveyorBeltImage.src = 'assets/svg/conveyor-belt.svg';
+    this.pipeJunctionImage.src = 'assets/svg/pipe-junction.svg';
+    this.hazardTileImage.src = 'assets/svg/hazard-tile.svg';
+    this.controlPanelImage.src = 'assets/svg/control-panel.svg';
+    this.qualityCheckpointImage.src = 'assets/svg/quality-checkpoint.svg';
+    this.bonusIoTSensorImage.src = 'assets/svg/bonus-iot-sensor.svg';
+    this.bonusSpeedImage.src = 'assets/svg/bonus-speed.svg';
+    this.bonusShieldImage.src = 'assets/svg/bonus-shield.svg';
   }
-  // Klassisches Pac-Man 28x31 Labyrinth (authentisches Arcade-Layout)
+  // Classic Industrial Factory Labyrinth (Original Map)
   // X = Wall, ' ' = Pellet, O = Power Pellet, - = Ghost House Door
   // P = Pac-Man Start, r/p/b/o = Ghosts (red/pink/blue/orange)
   // T = Tunnel (Wraparound), G = Ghost House Interior (no pellet)
+  // Q = Quality Checkpoint (special bonus)
   private readonly tileMap: string[] = [
     "XXXXXXXXXXXXXXXXXXXXXXXXXXXX",  // 0
-    "X            XX            X",  // 1
-    "X XXXX XXX   XX   XXX XXXX X",  // 2 (more loops, wider mid-corridors)
-    "XO  X  XXX   XX   XXX  XX OX",  // 3 (power corner, added side bypass)
+    "X     Q      XX      Q     X",  // 1 - Quality checkpoints
+    "X XXXX XXX   XX   XXX XXXX X",  // 2
+    "XO     XXX   XX   XXX     OX",  // 3
     "X XXXX XXX   XX   XXX XXXX X",  // 4
     "X                          X",  // 5
-    "X XXXX XX XX  XXXX XX XXXX X",  // 6 (added mid shortcuts)
+    "X XXXX XX XX  XXXX XX XXXX X",  // 6
     "X XXXX XX XX  XXXX XX XXXX X",  // 7
-    "X      XX    XX    XX      X",  // 8
-    "XXXXXX XXX   XX   XXX XXXXXX",  // 9 (opened central ring)
-    "X    X XXXXX XX XXXXX X    X",  // 10
-    "X    X XX          XX X    X",  // 11
-    "X    X XX XXX--XXX XX X    X",  // 12
-    "XXXXXX XX XGrGGGGX XX XXXXXX",  // 13 - Ghost house with red ghost
-    "T         XGbGpGoX         T",  // 14 - Tunnel + ghosts
+    "X   Q  XX    XX    XX  Q   X",  // 8 - Quality checkpoints
+    "XXXXXX XXX   XX   XXX XXXXXX",  // 9
+    "X..    XXXXX XX XXXXX    ..X",  // 10
+    "X.     XX          XX     .X",  // 11
+    "X..    XX XXX--XXX XX    ..X",  // 12
+    "XXXXXX XX XGrGGGGX XX XXXXXX",  // 13
+    "T         XGbGpGoX         T",  // 14
     "XXXXXX XX XGGGGGGX XX XXXXXX",  // 15
-    "X    X XX XXXXXXXX XX X    X",  // 16
-    "X    X XX          XX X    X",  // 17
-    "X    X XX XXXXXXXX XX X    X",  // 18
+    "X      XX XXXXXXXX XX      X",  // 16
+    "X      XX          XX      X",  // 17
+    "X      XX XXXXXXXX XX      X",  // 18
     "XXXXXX XX XXXXXXXX XX XXXXXX",  // 19
     "X            XX            X",  // 20
-    "X XXXX XXX   XX   XXX XXXX X",  // 21 (more branching)
+    "X XXXX XXX   XX   XXX XXXX X",  // 21
     "X XXXX XXX   XX   XXX XXXX X",  // 22
-    "XO  XX       P        XX  OX",  // 23 - Pac-Man start
+    "XO  XX       P        XX  OX",  // 23
     "XXX XX XX XXXXXXXX XX XX XXX",  // 24
     "XXX XX XX XXXXXXXX XX XX XXX",  // 25
     "X      XX    XX    XX      X",  // 26
@@ -696,6 +1052,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     "X                          X",  // 29
     "XXXXXXXXXXXXXXXXXXXXXXXXXXXX"   // 30
   ];
+
   private loadMap() {
     for (let r = 0; r < this.tileMap.length; r++) {
       const row = this.tileMap[r];
@@ -729,6 +1086,16 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           this.ghosts.add(ghost);
         } else if (tileMapChar === 'P') {
           this.robot = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.robotRightImage);
+        } else if (tileMapChar === 'Q') {
+          // Quality Checkpoint - special bonus location
+          const checkpoint = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.qualityCheckpointImage);
+          checkpoint.type = 'quality-checkpoint';
+          this.qualityCheckpoints.add(checkpoint);
+        } else if (tileMapChar === '.') {
+          // Control Panel - decorative element
+          const controlPanel = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.controlPanelImage);
+          controlPanel.type = 'control-panel';
+          this.controlPanels.add(controlPanel);
         } else if (tileMapChar === ' ') {
           // kleines Pellet in der Mitte der Zelle - Produktionsauftrag
           this.sensorData.add(new Block(x + this.CELL_SIZE / 2 - 2, y + this.CELL_SIZE / 2 - 2, 4, 4, null));
@@ -891,21 +1258,51 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         return; // Keine Bewegung während Ready
 
       case 'dying':
+        // Initialize maze destruction effect on first frame
+        if (this.stateTimer === 0) {
+          this.mazeDestruction.clear();
+          this.walls.forEach(wall => {
+            this.mazeDestruction.set(wall, {
+              offsetY: 0,
+              rotation: (Math.random() - 0.5) * 0.5,
+              speed: 2 + Math.random() * 3
+            });
+          });
+        }
+
         this.stateTimer += deltaTime;
         if (this.stateTimer >= this.DEATH_DURATION) {
           if (this.lives <= 0) {
-            this.gameState = 'gameover';
-            this.gameOver = true;
-            // Load leaderboard immediately
-            this.loadLeaderboard();
-            // Submit final score to backend
-            this.submitScore();
-            this.stopGameLoop();
+            // Trigger final explosion before game over
+            this.gameState = 'finalexplosion';
+            this.stateTimer = 0;
+            // Initialize more dramatic destruction
+            this.mazeDestruction.clear();
+            this.walls.forEach(wall => {
+              this.mazeDestruction.set(wall, {
+                offsetY: 0,
+                rotation: (Math.random() - 0.5) * 1.0,
+                speed: 3 + Math.random() * 5
+              });
+            });
           } else {
             this.resetPositions();
             this.gameState = 'ready';
             this.stateTimer = 0;
           }
+        }
+        return;
+
+      case 'finalexplosion':
+        this.stateTimer += deltaTime;
+        if (this.stateTimer >= this.FINAL_EXPLOSION_DURATION) {
+          this.gameState = 'gameover';
+          this.gameOver = true;
+          // Load leaderboard immediately
+          this.loadLeaderboard();
+          // Submit final score to backend
+          this.submitScore();
+          this.stopGameLoop();
         }
         return;
 
@@ -923,6 +1320,34 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
       case 'playing':
         break; // Weiter mit normalem Update
+    }
+
+    // Update particles
+    this.updateParticles();
+
+    // Update animation timers
+    this.bonusBounce += 0.1;
+    this.maintenancePulse += 0.08;
+    this.ledBlinkTimer += deltaTime;
+
+    // Update feedback effects
+    if (this.damageFlash > 0) {
+      this.damageFlash -= 0.05;
+    }
+    if (this.successBurst > 0) {
+      this.successBurst -= 0.02;
+    }
+    if (this.comboDisplayTimer > 0) {
+      this.comboDisplayTimer -= deltaTime;
+    }
+
+    // Update shield ripples
+    for (let i = this.shieldRipples.length - 1; i >= 0; i--) {
+      this.shieldRipples[i].radius += 2;
+      this.shieldRipples[i].alpha -= 0.02;
+      if (this.shieldRipples[i].alpha <= 0) {
+        this.shieldRipples.splice(i, 1);
+      }
     }
 
     // Pac-Man Mundanimation
@@ -968,6 +1393,22 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
+    // Bonus rotation - change bonus type periodically
+    this.bonusRotationTimer += deltaTime;
+    if (this.bonusRotationTimer >= this.BONUS_ROTATION_INTERVAL) {
+      this.bonusRotationTimer = 0;
+      const bonusTypes: ('iot-sensor' | 'shield' | 'diagnostic')[] = ['iot-sensor', 'shield', 'diagnostic'];
+      this.currentBonusType = bonusTypes[Math.floor(Math.random() * bonusTypes.length)];
+    }
+
+    // Bonus effect timers
+    if (this.bonusEffectTimer > 0) {
+      this.bonusEffectTimer -= deltaTime;
+      if (this.bonusEffectTimer <= 0) {
+        this.shieldActive = false;
+      }
+    }
+
     // Ghost Release Timer - force each ghost out of the house quickly
     this.ghostReleaseTimer += deltaTime;
     while (this.ghostReleaseTimer >= this.GHOST_RELEASE_INTERVAL && this.ghostsReleased < this.malfunctions.size) {
@@ -1010,7 +1451,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const testX = this.pacman.x;
     const testY = this.pacman.y;
-    const speed = this.CELL_SIZE / 4;
+    let speed = this.CELL_SIZE / 4;
 
     let nextX = testX;
     let nextY = testY;
@@ -1163,13 +1604,31 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     const isAggressive = ghost.type === 'aggressive';
     const inGhostHouse = !isAggressive && (gridY >= 12 && gridY <= 15 && gridX >= 11 && gridX <= 16);
 
+    // Track time in ghost house
+    if (inGhostHouse) {
+      const currentTime = this.ghostHouseTimer.get(ghost) || 0;
+      this.ghostHouseTimer.set(ghost, currentTime + (1000 / this.FPS));
+    } else {
+      this.ghostHouseTimer.set(ghost, 0);
+    }
+
+    const timeInHouse = this.ghostHouseTimer.get(ghost) || 0;
+    const forceExit = timeInHouse > this.MAX_HOUSE_TIME;
+
     let targetX = this.pacman.x;
     let targetY = this.pacman.y;
 
-    if (inGhostHouse) {
+    if (inGhostHouse || forceExit) {
       // Force target to be outside the door (Row 11, Col 13.5) to exit the box
+      // If stuck for >20s, use emergency exit route
       targetX = 13.5 * this.CELL_SIZE;
       targetY = 11 * this.CELL_SIZE;
+
+      // Emergency exit: force upward movement if stuck too long
+      if (forceExit && gridY > 12) {
+        ghost.updateDirection('U', this.CELL_SIZE, this.walls);
+        return;
+      }
     } else {
       // Frightened Mode: Zufällige Richtung bei Kreuzungen
       if (ghost.scared || this.ghostMode === 'frightened') {
@@ -1261,9 +1720,22 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     // Check ghost collisions
     for (const ghost of this.ghosts) {
       if (this.collision(ghost, this.pacman)) {
+        // Shield protects from collision
+        if (this.shieldActive && !ghost.scared) {
+          // Ghost bounces back with shield
+          ghost.velocityX = -ghost.velocityX;
+          ghost.velocityY = -ghost.velocityY;
+          this.efficiency += 50;
+          this.audioService.play('eatghost');
+
+          // Add ripple effect
+          this.shieldRipples.push({radius: 20, alpha: 1.0});
+          continue;
+        }
+
         if (ghost.scared) {
           // Reparatur: Störung "reparieren" (+200 Effizienz)
-          this.audioService.play('eatghost'); // TODO: Replace with repair sound
+          this.audioService.play('eatghost');
           this.efficiency += 200;
           // Respawn ghost at starting position
           ghost.reset();
@@ -1272,8 +1744,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           continue;
         } else {
           // Systemfehler: Health verlieren
-          this.audioService.play('die'); // TODO: Replace with system error sound
+          this.audioService.play('die');
           this.systemHealth -= 1;
+          this.damageFlash = 0.5; // Trigger damage flash
           this.gameState = 'dying';
           this.stateTimer = 0;
           return; // Stoppe weitere Bewegung
@@ -1312,16 +1785,28 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.collision(this.pacman, food)) {
         this.audioService.play('waka');
         foodEaten = food;
-        this.pelletStreak++;
-        // Update streak multiplier
-        if (this.pelletStreak >= 30) {
-          this.streakMultiplier = 3.0;
-        } else if (this.pelletStreak >= 20) {
-          this.streakMultiplier = 2.0;
-        } else if (this.pelletStreak >= 10) {
-          this.streakMultiplier = 1.5;
+        // Create green particles for sensor data
+        this.createParticles(food.x + 2, food.y + 2, '#00FF88', 6);
+
+        // Only count pellets after touching a checkpoint
+        if (this.pelletCountingEnabled) {
+          this.pelletStreak++;
+
+          // Show combo display for high streaks
+          if (this.pelletStreak >= 10) {
+            this.comboDisplayTimer = 1000;
+          }
+
+          // Update streak multiplier
+          if (this.pelletStreak >= 30) {
+            this.streakMultiplier = 3.0;
+          } else if (this.pelletStreak >= 20) {
+            this.streakMultiplier = 2.0;
+          } else if (this.pelletStreak >= 10) {
+            this.streakMultiplier = 1.5;
+          }
+          this.score += Math.floor(10 * this.streakMultiplier);
         }
-        this.score += Math.floor(10 * this.streakMultiplier);
       }
     }
     if (foodEaten) {
@@ -1334,6 +1819,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.collision(this.pacman, pellet)) {
         this.audioService.play('powerpill');
         powerEaten = pellet;
+        // Create orange particles for power pellet
+        this.createParticles(pellet.x + 4, pellet.y + 4, '#ED6B00', 12);
         this.score += 50;
         // Activate scared mode for 10 seconds
         this.scaredTimer = this.scaredDuration;
@@ -1347,19 +1834,68 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.powerPellets.delete(powerEaten);
     }
 
-    // Check cherry collision (Bonus-Frucht)
-    if (this.cherry && this.collision(this.pacman, this.cherry)) {
-      this.audioService.play('eatghost'); // TODO: Replace with bonus collection sound
-      this.efficiency += 500; // 500 Effizienz-Einheiten
+    // Quality Checkpoint collision
+    if (this.robot) {
+      this.qualityCheckpoints.forEach(checkpoint => {
+        if (this.collision(this.robot!, checkpoint)) {
+          this.score += 500;
+          this.efficiency += 500;
+          // Create blue particles for checkpoint
+          this.createParticles(checkpoint.x + 16, checkpoint.y + 16, '#4169E1', 16);
+          this.qualityCheckpoints.delete(checkpoint);
+          this.audioService.play('eatghost');
 
-      // Bonus-Effekt: System-Boost
-      // System Health nur bis max. 3 (Anforderung)
+          // Enable pellet counting after first checkpoint
+          this.pelletCountingEnabled = true;
+          this.checkpointsCollected++;
+
+          // Trigger success burst effect
+          this.successBurst = 1.0;
+
+          // Extra life every 2 checkpoints (max 3 lives)
+          if (this.checkpointsCollected % 2 === 0 && this.systemHealth < 3) {
+            this.systemHealth++;
+          }
+        }
+      });
+    }    // Cherry/Bonus collision with effects
+    if (this.cherry && this.collision(this.pacman, this.cherry)) {
+      let bonusScore = 500;
+      let particleColor = '#FFD700';
+
+      // Apply bonus effect based on type
+      switch (this.currentBonusType) {
+        case 'iot-sensor':
+          bonusScore = 700;
+          particleColor = '#00FFFF';
+          this.dataStreak += 10; // Massive boost to data streak
+          this.audioService.play('eatghost');
+          break;
+        case 'shield':
+          bonusScore = 500;
+          particleColor = '#4169E1';
+          this.shieldActive = true;
+          this.bonusEffectTimer = 10000; // 10 seconds
+          this.audioService.play('eatghost');
+          break;
+        case 'diagnostic':
+          bonusScore = 500;
+          particleColor = '#FF69B4';
+          this.audioService.play('eatghost');
+          break;
+      }
+
+      // Create colored particles based on bonus type
+      this.createParticles(this.cherry.x + 16, this.cherry.y + 16, particleColor, 20);
+      this.efficiency += bonusScore;
+
+      // System Health bonus (capped at 3)
       if (this.systemHealth < 3) {
-        this.systemHealth += 1; // Extra Health!
+        this.systemHealth += 1;
       }
 
       this.cherry = null;
-      this.cherrySpawnCooldown = 300; // 10 Sekunden Cooldown (bei 30 FPS)
+      this.cherrySpawnCooldown = 300;
     }
 
     // Cherry Spawn System: Erscheint nach bestimmter Anzahl gegessener Pellets
@@ -1411,6 +1947,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     // Reset ghost release timer
     this.ghostReleaseTimer = 0;
     this.ghostsReleased = 0;
+    // Reset house timers
+    this.ghostHouseTimer.clear();
   }
 
   // Send final score to backend API
@@ -1466,6 +2004,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.score = 0;
     this.pelletStreak = 0;
     this.streakMultiplier = 1.0;
+    this.checkpointsCollected = 0;
+    this.pelletCountingEnabled = false;
     this.currentLevel = 1;
     this.scaredTimer = 0;
     this.scaredDuration = 10000;

@@ -1,0 +1,18 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Industrial wall - metal panels -->
+  <rect x="0" y="0" width="32" height="32" fill="#1a1a2e"/>
+  <rect x="1" y="1" width="30" height="30" fill="#2d3142" stroke="#4a5568" stroke-width="2"/>
+
+  <!-- Panel rivets -->
+  <circle cx="6" cy="6" r="1.5" fill="#6b7280"/>
+  <circle cx="26" cy="6" r="1.5" fill="#6b7280"/>
+  <circle cx="6" cy="26" r="1.5" fill="#6b7280"/>
+  <circle cx="26" cy="26" r="1.5" fill="#6b7280"/>
+
+  <!-- Panel lines -->
+  <line x1="16" y1="2" x2="16" y2="30" stroke="#4a5568" stroke-width="1"/>
+  <line x1="2" y1="16" x2="30" y2="16" stroke="#4a5568" stroke-width="1"/>
+
+  <!-- Metallic sheen -->
+  <rect x="4" y="4" width="24" height="2" fill="#4a5568" opacity="0.3"/>
+</svg>

@@ -1,0 +1,24 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Ghost house door - transparent barrier -->
+
+  <!-- Door frame -->
+  <rect x="2" y="0" width="28" height="32" fill="none" stroke="#FFD700" stroke-width="2"/>
+
+  <!-- Energy barrier lines -->
+  <line x1="4" y1="4" x2="28" y2="4" stroke="#00FFFF" stroke-width="1.5" opacity="0.7"/>
+  <line x1="4" y1="8" x2="28" y2="8" stroke="#00FFFF" stroke-width="1.5" opacity="0.7"/>
+  <line x1="4" y1="12" x2="28" y2="12" stroke="#00FFFF" stroke-width="1.5" opacity="0.7"/>
+  <line x1="4" y1="16" x2="28" y2="16" stroke="#00FFFF" stroke-width="1.5" opacity="0.7"/>
+  <line x1="4" y1="20" x2="28" y2="20" stroke="#00FFFF" stroke-width="1.5" opacity="0.7"/>
+  <line x1="4" y1="24" x2="28" y2="24" stroke="#00FFFF" stroke-width="1.5" opacity="0.7"/>
+  <line x1="4" y1="28" x2="28" y2="28" stroke="#00FFFF" stroke-width="1.5" opacity="0.7"/>
+
+  <!-- Energy glow -->
+  <rect x="2" y="0" width="28" height="32" fill="#00FFFF" opacity="0.1"/>
+
+  <!-- Warning stripes -->
+  <rect x="0" y="0" width="2" height="8" fill="#FFD700"/>
+  <rect x="30" y="0" width="2" height="8" fill="#FFD700"/>
+  <rect x="0" y="24" width="2" height="8" fill="#FFD700"/>
+  <rect x="30" y="24" width="2" height="8" fill="#FFD700"/>
+</svg>

@@ -1,0 +1,12 @@
+<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <!-- Speed Boost bonus - lightning bolt -->
+  <path d="M 13 2 L 7 12 L 11 12 L 9 22 L 17 10 L 13 10 Z"
+        fill="#FFD700" stroke="#FFA500" stroke-width="1" stroke-linejoin="round"/>
+
+  <!-- Inner highlight -->
+  <path d="M 12 4 L 9 11 L 11.5 11 L 10 18 L 15 11 L 12.5 11 Z"
+        fill="#FFFF00" opacity="0.6"/>
+
+  <!-- Glow effect -->
+  <circle cx="12" cy="12" r="11" fill="none" stroke="#FFD700" stroke-width="1" opacity="0.3"/>
+</svg>
