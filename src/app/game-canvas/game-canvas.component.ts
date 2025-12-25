@@ -201,6 +201,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private powerPelletVisible = true;
   private powerPelletBlinkTimer = 0;
 
+  // IFM Logo display control
+  showIfmLogo = true;
+
   // Ready/Game Over Screen
   gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' | 'paused' | 'finalexplosion' = 'ready';
   private stateTimer = 0;
@@ -631,7 +634,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         ctx.fillText('🛡️ INVINCIBLE', this.CANVAS_WIDTH - 10, statusY);
         statusY += 12;
       }
-      if (this.turboSpeed) {
+      if (this.turboSpeed && this.boostEnergy > 0) {
         ctx.fillStyle = '#FFD700';
         ctx.fillText('⚡ TURBO', this.CANVAS_WIDTH - 10, statusY);
         statusY += 12;
@@ -656,6 +659,14 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Draw particles
     this.drawParticles(ctx);
+
+    // Apply dynamic lighting effect
+    if (this.lightingEnabled && this.gameState === 'playing') {
+      this.drawDynamicLighting(ctx);
+    }
+
+    // Draw Energy Gauge for Boost
+    this.drawEnergyGauge(ctx);
 
     // System Health unten links
     for (let i = 0; i < this.systemHealth; i++) {
@@ -927,6 +938,22 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   slowMotion = 1.0;          // Practice Mode: Zeitlupe (1.0 = normal)
   turboSpeed = false;        // Turbo Mode: 2x Geschwindigkeit
 
+  // Energy Gauge System for Turbo
+  private boostEnergy = 100;           // Current energy (0-100)
+  private readonly MAX_BOOST_ENERGY = 100;
+  private readonly BOOST_DRAIN_RATE = 40;  // Energy consumed per second (was 25)
+  private readonly BOOST_RECHARGE_RATE = 8; // Energy recharged per second when not boosting (was 15)
+  private isBoostKeyPressed = false;
+
+  // Dynamic Lighting System
+  private lightingEnabled = false;
+  private flashlightRadius = 120;
+  private ambientDarkness = 0.85; // 0 = fully dark, 1 = fully lit
+
+  // Voice Announcements
+  private lastAnnouncement = '';
+  private announcementCooldown = 0;
+
   // Practice Mode: Zeit-Rückspulung
   private gameHistory: Array<{
     pacmanX: number;
@@ -1168,9 +1195,152 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.gameState = 'ready';
     this.stateTimer = 0;
     this.scaredDuration = this.getFrightenedDuration();
+
+    // Announce game start
+    setTimeout(() => {
+      this.announce('PRODUCTION SEQUENCE INITIATED');
+    }, 500);
   }
 
   private onKeyUpBound = (e: KeyboardEvent) => this.onKeyUp(e);
+
+  // Voice Announcement System
+  private announce(text: string) {
+    if (this.lastAnnouncement === text && this.announcementCooldown > 0) {
+      return; // Avoid repeating same announcement too quickly
+    }
+
+    this.lastAnnouncement = text;
+    this.announcementCooldown = 2000; // 2 second cooldown
+
+    // Use Web Speech API for robotic voice
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.2; // Slightly faster
+      utterance.pitch = 0.8; // Lower pitch for robotic effect
+      utterance.volume = 0.7;
+      window.speechSynthesis.cancel(); // Cancel any ongoing speech
+      window.speechSynthesis.speak(utterance);
+    }
+
+    console.log(`🤖 ANNOUNCEMENT: ${text}`);
+  }
+
+  // Update Energy Gauge
+  private updateEnergyGauge(deltaTime: number) {
+    const deltaSeconds = deltaTime / 1000;
+
+    if (this.isBoostKeyPressed && this.boostEnergy > 0 && this.gameState === 'playing') {
+      // Drain energy when boosting
+      this.boostEnergy -= this.BOOST_DRAIN_RATE * deltaSeconds;
+
+      // Warn when energy is low
+      if (this.boostEnergy <= 20 && this.boostEnergy > 15) {
+        this.announce('LOW ENERGY');
+      }
+      if (this.boostEnergy < 0) {
+        this.boostEnergy = 0;
+      }
+    } else if (!this.isBoostKeyPressed && this.boostEnergy < this.MAX_BOOST_ENERGY) {
+      // Recharge energy when not boosting
+      this.boostEnergy += this.BOOST_RECHARGE_RATE * deltaSeconds;
+      if (this.boostEnergy > this.MAX_BOOST_ENERGY) {
+        this.boostEnergy = this.MAX_BOOST_ENERGY;
+      }
+    }
+  }
+
+  // Draw Dynamic Lighting (Flashlight Effect)
+  private drawDynamicLighting(ctx: CanvasRenderingContext2D) {
+    if (!this.pacman) return;
+
+    const centerX = this.pacman.x + this.pacman.width / 2;
+    const centerY = this.pacman.y + this.pacman.height / 2;
+
+    // Create darkness overlay
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = `rgba(0, 0, 0, ${this.ambientDarkness})`;
+    ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+    ctx.restore();
+
+    // Create flashlight effect
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+
+    // Main flashlight beam
+    const gradient = ctx.createRadialGradient(
+      centerX, centerY, 0,
+      centerX, centerY, this.flashlightRadius
+    );
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+    gradient.addColorStop(0.6, 'rgba(0, 0, 0, 0.8)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+
+    // Add flickering effect for realism
+    if (Math.random() < 0.1) {
+      const flicker = Math.random() * 10 - 5;
+      const flickerGradient = ctx.createRadialGradient(
+        centerX, centerY, 0,
+        centerX, centerY, this.flashlightRadius + flicker
+      );
+      flickerGradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)');
+      flickerGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = flickerGradient;
+      ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+    }
+
+    ctx.restore();
+  }
+
+  // Draw Energy Gauge
+  private drawEnergyGauge(ctx: CanvasRenderingContext2D) {
+    const barWidth = 150;
+    const barHeight = 20;
+    const barX = this.CANVAS_WIDTH - barWidth - 15;
+    const barY = 15;
+
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
+
+    // Border
+    ctx.strokeStyle = '#ED6B00';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
+
+    // Energy bar
+    const energyWidth = (this.boostEnergy / this.MAX_BOOST_ENERGY) * barWidth;
+    const gradient = ctx.createLinearGradient(barX, barY, barX + energyWidth, barY);
+
+    if (this.boostEnergy > 60) {
+      gradient.addColorStop(0, '#00FF88');
+      gradient.addColorStop(1, '#00CC6A');
+    } else if (this.boostEnergy > 30) {
+      gradient.addColorStop(0, '#FFD700');
+      gradient.addColorStop(1, '#FFA500');
+    } else {
+      gradient.addColorStop(0, '#FF6B6B');
+      gradient.addColorStop(1, '#FF0000');
+    }
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(barX, barY, energyWidth, barHeight);
+
+    // Text
+    ctx.font = 'bold 10px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    const text = `BOOST: ${Math.floor(this.boostEnergy)}%`;
+    ctx.strokeText(text, barX + barWidth / 2, barY + 14);
+    ctx.fillText(text, barX + barWidth / 2, barY + 14);
+    ctx.textAlign = 'left';
+  }
 
   ngAfterViewInit(): void {
     const canvasEl = this.gameCanvas.nativeElement;
@@ -1182,6 +1352,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     this.ctx = context;
+
+    // Hide IFM logo after 5 seconds
+    setTimeout(() => {
+      this.showIfmLogo = false;
+    }, 5000);
 
     // Register keyboard input
     window.addEventListener('keydown', this.onKeyDownBound);
@@ -1216,6 +1391,23 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private update() {
     const deltaTime = 1000 / this.FPS;
+
+    // Update Energy Gauge
+    this.updateEnergyGauge(deltaTime);
+
+    // Update announcement cooldown
+    if (this.announcementCooldown > 0) {
+      this.announcementCooldown -= deltaTime;
+    }
+
+    // Update Boost Mode based on key state and energy
+    if (this.gameMode !== 'practice') {
+      if (this.isBoostKeyPressed && this.boostEnergy > 0) {
+        this.turboSpeed = true;
+      } else {
+        this.turboSpeed = false;
+      }
+    }
 
     // Gamepad Input
     const gpDir = this.inputService.getDirection();
@@ -1276,6 +1468,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
             // Trigger final explosion before game over
             this.gameState = 'finalexplosion';
             this.stateTimer = 0;
+
+            // Announce critical failure
+            this.announce('CRITICAL SYSTEM FAILURE');
+
             // Initialize more dramatic destruction
             this.mazeDestruction.clear();
             this.walls.forEach(wall => {
@@ -1289,6 +1485,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
             this.resetPositions();
             this.gameState = 'ready';
             this.stateTimer = 0;
+
+            // Announce malfunction
+            setTimeout(() => {
+              this.announce('SYSTEM MALFUNCTION DETECTED');
+            }, 500);
           }
         }
         return;
@@ -1700,21 +1901,37 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private move() {
     if (!this.pacman) return;
 
-    // Move pacman
-    this.pacman.x += this.pacman.velocityX;
-    this.pacman.y += this.pacman.velocityY;
+    // Apply boost multiplier only when turboSpeed is active
+    const boostMultiplier = this.turboSpeed ? 2 : 1;
 
-    // Tunnel-Wraparound für Pac-Man
-    this.handleTunnelWraparound(this.pacman);
+    // Move pacman with boost - apply in steps to prevent wall clipping
+    const steps = boostMultiplier;
+    for (let i = 0; i < steps; i++) {
+      const oldX = this.pacman.x;
+      const oldY = this.pacman.y;
 
-    // Check wall collisions (außer Ghost Door)
-    for (const wall of this.walls) {
-      if (wall.type === 'ghost-door') continue; // Pac-Man kann NICHT durch die Tür
-      if (this.collision(this.pacman, wall)) {
-        this.pacman.x -= this.pacman.velocityX;
-        this.pacman.y -= this.pacman.velocityY;
-        break;
+      // Move one step
+      this.pacman.x += this.pacman.velocityX;
+      this.pacman.y += this.pacman.velocityY;
+
+      // Tunnel-Wraparound für Pac-Man
+      this.handleTunnelWraparound(this.pacman);
+
+      // Check wall collisions (außer Ghost Door)
+      let collided = false;
+      for (const wall of this.walls) {
+        if (wall.type === 'ghost-door') continue; // Pac-Man kann NICHT durch die Tür
+        if (this.collision(this.pacman, wall)) {
+          // Revert movement
+          this.pacman.x = oldX;
+          this.pacman.y = oldY;
+          collided = true;
+          break;
+        }
       }
+
+      // Stop moving if we hit a wall
+      if (collided) break;
     }
 
     // Check ghost collisions
@@ -1828,6 +2045,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           g.scared = true;
           g.updateVelocity(this.CELL_SIZE); // update speed to 80%
         });
+
+        // Announce power mode
+        this.announce('POWER MODE ACTIVATED');
       }
     }
     if (powerEaten) {
@@ -1877,6 +2097,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           this.shieldActive = true;
           this.bonusEffectTimer = 10000; // 10 seconds
           this.audioService.play('eatghost');
+
+          // Announce shield activation
+          this.announce('DEFENSE SHIELD ACTIVATED');
           break;
         case 'diagnostic':
           bonusScore = 500;
@@ -1923,6 +2146,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.streakMultiplier = 1.0;
       this.gameState = 'levelcomplete';
       this.stateTimer = 0;
+
+      // Announce level complete
+      this.announce('LEVEL COMPLETE. INITIATING NEXT SEQUENCE');
     }
   }
 
@@ -2016,10 +2242,15 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.gameState = 'ready';
     this.stateTimer = 0;
     this.gameHistory = [];
+    this.boostEnergy = this.MAX_BOOST_ENERGY;
+    this.isBoostKeyPressed = false;
     this.startGameLoop();
   }
 
   private onKeyDown(e: KeyboardEvent) {
+    // Prevent key repeat events
+    if (e.repeat) return;
+
     if (e.key === 'Escape') {
       if (this.gameState === 'paused') {
         this.resumeFromPause();
@@ -2074,13 +2305,16 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
+    // Shift for boost in all modes
+    if (e.key === 'Shift' && this.gameMode !== 'practice') {
+      this.isBoostKeyPressed = true;
+      return;
+    }
+
     // Keine Steuerung während Ready, Dying oder Level Complete
     if (this.gameState !== 'playing') return;
 
     if (!this.pacman) return;
-
-    // Turbo Mode: Geschwindigkeits-Multiplikator
-    const speedMultiplier = this.turboSpeed ? 2 : 1;
 
     // Buffer the direction for smoother cornering
     if (e.key === 'ArrowUp') {
@@ -2122,6 +2356,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       if (e.key === '1' || e.key === '2') {
         this.slowMotion = 1.0;
+      }
+    } else {
+      // Release boost in normal modes
+      if (e.key === 'Shift') {
+        this.isBoostKeyPressed = false;
+        this.turboSpeed = false;
       }
     }
   }

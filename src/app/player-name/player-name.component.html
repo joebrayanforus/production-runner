@@ -1,45 +1,60 @@
 <div class="player-name-container">
-  <!-- IFM Logo Header -->
-  <div class="ifm-logo-section">
-    <img src="assets/ifm1.webp" alt="ifm" class="ifm-logo-img">
+  <!-- Video Background -->
+  <div class="video-background">
+    <video autoplay loop muted playsinline class="bg-video">
+      <source src="assets/videos/WhatsApp Video 2025-12-17 at 14.28.04.mp4" type="video/mp4">
+    </video>
+    <div class="video-overlay"></div>
   </div>
 
-  <!-- Header -->
-  <header class="header">
-    <div class="title-section">
-      <h1>PRODUCTION RUNNER</h1>
+  <!-- Pixel Clouds -->
+  <div class="pixel-clouds">
+    <div class="cloud">☁️</div>
+    <div class="cloud">☁️</div>
+  </div>
+
+  <!-- IFM Logo Pixel Style -->
+  <div class="ifm-logo-section">
+    <img src="assets/ifm1.webp" alt="ifm" class="ifm-logo-img">
+    <div class="ifm-pixel-tag">POWERED BY IFM</div>
+  </div>
+
+  <!-- Pixel Art Header -->
+  <header class="pixel-header">
+    <div class="pixel-title-box">
+      <h1 class="pixel-game-title">ENTER NAME</h1>
+      <p class="pixel-subtitle">{{ gameMode === 'classic' ? '★ CLASSIC MODE ★' : '⚡ PRACTICE MODE ⚡' }}</p>
     </div>
-    <p class="subtitle">{{ gameMode === 'classic' ? 'STANDARD BETRIEB' : 'TRAININGSMODUS' }}</p>
   </header>
 
-  <!-- Main Screen -->
+  <!-- Arcade Screen with Pixel Art Style -->
   <div class="arcade-screen">
+    <div class="screen-scanlines"></div>
+
     <label class="player-label">
-      <span class="label-icon">⚙️</span>
-      <span class="label-text">OPERATOR IDENTIFIKATION</span>
-      <span class="label-icon">⚙️</span>
+      <span class="label-text">▼ OPERATOR ID ▼</span>
     </label>
 
-    <!-- Player Name Display -->
+    <!-- Player Name Display with Pixel Style -->
     <div class="input-wrapper">
       <div class="arcade-input">
-        {{ playerName.toUpperCase() || 'GEBEN SIE IHREN NAMEN EIN...' }}
+        {{ playerName.toUpperCase() || '_ _ _ _ _ _ _ _ _ _' }}
       </div>
       <div class="input-cursor active"></div>
     </div>
 
     <!-- Current Input Display -->
     <p class="name-preview" *ngIf="isPlayerNameValid()">
-      OPERATOR: <span class="preview-name">{{ playerName.toUpperCase() }}</span>
+      ► OPERATOR: <span class="preview-name">{{ playerName.toUpperCase() }}</span>
     </p>
     <p class="hint-text" *ngIf="!isPlayerNameValid()">
-      NAMEN EINGEBEN ZUM STARTEN (MAX 20 ZEICHEN)
+      ⚠ ENTER YOUR NAME TO START ⚠
     </p>
 
-    <!-- Virtual Keyboard -->
+    <!-- Virtual Keyboard Pixel Style -->
     <div class="virtual-keyboard">
       <div class="keyboard-title">
-        ⌨️ NAVIGATIONSTASTEN ODER GAMEPAD ⌨️
+        ⌨ USE ARROWS OR GAMEPAD ⌨
       </div>
 
       <div class="keyboard-grid">
@@ -63,7 +78,7 @@
         <button class="control-button delete-btn"
                 [class.selected]="focusArea === 'buttons' && buttonIndex === 0"
                 (click)="deleteCharacter()" type="button">
-          🔙 LÖSCHEN
+          ◄ DELETE
         </button>
         <button
           class="control-button play-btn"
@@ -72,23 +87,28 @@
           [disabled]="!isPlayerNameValid()"
           type="button"
         >
-          ▶ SPIEL STARTEN
+          ▶ START GAME
         </button>
         <button class="control-button back-btn"
                 [class.selected]="focusArea === 'buttons' && buttonIndex === 2"
                 (click)="goBack()" type="button">
-          ◄ ZURÜCK
+          ✕ BACK
         </button>
       </div>
 
       <p class="keyboard-hint">
-        ↑↓←→ NAV. | ENTER/A WÄHLEN | ESC/B ZURÜCK | START/SHIFT SPIEL STARTEN
+        ↑↓←→ MOVE | ENTER/A SELECT | ESC/B BACK
       </p>
     </div>
   </div>
 
-  <!-- Footer -->
-  <footer class="footer">
-    <p>Dein Name wird auf der Leaderboard angezeigt</p>
+  <!-- Pixel Ground -->
+  <div class="pixel-ground">
+    <div class="ground-pattern"></div>
+  </div>
+
+  <!-- Footer Pixel Style -->
+  <footer class="pixel-footer">
+    <p>★ YOUR NAME WILL APPEAR ON THE LEADERBOARD ★</p>
   </footer>
 </div>

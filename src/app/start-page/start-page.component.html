@@ -1,47 +1,77 @@
 <div class="start-container">
-  <!-- IFM Logo Header -->
-  <div class="ifm-logo-header">
-    <img src="assets/ifm1.webp" alt="ifm - innovative sensor technology" class="ifm-logo">
+  <!-- Video Background -->
+  <div class="video-background">
+    <video autoplay loop muted playsinline class="bg-video">
+      <source src="assets/videos/WhatsApp Video 2025-12-17 at 14.28.04.mp4" type="video/mp4">
+    </video>
+    <div class="video-overlay"></div>
   </div>
 
-  <!-- Top 3 Leaderboard -->
-  <section class="top-scores" *ngIf="topScores.length > 0">
-    <h3 class="top-scores-title">🏆 TOP PERFORMER</h3>
-    <div class="top-scores-list">
-      <div class="score-item" *ngFor="let entry of topScores; let i = index">
-        <span class="rank">{{ i + 1 }}</span>
-        <span class="player-name">{{ entry.username }}</span>
-        <span class="score">{{ entry.points }} Punkte</span>
+  <!-- Pixel Art Clouds -->
+  <div class="clouds">
+    <div class="cloud cloud-1">☁️</div>
+    <div class="cloud cloud-2">☁️</div>
+    <div class="cloud cloud-3">☁️</div>
+  </div>
+
+  <!-- IFM Logo with Pixel Style -->
+  <div class="ifm-branding">
+    <img src="assets/ifm1.webp" alt="ifm" class="ifm-pixel-logo">
+    <div class="ifm-tagline">POWERED BY IFM</div>
+  </div>
+
+  <!-- Pixel Art Game Title -->
+  <div class="game-title-container">
+    <div class="pixel-border-top"></div>
+    <h1 class="pixel-title">START GAME</h1>
+    <div class="pixel-border-bottom"></div>
+  </div>
+
+  <!-- Retro Menu -->
+  <nav class="retro-menu">
+    <button class="menu-item"
+            [class.selected]="selectedMode === 'classic'"
+            (click)="selectMode('classic')">
+      <span class="menu-arrow">▶</span>
+      <span class="menu-text">1 PLAYER</span>
+    </button>
+    <button class="menu-item"
+            [class.selected]="selectedMode === 'practice'"
+            (click)="selectMode('practice')">
+      <span class="menu-arrow">▶</span>
+      <span class="menu-text">SIMULATION</span>
+    </button>
+    <button class="menu-item menu-disabled">
+      <span class="menu-arrow"></span>
+      <span class="menu-text">EXIT</span>
+    </button>
+  </nav>
+
+  <!-- Top Scores Pixel Box -->
+  <div class="pixel-scores-box" *ngIf="topScores.length > 0">
+    <div class="pixel-box-header">🏆 HIGH SCORES</div>
+    <div class="pixel-box-content">
+      <div class="score-line" *ngFor="let entry of topScores.slice(0, 3); let i = index">
+        <span class="score-rank">{{ i + 1 }}.</span>
+        <span class="score-name">{{ entry.username }}</span>
+        <span class="score-points">{{ entry.points }}</span>
       </div>
     </div>
-  </section>
+  </div>
 
-  <!-- Hero Section - Game Title -->
-  <header class="hero">
-    <h1>PRODUCTION RUNNER</h1>
-    <p class="subtitle">IFM AUTOMATION CHALLENGE</p>
-  </header>
+  <!-- Press Start Blinking Text -->
+  <div class="press-start" (click)="startGame()">
+    <span class="blink-text">PRESS START</span>
+  </div>
 
-  <!-- Game Modes Section -->
-  <section class="modes-section">
-    <div class="modes-grid">
-      <!-- Classic Mode -->
-      <div class="mode-card" [class.selected]="selectedMode === 'classic'" (click)="selectMode('classic')">
-        <div class="mode-icon">▶️</div>
-        <h3>Classic Mode</h3>
-      </div>
+  <!-- Pixel Ground -->
+  <div class="pixel-ground">
+    <div class="ground-pattern"></div>
+  </div>
 
-      <!-- Practice Mode -->
-      <div class="mode-card" [class.selected]="selectedMode === 'practice'" (click)="selectMode('practice')">
-        <div class="mode-icon">🏋️</div>
-        <h3>Trainings-Modus</h3>
-      </div>
-    </div>
-  </section>
-
-  <!-- Start Button -->
-  <button class="start-button" (click)="startGame()">
-    <span class="play-icon">▶</span>
-    SPIEL STARTEN
-  </button>
+  <!-- Industrial Elements -->
+  <div class="industrial-elements">
+    <div class="factory-icon">🏭</div>
+    <div class="robot-icon">🤖</div>
+  </div>
 </div>
