@@ -30,6 +30,12 @@
   <!-- Retro Menu -->
   <nav class="retro-menu">
     <button class="menu-item"
+            [class.selected]="selectedMode === 'presentation'"
+            (click)="selectMode('presentation')">
+      <span class="menu-arrow">▶</span>
+      <span class="menu-text">PRÉSENTATION</span>
+    </button>
+    <button class="menu-item"
             [class.selected]="selectedMode === 'classic'"
             (click)="selectMode('classic')">
       <span class="menu-arrow">▶</span>

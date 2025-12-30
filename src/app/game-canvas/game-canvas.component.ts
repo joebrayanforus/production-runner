@@ -37,7 +37,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private ctx!: CanvasRenderingContext2D;
   private animationFrameId = 0;
   private lastFrameTime = 0;
-  private readonly FPS = 30;
+  private readonly FPS = 60;
   private onKeyDownBound = (e: KeyboardEvent) => this.onKeyDown(e);
   // Assets - Industrial Equipment
   private malfunctionBlueImage = new Image();
@@ -111,6 +111,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   // Missing streak system
   private pelletStreak = 0;
   private streakMultiplier = 1.0;
+  private comboResetTimer = 0;
+  private readonly COMBO_RESET_DELAY = 3000; // 3 secondes sans pellet = reset combo
   private cherrySpawnCooldown = 0;
   private ghostReleaseTimer = 0;
   private ghostsReleased = 0;
@@ -166,10 +168,15 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Death animation - maze destruction
   private mazeDestruction: Map<Block, {offsetY: number, rotation: number, speed: number}> = new Map();
+  private gameOverParticles: Array<{x: number, y: number, vx: number, vy: number, size: number, color: string, alpha: number}> = [];
   private mazeRedIntensity = 0;
 
   // Particle System for visual effects
   private particles: Particle[] = [];
+
+  // Decorative Industrial Elements
+  private warningSignsPositions: Array<{x: number, y: number, type: 'achtung' | 'verboten' | 'warnung'}> = [];
+  private statusLEDPositions: Array<{x: number, y: number, color: 'green' | 'red' | 'orange', blinkSpeed: number}> = [];
 
   // Malfunction Spawning Timer
   private malfunctionSpawnTimer = 0;
@@ -207,10 +214,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   // Ready/Game Over Screen
   gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' | 'paused' | 'finalexplosion' = 'ready';
   private stateTimer = 0;
-  private readonly READY_DURATION = 2000; // 2 Sekunden "READY!"
-  private readonly DEATH_DURATION = 1500; // 1.5 Sekunden Todesanimation
-  private readonly FINAL_EXPLOSION_DURATION = 3000; // 3 seconds final explosion
-  private readonly LEVELCOMPLETE_DURATION = 2000; // 2 Sekunden Level-Übergang
+  private readonly READY_DURATION = 500; // 0.5 seconde "READY!"
+  private readonly DEATH_DURATION = 300; // 0.3 seconde animation mort
+  private readonly FINAL_EXPLOSION_DURATION = 1500; // 1.5 seconds final explosion
+  private readonly LEVELCOMPLETE_DURATION = 1000; // 1 seconde Level-Übergang
 
   // Level-Progression: Geschwindigkeit und Frighten-Dauer pro Level
   private getGhostSpeed(): number {
@@ -249,12 +256,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ];
   }
   private draw(ctx: CanvasRenderingContext2D) {
-    // Industrial grid background
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+    // Transparent background - no fill
+    // ctx.fillStyle = '#1E2A3A';
+    // ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
 
     // Subtle grid pattern
-    ctx.strokeStyle = 'rgba(0, 255, 136, 0.05)';
+    ctx.strokeStyle = 'rgba(245, 245, 245, 0.05)';
     ctx.lineWidth = 0.5;
     for (let x = 0; x < this.CANVAS_WIDTH; x += this.CELL_SIZE) {
       ctx.beginPath();
@@ -269,7 +276,38 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.stroke();
     }
 
-    // Wände zeichnen (optimiert sans shadow)
+    // Thicker grid every 5 cells
+    ctx.strokeStyle = 'rgba(245, 245, 245, 0.1)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < this.CANVAS_WIDTH; x += this.CELL_SIZE * 5) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, this.CANVAS_HEIGHT);
+      ctx.stroke();
+    }
+    for (let y = 0; y < this.CANVAS_HEIGHT; y += this.CELL_SIZE * 5) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(this.CANVAS_WIDTH, y);
+      ctx.stroke();
+    }
+
+    // Coordinate annotations - transparent (hidden)
+    ctx.font = '6px monospace';
+    ctx.fillStyle = 'rgba(51, 51, 51, 0)';
+    ctx.textAlign = 'center';
+    for (let x = 100; x < this.CANVAS_WIDTH; x += 100) {
+      ctx.fillText(`${x}`, x, 42);
+    }
+    ctx.textAlign = 'left';
+    for (let y = 100; y < this.CANVAS_HEIGHT - 40; y += 100) {
+      ctx.fillText(`${y}`, 5, y + 3);
+    }
+
+    // Draw decorative industrial elements
+    this.drawIndustrialDecorations(ctx);
+
+    // Draw production line walls (pipes, conveyors, machinery)
     this.walls.forEach(wall => {
       ctx.save();
 
@@ -289,107 +327,322 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         if (this.ghostDoorImage.complete) {
           ctx.drawImage(this.ghostDoorImage, 0, 0, wall.width, wall.height);
         } else {
-          // Fallback: pinke Linie
-          ctx.fillStyle = '#FFB8FF';
-          ctx.fillRect(0, wall.height / 2 - 2, wall.width, 4);
+          // Industrial gate fallback
+          ctx.fillStyle = '#505050';
+          ctx.fillRect(0, 0, wall.width, wall.height);
+          ctx.strokeStyle = '#ED6B00';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(0, 0, wall.width, wall.height);
         }
       } else if (wall.image && wall.image.complete) {
-        // Walls drawing
+        // Walls drawing with images
         if ((this.gameState === 'dying' || this.gameState === 'finalexplosion') && this.mazeRedIntensity > 0) {
-          // Red tint overlay
           ctx.globalCompositeOperation = 'source-over';
-          if (this.mazeDestruction.has(wall)) {
-            ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
-          } else {
-            ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
-          }
+          ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
           ctx.fillStyle = `rgba(255, 0, 0, ${this.mazeRedIntensity * 0.5})`;
           ctx.fillRect(0, 0, wall.width, wall.height);
         } else {
-          if (this.mazeDestruction.has(wall)) {
-            ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
-          } else {
-            ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
-          }
+          ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
         }
       } else {
-        // Fallback: Blaue Wände mit 3D-Effekt
-        ctx.fillStyle = '#2121DE';
+        // Fallback: Industrial pipe/conveyor style
+        // Determine if horizontal or vertical
+        const isHorizontal = wall.width > wall.height;
+
+        // Main pipe/conveyor body - IFM orange
+        const pipeGradient = isHorizontal
+          ? ctx.createLinearGradient(0, 0, 0, wall.height)
+          : ctx.createLinearGradient(0, 0, wall.width, 0);
+        pipeGradient.addColorStop(0, '#FF9A33');
+        pipeGradient.addColorStop(0.5, '#FF7A01');
+        pipeGradient.addColorStop(1, '#E66A00');
+        ctx.fillStyle = pipeGradient;
         ctx.fillRect(0, 0, wall.width, wall.height);
-        // Inner highlight für 3D-Effekt
-        ctx.fillStyle = '#4A4AFF';
-        ctx.fillRect(2, 2, wall.width - 4, wall.height - 4);
+
+        // Metallic edge highlight
+        ctx.fillStyle = '#FF9A33';
+        if (isHorizontal) {
+          ctx.fillRect(0, 0, wall.width, 2);
+        } else {
+          ctx.fillRect(0, 0, 2, wall.height);
+        }
+
+        // Shadow edge
+        ctx.fillStyle = '#CC6100';
+        if (isHorizontal) {
+          ctx.fillRect(0, wall.height - 2, wall.width, 2);
+        } else {
+          ctx.fillRect(wall.width - 2, 0, 2, wall.height);
+        }
+
+        // Subtle accent stripes with flow animation
+        const flowOffset = (Date.now() / 100) % 20;
+        ctx.strokeStyle = 'rgba(245, 245, 245, 0.2)';
+        ctx.lineWidth = 1;
+        if (isHorizontal) {
+          for (let x = -flowOffset; x < wall.width; x += 20) {
+            ctx.globalAlpha = 0.3 + Math.sin((x + flowOffset) / 10) * 0.2;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, wall.height);
+            ctx.stroke();
+          }
+        } else {
+          for (let y = -flowOffset; y < wall.height; y += 20) {
+            ctx.globalAlpha = 0.3 + Math.sin((y + flowOffset) / 10) * 0.2;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(wall.width, y);
+            ctx.stroke();
+          }
+        }
+        ctx.globalAlpha = 1;
+
+        // Rivets/Bolts on pipes (every 40px)
+        ctx.fillStyle = '#707070';
+        if (isHorizontal && wall.width > 40) {
+          for (let x = 20; x < wall.width; x += 40) {
+            // Top rivet
+            ctx.beginPath();
+            ctx.arc(x, 4, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#404040';
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+            // Bottom rivet
+            ctx.beginPath();
+            ctx.arc(x, wall.height - 4, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          }
+        } else if (!isHorizontal && wall.height > 40) {
+          for (let y = 20; y < wall.height; y += 40) {
+            // Left rivet
+            ctx.beginPath();
+            ctx.arc(4, y, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#404040';
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+            // Right rivet
+            ctx.beginPath();
+            ctx.arc(wall.width - 4, y, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+
+        // Corner connectors/sensors at wall intersections
+        if (wall.width === wall.height || (wall.width <= this.CELL_SIZE && wall.height <= this.CELL_SIZE)) {
+          // Draw sensor/connector at corner with LED
+          const sensorPulse = 0.7 + Math.sin(Date.now() / 300) * 0.3;
+          ctx.fillStyle = '#ED6B00';
+          ctx.fillRect(wall.width / 2 - 3, wall.height / 2 - 3, 6, 6);
+          ctx.strokeStyle = '#00FF88';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(wall.width / 2 - 3, wall.height / 2 - 3, 6, 6);
+          // LED indicator
+          ctx.fillStyle = `rgba(0, 255, 136, ${sensorPulse})`;
+          ctx.fillRect(wall.width / 2 - 1, wall.height / 2 - 1, 2, 2);
+        }
       }
 
       ctx.restore();
     });
 
-    // Sensordaten zeichnen (kleine ifm-Symbole)
+    // Sensordaten zeichnen (IoT sensor nodes - IFM style)
     this.sensorData.forEach(food => {
-      // Draw sensor data pellet (small green dot)
+      ctx.save();
+      // Draw sensor data pellet with glow effect
       if (this.sensorDataImage.complete) {
         ctx.drawImage(this.sensorDataImage, food.x, food.y, 8, 8);
       } else {
-        // Fallback
+        // Fallback: Industrial IoT sensor node
+        const sensorPulse = 0.6 + Math.sin(Date.now() / 200 + food.x + food.y) * 0.4;
+
+        // Outer glow
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = `rgba(0, 255, 136, ${sensorPulse * 0.5})`;
         ctx.fillStyle = '#00FF88';
-        ctx.fillRect(food.x + 1, food.y + 1, 3, 3);
+        ctx.beginPath();
+        ctx.arc(food.x + 4, food.y + 4, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Inner core
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(food.x + 4, food.y + 4, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Data transmission rings (animated)
+        if (Math.random() < 0.05) {
+          ctx.strokeStyle = `rgba(0, 255, 136, ${sensorPulse})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(food.x + 4, food.y + 4, 6, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
+      ctx.restore();
     });
 
-    // Wartungsstationen zeichnen (blinkend)
+    // Wartungsstationen zeichnen (Industrial Power Hubs)
     if (this.powerPelletVisible) {
       this.maintenanceStations.forEach(pellet => {
+        ctx.save();
         if (this.maintenanceStationImage.complete) {
           // Pulse animation
           const scale = 1 + Math.sin(this.maintenancePulse) * 0.15;
           const offset = (pellet.width * (1 - scale)) / 2;
 
-          // Orange glow
+          // Orange glow with multiple layers
           ctx.shadowColor = '#ED6B00';
-          ctx.shadowBlur = 12;
+          ctx.shadowBlur = 20;
           ctx.drawImage(this.maintenanceStationImage,
             pellet.x + offset, pellet.y + offset,
             pellet.width * scale, pellet.height * scale);
           ctx.shadowBlur = 0;
         } else {
-          // Fallback: orange square
+          // Fallback: Industrial maintenance hub with rotating elements
+          const centerX = pellet.x + pellet.width / 2;
+          const centerY = pellet.y + pellet.height / 2;
+          const rotation = (Date.now() / 1000) % (Math.PI * 2);
+          const pulse = 0.8 + Math.sin(this.maintenancePulse) * 0.2;
+
+          // Outer glow
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = '#ED6B00';
+
+          // Main hub body
           ctx.fillStyle = '#ED6B00';
-          ctx.fillRect(pellet.x + 2, pellet.y + 2, pellet.width - 4, pellet.height - 4);
+          ctx.fillRect(pellet.x + 4, pellet.y + 4, pellet.width - 8, pellet.height - 8);
+
+          // Rotating segments
+          ctx.translate(centerX, centerY);
+          ctx.rotate(rotation);
+          for (let i = 0; i < 4; i++) {
+            ctx.rotate(Math.PI / 2);
+            ctx.fillStyle = `rgba(0, 255, 136, ${pulse})`;
+            ctx.fillRect(-2, -pellet.width / 2 + 2, 4, 6);
+          }
+          ctx.rotate(-rotation);
+          ctx.translate(-centerX, -centerY);
+
+          ctx.shadowBlur = 0;
+
+          // Center core
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Energy border
+          ctx.strokeStyle = '#00FF88';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(pellet.x + 2, pellet.y + 2, pellet.width - 4, pellet.height - 4);
         }
+        ctx.restore();
       });
     }
 
-    // Control Panels zeichnen (decorative)
+    // Control Panels zeichnen (Industrial HMI panels)
     this.controlPanels.forEach(panel => {
+      ctx.save();
       if (this.controlPanelImage.complete) {
         ctx.drawImage(this.controlPanelImage, panel.x, panel.y, this.CELL_SIZE, this.CELL_SIZE);
+      } else {
+        // Fallback: Industrial control panel
+        // Panel body
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(panel.x, panel.y, this.CELL_SIZE, this.CELL_SIZE);
 
-        // LED indicator (blinking) - simplified
-        if (Math.floor(this.ledBlinkTimer / 500) % 2 === 0) {
-          ctx.fillStyle = '#00FF88';
-          ctx.beginPath();
-          ctx.arc(panel.x + this.CELL_SIZE - 5, panel.y + 5, 2, 0, Math.PI * 2);
-          ctx.fill();
+        // LCD screen area
+        ctx.fillStyle = '#1a3a1a';
+        ctx.fillRect(panel.x + 3, panel.y + 3, this.CELL_SIZE - 6, 10);
+
+        // LCD text
+        ctx.font = '5px monospace';
+        ctx.fillStyle = '#00FF88';
+        ctx.fillText('OK', panel.x + 5, panel.y + 10);
+
+        // Button array
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = '#404040';
+          ctx.fillRect(panel.x + 4 + i * 6, panel.y + 16, 4, 4);
         }
       }
-    });    // Quality Checkpoints zeichnen (blinkend)
-    const checkpointVisible = Math.floor(Date.now() / 300) % 2 === 0;
-    if (checkpointVisible) {
-      this.qualityCheckpoints.forEach(checkpoint => {
-        if (this.qualityCheckpointImage.complete) {
-          ctx.drawImage(this.qualityCheckpointImage, checkpoint.x + 8, checkpoint.y + 8, 16, 16);
-          // Glow effect
-          ctx.strokeStyle = '#4169E1';
-          ctx.lineWidth = 2;
+
+      // Multi-color LED indicators
+      const leds = [
+        { x: panel.x + this.CELL_SIZE - 5, y: panel.y + 5, color: '#00FF88', blink: 500 },
+        { x: panel.x + this.CELL_SIZE - 5, y: panel.y + 10, color: '#ED6B00', blink: 700 },
+        { x: panel.x + this.CELL_SIZE - 5, y: panel.y + 15, color: '#FFD700', blink: 900 }
+      ];
+
+      leds.forEach(led => {
+        if (Math.floor(this.ledBlinkTimer / led.blink) % 2 === 0) {
+          ctx.shadowBlur = 5;
+          ctx.shadowColor = led.color;
+          ctx.fillStyle = led.color;
           ctx.beginPath();
-          ctx.arc(checkpoint.x + 16, checkpoint.y + 16, 12, 0, Math.PI * 2);
-          ctx.stroke();
+          ctx.arc(led.x, led.y, 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
         }
       });
-    }
+      ctx.restore();
+    });    // Quality Checkpoints zeichnen (Quality inspection stations)
+    this.qualityCheckpoints.forEach(checkpoint => {
+      ctx.save();
+      if (this.qualityCheckpointImage.complete) {
+        ctx.drawImage(this.qualityCheckpointImage, checkpoint.x + 8, checkpoint.y + 8, 16, 16);
+      }
 
-    // Cherry/Bonus zeichnen mit aktuellem Bonus-Typ
+      // Rotating scanner ring
+      const rotation = (Date.now() / 500) % (Math.PI * 2);
+      const centerX = checkpoint.x + 16;
+      const centerY = checkpoint.y + 16;
+
+      // Outer scanning ring
+      ctx.translate(centerX, centerY);
+      ctx.rotate(rotation);
+      ctx.strokeStyle = '#4169E1';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 12, 0, Math.PI / 2);
+      ctx.stroke();
+      ctx.rotate(-rotation);
+      ctx.translate(-centerX, -centerY);
+
+      // Pulse rings (expanding)
+      const pulsePhase = (Date.now() % 2000) / 2000;
+      for (let i = 0; i < 3; i++) {
+        const phase = (pulsePhase + i * 0.33) % 1;
+        const radius = 8 + phase * 8;
+        const alpha = 1 - phase;
+        ctx.strokeStyle = `rgba(65, 105, 225, ${alpha * 0.5})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Center indicator
+      ctx.fillStyle = '#4169E1';
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#4169E1';
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      ctx.restore();
+    });
+
+    // Cherry/Bonus zeichnen mit aktuellem Bonus-Typ (Industrial upgrades)
     if (this.cherry) {
+      ctx.save();
       let bonusImage = this.cherryImage;
       switch (this.currentBonusType) {
         case 'iot-sensor':
@@ -402,12 +655,76 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           bonusImage = this.cherryImage;
           break;
       }
-      if (bonusImage.complete) {
-        // Bounce animation
-        const bounceOffset = Math.sin(this.bonusBounce) * 3;
 
-        ctx.drawImage(bonusImage, this.cherry.x + 4, this.cherry.y + 4 + bounceOffset, 24, 24);
+      // Bounce animation
+      const bounceOffset = Math.sin(this.bonusBounce) * 4;
+      const centerX = this.cherry.x + 16;
+      const centerY = this.cherry.y + 16 + bounceOffset;
+
+      // Rotating energy ring
+      const rotation = (Date.now() / 1000) % (Math.PI * 2);
+      ctx.translate(centerX, centerY);
+      ctx.rotate(rotation);
+
+      // Energy ring
+      ctx.strokeStyle = '#ED6B00';
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.6 + Math.sin(Date.now() / 200) * 0.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, 16, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Segments
+      for (let i = 0; i < 6; i++) {
+        ctx.rotate(Math.PI / 3);
+        ctx.fillStyle = '#00FF88';
+        ctx.fillRect(-2, -18, 4, 4);
       }
+
+      ctx.rotate(-rotation);
+      ctx.translate(-centerX, -centerY);
+      ctx.globalAlpha = 1;
+
+      // Bonus item with glow
+      if (bonusImage.complete) {
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ED6B00';
+        ctx.drawImage(bonusImage, this.cherry.x + 4, this.cherry.y + 4 + bounceOffset, 24, 24);
+        ctx.shadowBlur = 0;
+      } else {
+        // Fallback: industrial upgrade icon
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ED6B00';
+        ctx.fillStyle = '#ED6B00';
+        ctx.fillRect(this.cherry.x + 8, this.cherry.y + 8 + bounceOffset, 16, 16);
+        ctx.strokeStyle = '#00FF88';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.cherry.x + 8, this.cherry.y + 8 + bounceOffset, 16, 16);
+        ctx.shadowBlur = 0;
+
+        // Type indicator
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center';
+        const icon = this.currentBonusType === 'shield' ? 'S' :
+                     this.currentBonusType === 'iot-sensor' ? 'I' : 'D';
+        ctx.fillText(icon, centerX, centerY + 3);
+      }
+
+      // Particle effects around bonus
+      for (let i = 0; i < 4; i++) {
+        const angle = (Date.now() / 500 + i * Math.PI / 2) % (Math.PI * 2);
+        const dist = 20 + Math.sin(Date.now() / 300) * 5;
+        const px = centerX + Math.cos(angle) * dist;
+        const py = centerY + Math.sin(angle) * dist;
+
+        ctx.fillStyle = `rgba(0, 255, 136, ${0.5 + Math.sin(Date.now() / 200) * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(px, py, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
     }    // Robot mit Animation zeichnen
     if (this.robot && this.gameState !== 'dying') {
       this.drawRobot(ctx);
@@ -425,6 +742,32 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // UI Overlay
     this.drawUI(ctx);
+
+    // Industrial scanline effect (subtle)
+    this.drawIndustrialScanlines(ctx);
+  }
+
+  private drawIndustrialScanlines(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+
+    // Horizontal scanlines
+    ctx.globalAlpha = 0.03;
+    ctx.fillStyle = '#000000';
+    for (let y = 30; y < this.CANVAS_HEIGHT - 35; y += 4) {
+      ctx.fillRect(0, y, this.CANVAS_WIDTH, 2);
+    }
+
+    // Moving scan beam
+    const scanY = 30 + ((Date.now() / 20) % (this.CANVAS_HEIGHT - 65));
+    const scanGradient = ctx.createLinearGradient(0, scanY - 20, 0, scanY + 20);
+    scanGradient.addColorStop(0, 'rgba(0, 255, 136, 0)');
+    scanGradient.addColorStop(0.5, 'rgba(0, 255, 136, 0.05)');
+    scanGradient.addColorStop(1, 'rgba(0, 255, 136, 0)');
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = scanGradient;
+    ctx.fillRect(0, scanY - 20, this.CANVAS_WIDTH, 40);
+
+    ctx.restore();
   }
 
   private drawRobot(ctx: CanvasRenderingContext2D) {
@@ -442,54 +785,117 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.robotRotation += (targetRotation - this.robotRotation) * 0.2;
     ctx.rotate(this.robotRotation);
 
-    // Draw ifm robot instead of pacman
-    // Robot body (orange square)
-    ctx.fillStyle = '#ED6B00';
-    ctx.fillRect(-size/2, -size/2, size, size);
-    ctx.strokeStyle = '#1a1a1a';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(-size/2, -size/2, size, size);
-
-    // Robot head (smaller square, positioned based on direction)
-    const headSize = size * 0.6;
-    let headX = 0, headY = 0;
-
-    if (this.robot.direction === 'U') { headX = 0; headY = -size * 0.3; }
-    else if (this.robot.direction === 'D') { headX = 0; headY = size * 0.3; }
-    else if (this.robot.direction === 'L') { headX = -size * 0.3; headY = 0; }
-    else if (this.robot.direction === 'R') { headX = size * 0.3; headY = 0; }
-
-    ctx.fillStyle = '#ED6B00';
-    ctx.fillRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
-    ctx.strokeRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
-
-    // Robot eyes (sensors)
-    ctx.fillStyle = '#1a1a1a';
-    if (this.robot.direction === 'U' || this.robot.direction === 'D') {
-      ctx.beginPath();
-      ctx.arc(headX - 2, headY, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(headX + 2, headY, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.arc(headX, headY - 2, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(headX, headY + 2, 1.5, 0, Math.PI * 2);
-      ctx.fill();
+    // Boost trail effect
+    if (this.turboSpeed && this.boostEnergy > 0) {
+      const trailLength = 3;
+      for (let i = 1; i <= trailLength; i++) {
+        const alpha = 0.3 - (i * 0.1);
+        const offset = -i * 4;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#ED6B00';
+        ctx.fillRect(offset - size/2, -size/2, size, size);
+      }
+      ctx.globalAlpha = 1;
     }
 
-    // Central ifm indicator
+    // Draw ifm robot - Industrial AGV style
+    // Main body with metallic gradient
+    const bodyGradient = ctx.createLinearGradient(-size/2, -size/2, size/2, size/2);
+    bodyGradient.addColorStop(0, '#FF8C00');
+    bodyGradient.addColorStop(0.5, '#ED6B00');
+    bodyGradient.addColorStop(1, '#D05500');
+    ctx.fillStyle = bodyGradient;
+    ctx.fillRect(-size/2, -size/2, size, size);
+
+    // Chassis border
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-size/2, -size/2, size, size);
+
+    // Corner rivets
+    const rivetPositions = [
+      [-size/2 + 2, -size/2 + 2],
+      [size/2 - 2, -size/2 + 2],
+      [-size/2 + 2, size/2 - 2],
+      [size/2 - 2, size/2 - 2]
+    ];
+    ctx.fillStyle = '#404040';
+    rivetPositions.forEach(([rx, ry]) => {
+      ctx.beginPath();
+      ctx.arc(rx, ry, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Direction indicator (front sensor array)
+    const headSize = size * 0.4;
+    let headX = 0, headY = 0;
+
+    if (this.robot.direction === 'U') { headX = 0; headY = -size * 0.35; }
+    else if (this.robot.direction === 'D') { headX = 0; headY = size * 0.35; }
+    else if (this.robot.direction === 'L') { headX = -size * 0.35; headY = 0; }
+    else if (this.robot.direction === 'R') { headX = size * 0.35; headY = 0; }
+
+    // Front sensor housing
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
+    ctx.strokeStyle = '#00FF88';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
+
+    // Active sensor LEDs
+    const ledPulse = 0.5 + Math.sin(Date.now() / 100) * 0.5;
+    ctx.fillStyle = `rgba(0, 255, 136, ${ledPulse})`;
+    if (this.robot.direction === 'U' || this.robot.direction === 'D') {
+      ctx.fillRect(headX - 3, headY - 1, 2, 2);
+      ctx.fillRect(headX + 1, headY - 1, 2, 2);
+    } else {
+      ctx.fillRect(headX - 1, headY - 3, 2, 2);
+      ctx.fillRect(headX - 1, headY + 1, 2, 2);
+    }
+
+    // Central IFM logo/indicator
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+    ctx.arc(0, 0, 4, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 1;
     ctx.stroke();
 
+    // IFM letters (simplified)
+    ctx.fillStyle = '#ED6B00';
+    ctx.font = 'bold 4px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('ifm', 0, 1);
+
+    // Boost glow effect
+    if (this.turboSpeed && this.boostEnergy > 0) {
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#ED6B00';
+      ctx.strokeStyle = '#ED6B00';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-size/2 - 2, -size/2 - 2, size + 4, size + 4);
+      ctx.shadowBlur = 0;
+    }
+
     ctx.restore();
+
+    // Speed lines when boosting
+    if (this.turboSpeed && this.boostEnergy > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = '#ED6B00';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 5; i++) {
+        const angle = this.robotRotation + Math.PI + (Math.random() - 0.5) * 0.5;
+        const dist = 15 + Math.random() * 10;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(centerX + Math.cos(angle) * dist, centerY + Math.sin(angle) * dist);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
 
   private getTargetRotation(direction: string): number {
@@ -612,53 +1018,100 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private drawUI(ctx: CanvasRenderingContext2D) {
-    // Score oben - Start bei y=50 um unter der game-info-bar zu bleiben
-    ctx.font = 'bold 16px "Press Start 2P", monospace';
-    ctx.fillStyle = 'white';
-    ctx.textAlign = 'left';
-    ctx.fillText(`EFFIZIENZ: ${this.efficiency}`, 10, 50);
-    ctx.fillText(`PROD-LVL: ${this.productionLevel}`, this.CANVAS_WIDTH / 2 - 50, 50);
+    // Draw industrial frame around game area
+    this.drawIndustrialFrame(ctx);
 
-    // High Score anzeigen
+    // IFM Logo on the score bar - very visible
+    ctx.save();
+
+    // Logo background plate - WHITE for maximum visibility
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(5, 32, 60, 20);
+
+    // Border - thick orange border
+    ctx.strokeStyle = '#ED6B00';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(5, 32, 60, 20);
+
+    // IFM letters - BIG with strong glow
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#ED6B00';
+    ctx.fillStyle = '#ED6B00';
+
+    // Letter I
+    ctx.fillRect(11, 36, 5, 12);
+
+    // Letter F
+    ctx.fillRect(21, 36, 5, 12);
+    ctx.fillRect(21, 36, 12, 4);
+    ctx.fillRect(21, 42, 9, 3);
+
+    // Letter M
+    ctx.fillRect(38, 36, 5, 12);
+    ctx.fillRect(38, 36, 4, 4);
+    ctx.fillRect(44, 38, 3, 3);
+    ctx.fillRect(49, 36, 4, 4);
+    ctx.fillRect(53, 36, 5, 12);
+
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    // Score as industrial KPIs - Start at y=45 to be below logo
+    ctx.font = 'bold 10px "Press Start 2P", monospace';
+    ctx.fillStyle = '#1a1a1a';
+    ctx.textAlign = 'left';
+
+    // Production Efficiency KPI
+    const efficiencyPercent = Math.min(100, Math.floor((this.efficiency / 1000) * 100));
+    ctx.fillText(`EFFICIENCY: ${efficiencyPercent}%`, 70, 45);
+
+    // Production Level
+    ctx.fillText(`LEVEL: ${this.productionLevel}`, this.CANVAS_WIDTH / 2 - 60, 45);
+
+    // High Score as "Best Performance"
     ctx.textAlign = 'right';
-    ctx.font = '14px "Press Start 2P", monospace';
-    ctx.fillStyle = '#FFD700';
-    ctx.fillText(`HI: ${this.getHighScore()}`, this.CANVAS_WIDTH - 10, 50);
+    ctx.font = '10px "Press Start 2P", monospace';
+    ctx.fillStyle = '#ED6B00';
+    const hiScorePercent = Math.min(100, Math.floor((this.getHighScore() / 1000) * 100));
+    ctx.fillText(`BEST: ${hiScorePercent}%`, this.CANVAS_WIDTH - 10, 45);
 
     // Practice Mode Status-Anzeige
     if (this.gameMode === 'practice') {
-      ctx.font = '10px monospace';
-      let statusY = 67;
+      ctx.font = '8px monospace';
+      let statusY = 30;
       if (this.isInvincible) {
-        ctx.fillStyle = '#00FF00';
-        ctx.fillText('🛡️ INVINCIBLE', this.CANVAS_WIDTH - 10, statusY);
+        ctx.fillStyle = '#00FF88';
+        ctx.fillText('SAFETY MODE', this.CANVAS_WIDTH - 10, statusY);
         statusY += 12;
       }
       if (this.turboSpeed && this.boostEnergy > 0) {
-        ctx.fillStyle = '#FFD700';
-        ctx.fillText('⚡ TURBO', this.CANVAS_WIDTH - 10, statusY);
+        ctx.fillStyle = '#ED6B00';
+        ctx.fillText('BOOST ACTIVE', this.CANVAS_WIDTH - 10, statusY);
         statusY += 12;
       }
       if (this.slowMotion < 1.0) {
-        ctx.fillStyle = '#FF69B4';
-        ctx.fillText(`🐌 ${this.slowMotion}x`, this.CANVAS_WIDTH - 10, statusY);
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillText(`SLOW ${this.slowMotion}x`, this.CANVAS_WIDTH - 10, statusY);
       }
     }
     ctx.textAlign = 'left';
 
-    // Combo counter display
+    // Combo counter display - adjusted position
     if (this.pelletStreak >= 10 && this.comboDisplayTimer > 0) {
       ctx.save();
-      ctx.font = 'bold 20px monospace';
+      ctx.font = 'bold 16px "Press Start 2P", monospace';
       ctx.textAlign = 'center';
       const comboAlpha = this.comboDisplayTimer / 1000;
-      ctx.fillStyle = `rgba(255, 215, 0, ${comboAlpha})`;
-      ctx.fillText(`${this.pelletStreak}x COMBO!`, this.CANVAS_WIDTH / 2, 100);
+      ctx.fillStyle = `rgba(237, 107, 0, ${comboAlpha})`; // IFM Orange
+      ctx.fillText(`${this.pelletStreak}x COMBO!`, this.CANVAS_WIDTH / 2, 60);
       ctx.restore();
     }
 
     // Draw particles
     this.drawParticles(ctx);
+
+    // Draw Advanced Maze Features
+    this.drawAdvancedMazeFeatures(ctx);
 
     // Apply dynamic lighting effect
     if (this.lightingEnabled && this.gameState === 'playing') {
@@ -668,15 +1121,15 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     // Draw Energy Gauge for Boost
     this.drawEnergyGauge(ctx);
 
-    // System Health unten links
+    // System Health - bottom left
     for (let i = 0; i < this.systemHealth; i++) {
-      this.drawRobotIcon(ctx, 20 + i * 25, this.CANVAS_HEIGHT - 15);
+      this.drawRobotIcon(ctx, 20 + i * 25, this.CANVAS_HEIGHT - 20);
     }
 
     // Active bonus effects display with circular progress
     ctx.font = '12px monospace';
     ctx.textAlign = 'right';
-    let effectY = this.CANVAS_HEIGHT - 40;
+    let effectY = this.CANVAS_HEIGHT - 30;
 
     if (this.shieldActive) {
       // Shield text
@@ -770,20 +1223,231 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Game Over Screen wird jetzt im HTML-Overlay angezeigt, nicht mehr im Canvas
 
-    // Final explosion screen
+    // Final explosion screen - ULTRA ENHANCED with massive effects
     if (this.gameState === 'finalexplosion') {
       ctx.save();
       const explosionProgress = this.stateTimer / this.FINAL_EXPLOSION_DURATION;
-      ctx.font = 'bold 32px "Press Start 2P", monospace';
-      ctx.fillStyle = `rgba(255, 0, 0, ${explosionProgress})`;
-      ctx.textAlign = 'center';
-      ctx.fillText('GAME OVER', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      const time = Date.now() / 1000;
 
-      // Flickering effect
-      if (Math.floor(Date.now() / 100) % 2 === 0) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${explosionProgress * 0.5})`;
-        ctx.fillText('GAME OVER', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      // Generate MASSIVE particle explosion
+      if (this.stateTimer < 100 && this.gameOverParticles.length === 0) {
+        for (let i = 0; i < 150; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 3 + Math.random() * 8;
+          const colors = ['#FF0000', '#FF7A01', '#FFAA00', '#FF3300', '#FFFFFF'];
+          this.gameOverParticles.push({
+            x: this.CANVAS_WIDTH / 2,
+            y: this.CANVAS_HEIGHT / 2,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            size: 2 + Math.random() * 8,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            alpha: 1.0
+          });
+        }
       }
+
+      // Dramatic screen shake with decay
+      const shakeIntensity = explosionProgress < 0.4 ? (0.4 - explosionProgress) / 0.4 : 0;
+      const shake = (Math.random() - 0.5) * 20 * shakeIntensity;
+      ctx.translate(shake, shake * 0.7);
+
+      // Radial gradient explosion background
+      const centerX = this.CANVAS_WIDTH / 2;
+      const centerY = this.CANVAS_HEIGHT / 2;
+      const radius = Math.max(this.CANVAS_WIDTH, this.CANVAS_HEIGHT) * explosionProgress * 1.5;
+      const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+      gradient.addColorStop(0, `rgba(255, 0, 0, ${0.6 * explosionProgress})`);
+      gradient.addColorStop(0.5, `rgba(255, 122, 1, ${0.4 * explosionProgress})`);
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+
+      // Pulsating wave rings
+      for (let i = 0; i < 3; i++) {
+        const waveProgress = (explosionProgress + i * 0.2) % 1;
+        const waveRadius = waveProgress * 400;
+        const waveAlpha = (1 - waveProgress) * 0.5;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, waveRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 122, 1, ${waveAlpha})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+
+      // Update and draw particles with trails
+      for (let i = this.gameOverParticles.length - 1; i >= 0; i--) {
+        const p = this.gameOverParticles[i];
+
+        // Draw trail
+        ctx.fillStyle = p.color.replace(')', `, ${p.alpha * 0.3})`.replace('#', 'rgba(').replace(/([0-9A-F]{2})/gi, (m) => parseInt(m, 16) + ','));
+        ctx.fillRect(p.x - p.vx, p.y - p.vy, p.size * 0.5, p.size * 0.5);
+
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.15; // gravity
+        p.vx *= 0.99; // air resistance
+        p.alpha -= 0.008;
+
+        if (p.alpha > 0) {
+          // Main particle with glow
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 10;
+          ctx.fillStyle = p.color.replace(')', `, ${p.alpha})`.replace('#', 'rgba(').replace(/([0-9A-F]{2})/gi, (m) => parseInt(m, 16) + ','));
+          ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+        } else {
+          this.gameOverParticles.splice(i, 1);
+        }
+      }
+      ctx.shadowBlur = 0;
+
+      // Intense RGB split glitch effect
+      if (Math.random() > 0.6) {
+        const glitchY = Math.random() * this.CANVAS_HEIGHT;
+        const glitchHeight = 30 + Math.random() * 60;
+        const glitchOffset = (Math.random() - 0.5) * 20;
+        ctx.fillStyle = `rgba(255, 0, 0, 0.3)`;
+        ctx.fillRect(glitchOffset, glitchY, this.CANVAS_WIDTH, glitchHeight);
+        ctx.fillStyle = `rgba(0, 255, 255, 0.3)`;
+        ctx.fillRect(-glitchOffset, glitchY, this.CANVAS_WIDTH, glitchHeight);
+      }
+
+      // Lightning effect
+      if (explosionProgress < 0.6 && Math.random() > 0.8) {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * (0.6 - explosionProgress)})`;
+        ctx.lineWidth = 2 + Math.random() * 3;
+        ctx.beginPath();
+        const startX = Math.random() * this.CANVAS_WIDTH;
+        ctx.moveTo(startX, 0);
+        for (let y = 0; y < this.CANVAS_HEIGHT; y += 20) {
+          ctx.lineTo(startX + (Math.random() - 0.5) * 40, y);
+        }
+        ctx.stroke();
+      }
+
+      // GAME OVER text with extreme effects
+      ctx.font = 'bold 56px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Multiple chromatic aberration layers
+      const aberrationLayers = [
+        {color: 'rgba(255, 0, 0, 0.7)', x: -6, y: -6},
+        {color: 'rgba(0, 255, 0, 0.5)', x: 0, y: 6},
+        {color: 'rgba(0, 255, 255, 0.7)', x: 6, y: -3},
+        {color: 'rgba(255, 0, 255, 0.5)', x: -3, y: 3}
+      ];
+
+      for (const layer of aberrationLayers) {
+        ctx.fillStyle = layer.color;
+        ctx.fillText('GAME OVER', centerX + layer.x + Math.sin(time * 10) * 2, centerY - 30 + layer.y);
+      }
+
+      // Main text with massive glow
+      ctx.shadowColor = '#FF0000';
+      ctx.shadowBlur = 60 + Math.sin(time * 8) * 20;
+      ctx.fillStyle = `rgba(255, 255, 255, ${explosionProgress})`;
+      ctx.fillText('GAME OVER', centerX, centerY - 30);
+
+      // Super intense flickering
+      if (Math.floor(time * 20) % 2 === 0) {
+        ctx.shadowBlur = 80;
+        ctx.shadowColor = '#FFFF00';
+        ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+        ctx.fillText('GAME OVER', centerX, centerY - 30);
+      }
+
+      // Distortion effect on text
+      if (explosionProgress < 0.5 && Math.random() > 0.7) {
+        ctx.save();
+        ctx.translate(centerX, centerY - 30);
+        ctx.scale(1 + (Math.random() - 0.5) * 0.1, 1 + (Math.random() - 0.5) * 0.1);
+        ctx.fillStyle = 'rgba(255, 122, 1, 0.5)';
+        ctx.fillText('GAME OVER', 0, 0);
+        ctx.restore();
+      }
+
+      // Animated subtitle with intense glow
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#FF7A01';
+      ctx.font = 'bold 20px "Press Start 2P", monospace';
+      const subtitleAlpha = Math.max(0, explosionProgress - 0.15) / 0.85;
+      ctx.fillStyle = `rgba(255, 122, 1, ${subtitleAlpha})`;
+      const subtitleY = centerY + 25 + Math.sin(time * 4) * 3;
+      ctx.fillText('>>> CRITICAL SYSTEM FAILURE <<<', centerX, subtitleY);
+
+      // Error code for dramatic effect
+      if (subtitleAlpha > 0.5) {
+        ctx.shadowBlur = 5;
+        ctx.font = 'bold 12px "Press Start 2P", monospace';
+        ctx.fillStyle = `rgba(255, 0, 0, ${subtitleAlpha * 0.7})`;
+        ctx.fillText(`ERROR CODE: 0x${Math.floor(time * 100).toString(16).toUpperCase()}`, centerX, subtitleY + 25);
+      }
+
+      // Animated score with extreme pulsing
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#FFFFFF';
+      ctx.font = 'bold 18px "Press Start 2P", monospace';
+      const scoreScale = 1 + Math.sin(time * 6) * 0.15;
+      ctx.save();
+      ctx.translate(centerX, centerY + 75);
+      ctx.scale(scoreScale, scoreScale);
+      ctx.fillStyle = `rgba(255, 255, 255, ${subtitleAlpha})`;
+      ctx.fillText(`FINAL SCORE: ${this.score}`, 0, 0);
+      ctx.restore();
+
+      // Warning bars with animation
+      if (explosionProgress > 0.2) {
+        const barAlpha = (explosionProgress - 0.2) / 0.8;
+        const barHeight = 8;
+        const barPulse = Math.sin(time * 10) * 0.3 + 0.7;
+        ctx.fillStyle = `rgba(255, 122, 1, ${barAlpha * barPulse})`;
+        ctx.fillRect(0, 0, this.CANVAS_WIDTH, barHeight);
+        ctx.fillRect(0, this.CANVAS_HEIGHT - barHeight, this.CANVAS_WIDTH, barHeight);
+
+        // Animated corner brackets
+        ctx.strokeStyle = `rgba(255, 122, 1, ${barAlpha})`;
+        ctx.lineWidth = 3;
+        const cornerSize = 40;
+        // Top-left
+        ctx.beginPath();
+        ctx.moveTo(0, cornerSize);
+        ctx.lineTo(0, 0);
+        ctx.lineTo(cornerSize, 0);
+        ctx.stroke();
+        // Top-right
+        ctx.beginPath();
+        ctx.moveTo(this.CANVAS_WIDTH - cornerSize, 0);
+        ctx.lineTo(this.CANVAS_WIDTH, 0);
+        ctx.lineTo(this.CANVAS_WIDTH, cornerSize);
+        ctx.stroke();
+        // Bottom-left
+        ctx.beginPath();
+        ctx.moveTo(0, this.CANVAS_HEIGHT - cornerSize);
+        ctx.lineTo(0, this.CANVAS_HEIGHT);
+        ctx.lineTo(cornerSize, this.CANVAS_HEIGHT);
+        ctx.stroke();
+        // Bottom-right
+        ctx.beginPath();
+        ctx.moveTo(this.CANVAS_WIDTH - cornerSize, this.CANVAS_HEIGHT);
+        ctx.lineTo(this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+        ctx.lineTo(this.CANVAS_WIDTH, this.CANVAS_HEIGHT - cornerSize);
+        ctx.stroke();
+      }
+
+      // CRT scanlines
+      for (let y = 0; y < this.CANVAS_HEIGHT; y += 3) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${0.15 * explosionProgress})`;
+        ctx.fillRect(0, y, this.CANVAS_WIDTH, 1);
+      }
+
+      // Vignette effect
+      const vignetteGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(this.CANVAS_WIDTH, this.CANVAS_HEIGHT) * 0.8);
+      vignetteGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vignetteGradient.addColorStop(1, `rgba(0, 0, 0, ${0.5 * explosionProgress})`);
+      ctx.fillStyle = vignetteGradient;
+      ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+
       ctx.restore();
     }
 
@@ -1154,6 +1818,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Speichere Gesamtanzahl der Pellets für Cherry-Spawn
     this.totalPellets = this.foods.size + this.powerPellets.size;
+
+    // Initialize advanced maze features
+    this.initializeAdvancedMazeFeatures();
   }
   ngOnInit(): void{
     console.log('🎮 GameCanvasComponent initialized');
@@ -1181,6 +1848,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Initialisiere Patrol-Route für CYAN Sensor
     this.initPatrolRoute();
+
+    // Initialize decorative industrial elements
+    this.initializeIndustrialDecorations();
 
     this.loadMap();
 
@@ -1296,15 +1966,101 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
+  // Draw Industrial Frame around game area with s.FOX and moneo info
+  private drawIndustrialFrame(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+
+    // Top bar - s.FOX optimization running
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 30);
+
+    // Top bar gradient with metallic effect
+    const topGradient = ctx.createLinearGradient(0, 0, 0, 28);
+    topGradient.addColorStop(0, '#333333');
+    topGradient.addColorStop(0.5, '#1a1a1a');
+    topGradient.addColorStop(1, '#2a2a2a');
+    ctx.fillStyle = topGradient;
+    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 28);
+
+    // IFM orange accent line with glow
+    ctx.shadowBlur = 5;
+    ctx.shadowColor = '#ED6B00';
+    ctx.fillStyle = '#ED6B00';
+    ctx.fillRect(0, 28, this.CANVAS_WIDTH, 2);
+    ctx.shadowBlur = 0;
+
+    // s.FOX system status
+    ctx.font = '8px "Press Start 2P", monospace';
+    ctx.fillStyle = '#00FF88';
+    ctx.textAlign = 'left';
+
+    if (this.gameState === 'ready') {
+      ctx.fillText('s.FOX INITIALIZING...', 10, 20);
+      // Loading bar
+      const loadProgress = (this.stateTimer / this.READY_DURATION) * 100;
+      ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
+      ctx.fillRect(10, 22, 100, 3);
+      ctx.fillStyle = '#00FF88';
+      ctx.fillRect(10, 22, loadProgress, 3);
+    } else if (this.gameState === 'playing') {
+      // Blinking cursor effect
+      const blink = Math.floor(Date.now() / 500) % 2 === 0 ? '_' : '';
+      ctx.fillText(`s.FOX RUNNING${blink}`, 10, 20);
+      // Activity indicator dots
+      const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
+      ctx.fillStyle = '#ED6B00';
+      ctx.fillText(dots, 110, 20);
+    } else if (this.gameState === 'gameover') {
+      ctx.fillStyle = '#FF6B6B';
+      ctx.fillText('SYSTEM HALTED', 10, 20);
+      // Error indicator
+      ctx.fillRect(5, 16, 3, 8);
+    }
+
+    // moneo AI Assistant indicator - top right
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#00FF88';
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.fillText('moneo IAIA', this.CANVAS_WIDTH - 10, 12);
+
+    // AI status indicator with LED
+    const aiStatus = this.gameState === 'playing' ? 'ANALYZING' : 'STANDBY';
+    ctx.fillStyle = this.gameState === 'playing' ? '#ED6B00' : '#808080';
+    ctx.fillText(aiStatus, this.CANVAS_WIDTH - 10, 22);
+
+    // Animated LED indicator
+    const ledPulse = this.gameState === 'playing'
+      ? 0.5 + Math.sin(Date.now() / 200) * 0.5
+      : 0.3;
+    const ledColor = this.gameState === 'playing' ? '#ED6B00' : '#808080';
+    ctx.fillStyle = `rgba(237, 107, 0, ${ledPulse})`;
+    ctx.beginPath();
+    ctx.arc(this.CANVAS_WIDTH - 80, 19, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // LED glow
+    if (this.gameState === 'playing') {
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = ledColor;
+      ctx.beginPath();
+      ctx.arc(this.CANVAS_WIDTH - 80, 19, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    // No bottom bar - clean game area
+
+    ctx.restore();
+  }
+
   // Draw Energy Gauge
   private drawEnergyGauge(ctx: CanvasRenderingContext2D) {
     const barWidth = 150;
-    const barHeight = 20;
+    const barHeight = 15;
     const barX = this.CANVAS_WIDTH - barWidth - 15;
-    const barY = 15;
+    const barY = 35; // Adjusted to be below top frame
 
     // Background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillStyle = 'rgba(26, 26, 26, 0.8)';
     ctx.fillRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
 
     // Border
@@ -1331,14 +2087,14 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.fillRect(barX, barY, energyWidth, barHeight);
 
     // Text
-    ctx.font = 'bold 10px "Press Start 2P", monospace';
+    ctx.font = 'bold 8px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#fff';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 3;
     const text = `BOOST: ${Math.floor(this.boostEnergy)}%`;
-    ctx.strokeText(text, barX + barWidth / 2, barY + 14);
-    ctx.fillText(text, barX + barWidth / 2, barY + 14);
+    ctx.strokeText(text, barX + barWidth / 2, barY + 11);
+    ctx.fillText(text, barX + barWidth / 2, barY + 11);
     ctx.textAlign = 'left';
   }
 
@@ -1399,6 +2155,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.announcementCooldown > 0) {
       this.announcementCooldown -= deltaTime;
     }
+
+    // Update Advanced Maze Features
+    this.updateAdvancedMazeFeatures(deltaTime);
 
     // Update Boost Mode based on key state and energy
     if (this.gameMode !== 'practice') {
@@ -1540,6 +2299,16 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     if (this.comboDisplayTimer > 0) {
       this.comboDisplayTimer -= deltaTime;
+    }
+
+    // Décrémenter le timer de combo reset
+    if (this.comboResetTimer > 0) {
+      this.comboResetTimer -= deltaTime;
+      if (this.comboResetTimer <= 0) {
+        // Reset combo si trop de temps sans pellet
+        this.pelletStreak = 0;
+        this.streakMultiplier = 1.0;
+      }
     }
 
     // Update shield ripples
@@ -1689,7 +2458,24 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.scaredDuration = this.getFrightenedDuration();
     this.gameState = 'ready';
     this.stateTimer = 0;
-  }  private render() {
+
+    // Reinitialize advanced features for new level
+    this.initializeAdvancedMazeFeatures();
+  }
+
+  // ========== ADVANCED MAZE FEATURES ==========
+
+  private initializeAdvancedMazeFeatures() {
+    // No advanced features currently
+  }  private updateAdvancedMazeFeatures(deltaTime: number) {
+    // No advanced features to update
+  }
+
+  private drawAdvancedMazeFeatures(ctx: CanvasRenderingContext2D) {
+    // No advanced features to draw
+  }
+
+  private render() {
     if (!this.ctx) return;
     // Fill with black background
     this.ctx.fillStyle = '#000000';
@@ -1921,6 +2707,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       let collided = false;
       for (const wall of this.walls) {
         if (wall.type === 'ghost-door') continue; // Pac-Man kann NICHT durch die Tür
+
         if (this.collision(this.pacman, wall)) {
           // Revert movement
           this.pacman.x = oldX;
@@ -2008,6 +2795,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         // Only count pellets after touching a checkpoint
         if (this.pelletCountingEnabled) {
           this.pelletStreak++;
+          this.comboResetTimer = this.COMBO_RESET_DELAY; // Reset le timer à chaque pellet
 
           // Show combo display for high streaks
           if (this.pelletStreak >= 10) {
@@ -2305,9 +3093,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
-    // Shift for boost in all modes
-    if (e.key === 'Shift' && this.gameMode !== 'practice') {
+    // Control for boost in all modes
+    if (e.key === 'Control' && this.gameMode !== 'practice') {
       this.isBoostKeyPressed = true;
+      console.log('🚀 Boost aktiviert (Control gedrückt)');
       return;
     }
 
@@ -2359,9 +3148,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     } else {
       // Release boost in normal modes
-      if (e.key === 'Shift') {
+      if (e.key === 'Control') {
         this.isBoostKeyPressed = false;
         this.turboSpeed = false;
+        console.log('🛑 Boost deaktiviert (Control losgelassen)');
       }
     }
   }
@@ -2383,6 +3173,116 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   requestExitToMenu() {
     this.showExitConfirm = true;
+  }
+
+  // ============================================================================
+  // DECORATIVE INDUSTRIAL ELEMENTS
+  // ============================================================================
+
+  private initializeIndustrialDecorations() {
+    // Warning Signs - Positioned near corners and danger zones (keep only ACHTUNG)
+    this.warningSignsPositions = [
+      { x: 2 * this.CELL_SIZE, y: 3 * this.CELL_SIZE, type: 'achtung' },
+      { x: 25 * this.CELL_SIZE, y: 3 * this.CELL_SIZE, type: 'achtung' },
+      { x: 2 * this.CELL_SIZE, y: 24 * this.CELL_SIZE, type: 'achtung' },
+      { x: 25 * this.CELL_SIZE, y: 24 * this.CELL_SIZE, type: 'achtung' }
+    ];
+
+    // Status LEDs - Blinking indicators (keep blinking dots)
+    this.statusLEDPositions = [
+      { x: 3 * this.CELL_SIZE, y: 6 * this.CELL_SIZE, color: 'green', blinkSpeed: 1000 },
+      { x: 24 * this.CELL_SIZE, y: 6 * this.CELL_SIZE, color: 'green', blinkSpeed: 1200 },
+      { x: 3 * this.CELL_SIZE, y: 21 * this.CELL_SIZE, color: 'orange', blinkSpeed: 800 },
+      { x: 24 * this.CELL_SIZE, y: 21 * this.CELL_SIZE, color: 'red', blinkSpeed: 600 },
+      { x: 10 * this.CELL_SIZE, y: 14 * this.CELL_SIZE, color: 'green', blinkSpeed: 1500 },
+      { x: 17 * this.CELL_SIZE, y: 14 * this.CELL_SIZE, color: 'green', blinkSpeed: 1300 }
+    ];
+  }
+
+  private drawIndustrialDecorations(ctx: CanvasRenderingContext2D) {
+    // Draw Warning Signs
+    this.drawWarningSigns(ctx);
+
+    // Draw Status LEDs (blinking dots)
+    this.drawStatusLEDs(ctx);
+  }
+
+  private drawWarningSigns(ctx: CanvasRenderingContext2D) {
+    this.warningSignsPositions.forEach(sign => {
+      ctx.save();
+      ctx.translate(sign.x, sign.y);
+
+      // Triangle warning sign (ACHTUNG only)
+      ctx.fillStyle = '#FFD700';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -12);
+      ctx.lineTo(-10, 8);
+      ctx.lineTo(10, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Exclamation mark
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(-1.5, -6, 3, 8);
+      ctx.beginPath();
+      ctx.arc(0, 6, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Text below
+      ctx.font = 'bold 5px Arial';
+      ctx.fillStyle = '#000000';
+      ctx.textAlign = 'center';
+      ctx.fillText('ACHTUNG', 0, 16);
+
+      ctx.restore();
+    });
+  }
+
+  private drawStatusLEDs(ctx: CanvasRenderingContext2D) {
+    const time = Date.now();
+    this.statusLEDPositions.forEach(led => {
+      ctx.save();
+      ctx.translate(led.x, led.y);
+
+      // Blink effect
+      const blinkPhase = (time % led.blinkSpeed) / led.blinkSpeed;
+      const isOn = blinkPhase < 0.5;
+      const intensity = isOn ? 1 : 0.3;
+
+      // LED housing - dark gray
+      ctx.fillStyle = '#333333';
+      ctx.beginPath();
+      ctx.arc(0, 0, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // LED light
+      let ledColor = '';
+      if (led.color === 'green') {
+        ledColor = `rgba(0, 255, 0, ${intensity})`;
+      } else if (led.color === 'red') {
+        ledColor = `rgba(255, 0, 0, ${intensity})`;
+      } else if (led.color === 'orange') {
+        ledColor = `rgba(255, 165, 0, ${intensity})`;
+      }
+
+      ctx.fillStyle = ledColor;
+      ctx.beginPath();
+      ctx.arc(0, 0, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Glow effect when on
+      if (isOn) {
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = ledColor;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      ctx.restore();
+    });
   }
 
   confirmExitToMenu() {

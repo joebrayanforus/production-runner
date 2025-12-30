@@ -1,0 +1,108 @@
+<div class="presentation-container">
+  <!-- Animated background particles -->
+  <div class="particles">
+    <div class="particle" *ngFor="let i of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]"
+         [style.left.%]="(i * 5.26)"
+         [style.animation-delay.s]="i * 0.2">
+    </div>
+  </div>
+
+  <div class="ifm-header">
+    <img src="assets/ifm1.webp" alt="IFM Logo" class="ifm-logo">
+    <h1 class="game-title">PRODUCTION RUNNER</h1>
+    <div class="subtitle-glow">IFM statmath GmbH</div>
+  </div>
+
+  <div class="slides-wrapper">
+    <div class="slide" [class.active]="currentSlide === i" *ngFor="let slide of slides; let i = index">
+      <div class="slide-content">
+        <!-- Visual decoration based on slide type -->
+        <div class="visual-background" [class]="'visual-' + slide.visual"></div>
+
+        <div class="slide-icon-large">{{ slide.icon }}</div>
+        <h2 class="slide-title">{{ slide.title }}</h2>
+        <h3 class="slide-subtitle">{{ slide.subtitle }}</h3>
+        <p class="slide-description">{{ slide.description }}</p>
+
+        <!-- Malfunction images for slide 2 -->
+        <div class="malfunction-grid" *ngIf="slide.malfunctions">
+          <div class="malfunction-item" *ngFor="let malfunction of slide.malfunctions">
+            <img [src]="malfunction.svg" [alt]="malfunction.name" class="malfunction-img">
+            <span class="malfunction-label">{{ malfunction.name }}</span>
+          </div>
+        </div>
+
+        <!-- Generic images grid for other slides -->
+        <div class="images-grid" *ngIf="slide.images && !slide.malfunctions"
+             [class.grid-3]="slide.images.length === 3"
+             [class.grid-6]="slide.images.length === 6">
+          <div class="image-item" *ngFor="let image of slide.images">
+            <img [src]="image.src" [alt]="image.label" class="game-img">
+            <span class="image-label">{{ image.label }}</span>
+          </div>
+        </div>
+
+        <!-- Feature list with icons -->
+        <div class="features-list" *ngIf="!slide.malfunctions && !slide.images">
+          <div class="feature-item" *ngFor="let feature of slide.features">
+            <span class="feature-icon">►</span>
+            <span class="feature-text">{{ feature }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="progress-bar">
+    <div class="progress-fill" [style.width.%]="((currentSlide + 1) / slides.length) * 100"></div>
+  </div>
+
+  <div class="navigation">
+    <button class="nav-btn prev" (click)="prevSlide()">
+      <span>◀</span>
+      <span class="nav-label">ZURÜCK</span>
+    </button>
+
+    <div class="dots">
+      <span
+        class="dot"
+        [class.active]="currentSlide === i"
+        *ngFor="let slide of slides; let i = index"
+        (click)="goToSlide(i)">
+        <span class="dot-number">{{ i + 1 }}</span>
+      </span>
+    </div>
+
+    <button class="nav-btn next" (click)="nextSlide()">
+      <span class="nav-label">WEITER</span>
+      <span>▶</span>
+    </button>
+  </div>
+
+  <div class="action-buttons">
+    <button class="start-btn" (click)="startGame()">
+      <span class="btn-glow"></span>
+      <span class="btn-icon">🎮</span>
+      JETZT SPIELEN!
+      <span class="btn-arrow">➤</span>
+    </button>
+  </div>
+
+  <div class="background-animation">
+    <div class="grid-line vertical" *ngFor="let i of [0,1,2,3,4,5,6,7,8,9]"
+         [style.left.%]="i * 10"
+         [style.animation-delay.s]="i * 0.1">
+    </div>
+    <div class="grid-line horizontal" *ngFor="let i of [0,1,2,3,4,5]"
+         [style.top.%]="i * 20"
+         [style.animation-delay.s]="i * 0.15">
+    </div>
+  </div>
+
+  <!-- IFM Corner accents -->
+  <div class="corner-accent top-left"></div>
+  <div class="corner-accent top-right"></div>
+  <div class="corner-accent bottom-left"></div>
+  <div class="corner-accent bottom-right"></div>
+</div>
