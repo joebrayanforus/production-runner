@@ -51,11 +51,18 @@ export class StartPageComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent) {
-    if (['ArrowLeft', 'ArrowUp'].includes(event.key)) {
-      this.selectedMode = 'classic';
+    const modes: GameMode[] = ['spielanleitung', 'classic', 'practice'];
+    const currentIndex = modes.indexOf(this.selectedMode);
+
+    if (['ArrowUp', 'ArrowLeft'].includes(event.key)) {
+      // Navigate to previous mode (with wrap around)
+      const newIndex = currentIndex === 0 ? modes.length - 1 : currentIndex - 1;
+      this.selectedMode = modes[newIndex];
       event.preventDefault();
-    } else if (['ArrowRight', 'ArrowDown'].includes(event.key)) {
-      this.selectedMode = 'practice';
+    } else if (['ArrowDown', 'ArrowRight'].includes(event.key)) {
+      // Navigate to next mode (with wrap around)
+      const newIndex = (currentIndex + 1) % modes.length;
+      this.selectedMode = modes[newIndex];
       event.preventDefault();
     } else if (event.key === 'Enter') {
       const now = Date.now();

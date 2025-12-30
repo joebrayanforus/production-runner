@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 
@@ -117,6 +117,20 @@ export class PresentationComponent implements OnInit {
 
   goToSlide(index: number) {
     this.currentSlide = index;
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onKeydown(event: KeyboardEvent) {
+    if (['ArrowRight', 'ArrowDown'].includes(event.key)) {
+      this.nextSlide();
+      event.preventDefault();
+    } else if (['ArrowLeft', 'ArrowUp'].includes(event.key)) {
+      this.prevSlide();
+      event.preventDefault();
+    } else if (event.key === 'Escape' || event.key === 'Enter') {
+      this.startGame();
+      event.preventDefault();
+    }
   }
 
   startGame() {
