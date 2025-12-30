@@ -1635,6 +1635,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   showExitConfirm = false;
   private pausedForExitConfirm = false;
   showPauseOverlay = false;
+  showSpielanleitung = false;
+  spielanleitungSlide = 0;
 
   // Get high score from leaderboard
   private getHighScore(): number {
@@ -3094,6 +3096,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Control for boost in all modes
+    // H pour SPIELANLEITUNG (Help/Hilfe)
+    if (e.key === 'h' || e.key === 'H') {
+      this.toggleSpielanleitung();
+      return;
+    }
+
     if (e.key === 'Control' && this.gameMode !== 'practice') {
       this.isBoostKeyPressed = true;
       console.log('🚀 Boost aktiviert (Control gedrückt)');
@@ -3293,5 +3301,39 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   cancelExitToMenu() {
     this.showExitConfirm = false;
+  }
+
+  toggleSpielanleitung() {
+    this.showSpielanleitung = !this.showSpielanleitung;
+    if (this.showSpielanleitung) {
+      this.spielanleitungSlide = 0;
+      this.gameState = 'paused';
+      this.stopGameLoop();
+    } else {
+      if (!this.gameOver) {
+        this.gameState = 'playing';
+        this.startGameLoop();
+      }
+    }
+  }
+
+  nextSpielanleitungSlide() {
+    if (this.spielanleitungSlide < 4) {
+      this.spielanleitungSlide++;
+    }
+  }
+
+  prevSpielanleitungSlide() {
+    if (this.spielanleitungSlide > 0) {
+      this.spielanleitungSlide--;
+    }
+  }
+
+  closeSpielanleitung() {
+    this.showSpielanleitung = false;
+    if (!this.gameOver) {
+      this.gameState = 'playing';
+      this.startGameLoop();
+    }
   }
 }

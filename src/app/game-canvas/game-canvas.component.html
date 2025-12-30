@@ -73,6 +73,88 @@
   </div>
 </div>
 
+<!-- SPIELANLEITUNG Overlay -->
+<div class="overlay spielanleitung-overlay" *ngIf="showSpielanleitung">
+  <div class="overlay-panel spielanleitung-panel">
+    <div class="spielanleitung-header">
+      <h2>📋 SPIELANLEITUNG</h2>
+      <button class="close-btn" (click)="closeSpielanleitung()">✕</button>
+    </div>
+
+    <!-- Slide 1: STEUERUNG -->
+    <div class="slide-content" *ngIf="spielanleitungSlide === 0">
+      <h3>🎮 STEUERUNG</h3>
+      <div class="control-grid">
+        <div class="control-item">▲▼◄► PFEILTASTEN</div>
+        <div class="control-desc">Roboter bewegen</div>
+        <div class="control-item">🎮 STRG / CTRL</div>
+        <div class="control-desc">Turbo aktivieren</div>
+        <div class="control-item">H</div>
+        <div class="control-desc">Diese Hilfe ein/aus</div>
+      </div>
+      <p class="slide-desc">🎯 ZIEL: Sammle alle Sensordaten!</p>
+    </div>
+
+    <!-- Slide 2: STÖRUNGEN -->
+    <div class="slide-content" *ngIf="spielanleitungSlide === 1">
+      <h3>⚠️ STÖRUNGEN VERMEIDEN</h3>
+      <div class="danger-list">
+        <div class="danger-item">🌡️ TEMPERATUR - Überhitzung</div>
+        <div class="danger-item">💨 DRUCK - Druckausfall</div>
+        <div class="danger-item">📳 VIBRATION - Vibrationen</div>
+        <div class="danger-item">⚙️ VERSCHLEISS - Verschleiß</div>
+      </div>
+      <p class="slide-desc">❌ BERÜHRE SIE NICHT! Kontakt = 1 Leben verloren</p>
+    </div>
+
+    <!-- Slide 3: POWER-UPS -->
+    <div class="slide-content" *ngIf="spielanleitungSlide === 2">
+      <h3>⚡ POWER-UPS</h3>
+      <div class="powerup-list">
+        <div class="powerup-item">🛡️ SCHUTZSCHILD - 10 Sek. Unverwundbar</div>
+        <div class="powerup-item">🔧 WARTUNG - Störungen werden langsam</div>
+        <div class="powerup-item">📡 IOT BOOST - Bonus Punkte</div>
+        <div class="powerup-item">⚡ TURBO - Geschwindigkeit +</div>
+      </div>
+      <p class="slide-desc">⭐ COMBO = Mehrere Daten nacheinander sammeln</p>
+    </div>
+
+    <!-- Slide 4: FABRIK -->
+    <div class="slide-content" *ngIf="spielanleitungSlide === 3">
+      <h3>🏗️ DIE FABRIK</h3>
+      <div class="element-list">
+        <div class="element-item">🧱 WÄNDE - Nicht durchquerbar</div>
+        <div class="element-item">🚪 GEISTERTÜR - Feinde spawnen hier</div>
+        <div class="element-item">✨ PUNKTE - Sensordaten (+10)</div>
+        <div class="element-item">⚙️ STEUERUNG - Kontrollpanel</div>
+      </div>
+    </div>
+
+    <!-- Slide 5: START -->
+    <div class="slide-content" *ngIf="spielanleitungSlide === 4">
+      <h3>🚀 BEREIT?</h3>
+      <div class="ready-info">
+        <div class="info-big">❤️ 3 LEBEN</div>
+        <div class="info-big">🏆 HIGHSCORE</div>
+        <div class="info-big">⚡ TURBO MIT STRG</div>
+      </div>
+      <p class="slide-desc">Drücke H um zurück zum Spiel zu gehen!</p>
+    </div>
+
+    <div class="slide-navigation">
+      <button class="nav-btn" [disabled]="spielanleitungSlide === 0" (click)="prevSpielanleitungSlide()">◄ ZURÜCK</button>
+      <div class="slide-indicator">
+        <span class="dot" [class.active]="spielanleitungSlide === 0"></span>
+        <span class="dot" [class.active]="spielanleitungSlide === 1"></span>
+        <span class="dot" [class.active]="spielanleitungSlide === 2"></span>
+        <span class="dot" [class.active]="spielanleitungSlide === 3"></span>
+        <span class="dot" [class.active]="spielanleitungSlide === 4"></span>
+      </div>
+      <button class="nav-btn" [disabled]="spielanleitungSlide === 4" (click)="nextSpielanleitungSlide()">WEITER ►</button>
+    </div>
+  </div>
+</div>
+
 <!-- Pause Overlay -->
 <div class="overlay" *ngIf="showPauseOverlay">
   <div class="overlay-panel">
