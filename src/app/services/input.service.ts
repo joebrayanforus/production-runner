@@ -63,4 +63,42 @@ export class InputService {
     }
     return false;
   }
+
+  // Shoulder buttons for navigation (L1/R1 or LB/RB)
+  public isLeftShoulderPressed(): boolean {
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const gp of gamepads) {
+      if (!gp) continue;
+      // L1/LB button (usually button 4)
+      if (gp.buttons[4]?.pressed) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public isRightShoulderPressed(): boolean {
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const gp of gamepads) {
+      if (!gp) continue;
+      // R1/RB button (usually button 5)
+      if (gp.buttons[5]?.pressed) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Back/View button (usually button 8)
+  public isBackButtonPressed(): boolean {
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const gp of gamepads) {
+      if (!gp) continue;
+      // Back/Select/View button (usually 8)
+      if (gp.buttons[8]?.pressed) {
+        return true;
+      }
+    }
+    return false;
+  }
 }

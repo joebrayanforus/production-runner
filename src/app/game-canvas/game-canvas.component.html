@@ -87,12 +87,19 @@
       <div class="control-grid">
         <div class="control-item">▲▼◄► PFEILTASTEN</div>
         <div class="control-desc">Roboter bewegen</div>
-        <div class="control-item">🎮 STRG / CTRL</div>
+        <div class="control-item">🎮 D-PAD / STICK</div>
+        <div class="control-desc">Roboter bewegen (Gamepad)</div>
+        <div class="control-item">⚡ STRG / CTRL</div>
         <div class="control-desc">Turbo aktivieren</div>
+        <div class="control-item">🎮 Y / △</div>
+        <div class="control-desc">Hilfe öffnen (Gamepad)</div>
         <div class="control-item">H</div>
-        <div class="control-desc">Diese Hilfe ein/aus</div>
+        <div class="control-desc">Hilfe ein/aus (Tastatur)</div>
       </div>
       <p class="slide-desc">🎯 ZIEL: Sammle alle Sensordaten!</p>
+      <div class="gamepad-hint">
+        <strong>🎮 GAMEPAD:</strong> L1/R1 oder ◄► für Navigation | B für Schließen
+      </div>
     </div>
 
     <!-- Slide 2: STÖRUNGEN -->
@@ -139,6 +146,9 @@
         <div class="info-big">⚡ TURBO MIT STRG</div>
       </div>
       <p class="slide-desc">Drücke H um zurück zum Spiel zu gehen!</p>
+      <div class="gamepad-hint">
+        <strong>🎮 GAMEPAD:</strong> Drücke B (○) um zu schließen
+      </div>
     </div>
 
     <div class="slide-navigation">
@@ -151,6 +161,12 @@
         <span class="dot" [class.active]="spielanleitungSlide === 4"></span>
       </div>
       <button class="nav-btn" [disabled]="spielanleitungSlide === 4" (click)="nextSpielanleitungSlide()">WEITER ►</button>
+    </div>
+
+    <div class="gamepad-controls-footer">
+      <span>🎮 L1/LB: Zurück</span>
+      <span>🎮 R1/RB: Weiter</span>
+      <span>🎮 B/○: Schließen</span>
     </div>
   </div>
 </div>

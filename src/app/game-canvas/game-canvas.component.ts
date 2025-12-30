@@ -1637,6 +1637,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   showPauseOverlay = false;
   showSpielanleitung = false;
   spielanleitungSlide = 0;
+  private gamepadPollInterval: any;
+  private lastGamepadSpielanleitungAction = 0;
 
   // Get high score from leaderboard
   private getHighScore(): number {
@@ -2170,6 +2172,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
+    // Gamepad Input for SPIELANLEITUNG
+    if (this.showSpielanleitung) {
+      this.handleSpielanleitungGamepad();
+    }
+
     // Gamepad Input
     const gpDir = this.inputService.getDirection();
     if (gpDir && this.pacman && this.gameState === 'playing') {
@@ -2197,6 +2204,19 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       if (this.inputService.isPauseButtonPressed()) {
         this.exitGame();
+      }
+    }
+
+    // Gamepad - Open SPIELANLEITUNG with Y button (button 3) during gameplay
+    if (this.gameState === 'playing' && !this.showSpielanleitung) {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const now = Date.now();
+      for (const gp of gamepads) {
+        if (gp && gp.buttons[3]?.pressed && now - this.lastGamepadSpielanleitungAction > 300) {
+          this.toggleSpielanleitung();
+          this.lastGamepadSpielanleitungAction = now;
+          break;
+        }
       }
     }
 
@@ -3334,6 +3354,60 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.gameOver) {
       this.gameState = 'playing';
       this.startGameLoop();
+    }
+  }
+
+  // Gamepad control for SPIELANLEITUNG
+  private handleSpielanleitungGamepad() {
+    const now = Date.now();
+    if (now - this.lastGamepadSpielanleitungAction < 300) {
+      return; // Debounce
+    }
+
+    // Left shoulder (L1/LB) - Previous slide
+    if (this.inputService.isLeftShoulderPressed()) {
+      this.prevSpielanleitungSlide();
+      this.lastGamepadSpielanleitungAction = now;
+      return;
+    }
+
+    // Right shoulder (R1/RB) - Next slide
+    if (this.inputService.isRightShoulderPressed()) {
+      this.nextSpielanleitungSlide();
+      this.lastGamepadSpielanleitungAction = now;
+      return;
+    }
+
+    // D-Pad Left - Previous slide
+    const dir = this.inputService.getDirection();
+    if (dir === 'L') {
+      this.prevSpielanleitungSlide();
+      this.lastGamepadSpielanleitungAction = now;
+      return;
+    }
+
+    // D-Pad Right - Next slide
+    if (dir === 'R') {
+      this.nextSpielanleitungSlide();
+      this.lastGamepadSpielanleitungAction = now;
+      return;
+    }
+
+    // Back button (View/Select) - Close SPIELANLEITUNG
+    if (this.inputService.isBackButtonPressed()) {
+      this.closeSpielanleitung();
+      this.lastGamepadSpielanleitungAction = now;
+      return;
+    }
+
+    // B button (button 1) - Close SPIELANLEITUNG
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const gp of gamepads) {
+      if (gp && gp.buttons[1]?.pressed) {
+        this.closeSpielanleitung();
+        this.lastGamepadSpielanleitungAction = now;
+        return;
+      }
     }
   }
 }
