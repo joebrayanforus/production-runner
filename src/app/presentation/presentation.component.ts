@@ -2,6 +2,17 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 
+interface Slide {
+  title: string;
+  subtitle: string;
+  description: string;
+  icon: string;
+  visual: string;
+  images?: { src: string; label: string }[];
+  malfunctions?: { name: string; svg: string; ifmText: string }[];
+  features: string[];
+}
+
 @Component({
   selector: 'app-presentation',
   standalone: true,
@@ -11,7 +22,7 @@ import { Router } from '@angular/router';
 })
 export class PresentationComponent implements OnInit {
   currentSlide = 0;
-  slides = [
+  slides: Slide[] = [
     {
       title: 'STEUERUNG',
       subtitle: 'Wie wird gespielt?',

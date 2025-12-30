@@ -720,30 +720,8 @@
   0% { transform: translateX(-100%) rotate(45deg); }
   100% { transform: translateX(100%) rotate(45deg); }
 }
-  border: 3px solid #FF7A01;
-  color: #1E2A3A;
-  padding: 20px 60px;
-  font-size: 20px;
-  font-family: 'Press Start 2P', monospace;
-  border-radius: 10px;
-  cursor: pointer;
-  overflow: hidden;
-  transition: all 0.3s ease;
-  box-shadow:
-    0 5px 20px rgba(255, 122, 1, 0.5),
-    inset 0 -5px 10px rgba(0, 0, 0, 0.2);
-}
 
-.start-btn:hover {
-  transform: translateY(-5px);
-  box-shadow:
-    0 10px 30px rgba(255, 122, 1, 0.8),
-    inset 0 -5px 10px rgba(0, 0, 0, 0.2);
-}
-
-.start-btn:active {
-  transform: translateY(-2px);
-}
+/* Action buttons at bottom */
 
 .btn-glow {
   position: absolute;

@@ -12,7 +12,7 @@ export type GameMode = 'classic' | 'practice' | 'spielanleitung';
 @Component({
   selector: 'app-start-page',
   standalone: true,
-  imports: [RouterLink, CommonModule],
+  imports: [CommonModule],
   templateUrl: './start-page.component.html',
   styleUrls: ['./start-page.component.css']
 })
