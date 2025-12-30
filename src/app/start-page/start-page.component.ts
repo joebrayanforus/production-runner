@@ -7,7 +7,7 @@ import {
   LeaderboardEntry
 } from '../services/leaderboard.service';
 
-export type GameMode = 'classic' | 'practice' | 'presentation';
+export type GameMode = 'classic' | 'practice' | 'spielanleitung';
 
 @Component({
   selector: 'app-start-page',
@@ -72,9 +72,9 @@ export class StartPageComponent implements OnInit, OnDestroy {
   }
 
   startGame(): void {
-    // Si mode présentation, naviguer directement vers /presentation
-    if (this.selectedMode === 'presentation') {
-      this.router.navigate(['/presentation']);
+    // Si mode spielanleitung, naviguer directement vers /spielanleitung
+    if (this.selectedMode === 'spielanleitung') {
+      this.router.navigate(['/spielanleitung']);
     } else {
       // Navigate to player-name page with selected game mode
       this.router.navigate(['/player-name'], {

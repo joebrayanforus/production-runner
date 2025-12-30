@@ -7,7 +7,7 @@ import { PresentationComponent } from './presentation/presentation.component';
 
 export const routes: Routes = [
   { path: '', component: StartPageComponent },        // Startseite (mode selection)
-  { path: 'presentation', component: PresentationComponent }, // Présentation du jeu
+  { path: 'spielanleitung', component: PresentationComponent }, // Spielanleitung (Instructions)
   { path: 'player-name', component: PlayerNameComponent }, // Player name input
   { path: 'game', component: GameCanvasComponent },   // Game
   { path: 'info', component: InfoComponent },         // Info-Seite (About & Sensors)
