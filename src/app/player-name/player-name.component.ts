@@ -15,6 +15,7 @@ export type GameMode = 'classic' | 'practice';
 export class PlayerNameComponent implements OnInit, OnDestroy {
   playerName = '';
   gameMode: GameMode = 'classic';
+  target: 'game' | 'boss' = 'game';
 
   // Virtual Keyboard Variables
   keyboardVisible = true; // Always show keyboard on this page
@@ -40,6 +41,7 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
     // Get game mode from route params
     this.route.queryParams.subscribe(params => {
       this.gameMode = params['mode'] || 'classic';
+      this.target = params['target'] === 'boss' ? 'boss' : 'game';
     });
 
     // Start gamepad polling for keyboard navigation
@@ -117,7 +119,8 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
 
   startGame(): void {
     if (this.isPlayerNameValid()) {
-      this.router.navigate(['/game'], {
+      const next = this.target === 'boss' ? '/boss' : '/game';
+      this.router.navigate([next], {
         queryParams: {
           mode: this.gameMode,
           playerName: this.playerName.trim()

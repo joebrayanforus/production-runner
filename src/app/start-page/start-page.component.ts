@@ -89,6 +89,14 @@ export class StartPageComponent implements OnInit, OnDestroy {
       });
     }
   }
+  
+  openBossFightInNewTab(): void {
+    const mode = this.selectedMode === 'practice' ? 'practice' : 'classic';
+
+    const url = `/player-name?mode=${encodeURIComponent(mode)}&target=boss`;
+    window.open(url, '_blank', 'noopener');
+  }
+
 
   // Gamepad Polling for Mode Selection
   private startGamepadPolling(): void {
