@@ -40,7 +40,7 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Get game mode from route params
     this.route.queryParams.subscribe(params => {
-      this.gameMode = params['mode'] || 'classic';
+      this.gameMode = params['mode'] === 'practice' ? 'practice' : 'classic';
       this.target = params['target'] === 'boss' ? 'boss' : 'game';
     });
 

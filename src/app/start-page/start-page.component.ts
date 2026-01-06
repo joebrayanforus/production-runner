@@ -7,7 +7,7 @@ import {
   LeaderboardEntry
 } from '../services/leaderboard.service';
 
-export type GameMode = 'classic' | 'practice' | 'spielanleitung';
+export type GameMode = 'classic' | 'practice' | 'spielanleitung' | 'boss';
 
 @Component({
   selector: 'app-start-page',
@@ -20,6 +20,7 @@ export class StartPageComponent implements OnInit, OnDestroy {
   selectedMode: GameMode = 'classic';
   leaderboard: LeaderboardEntry[] = [];
   topScores: LeaderboardEntry[] = [];
+  private readonly menuModes: GameMode[] = ['spielanleitung', 'classic', 'practice', 'boss'];
   private gamepadPollInterval: any;
   private lastKeyboardSelect = 0;
 
@@ -51,7 +52,7 @@ export class StartPageComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent) {
-    const modes: GameMode[] = ['spielanleitung', 'classic', 'practice'];
+    const modes: GameMode[] = this.menuModes;
     const currentIndex = modes.indexOf(this.selectedMode);
 
     if (['ArrowUp', 'ArrowLeft'].includes(event.key)) {
@@ -79,22 +80,21 @@ export class StartPageComponent implements OnInit, OnDestroy {
   }
 
   startGame(): void {
-    // Si mode spielanleitung, naviguer directement vers /spielanleitung
     if (this.selectedMode === 'spielanleitung') {
       this.router.navigate(['/spielanleitung']);
-    } else {
-      // Navigate to player-name page with selected game mode
-      this.router.navigate(['/player-name'], {
-        queryParams: { mode: this.selectedMode }
-      });
+      return;
     }
-  }
-  
-  openBossFightInNewTab(): void {
-    const mode = this.selectedMode === 'practice' ? 'practice' : 'classic';
 
-    const url = `/player-name?mode=${encodeURIComponent(mode)}&target=boss`;
-    window.open(url, '_blank', 'noopener');
+    if (this.selectedMode === 'boss') {
+      this.router.navigate(['/player-name'], {
+        queryParams: { mode: 'classic', target: 'boss' }
+      });
+      return;
+    }
+
+    this.router.navigate(['/player-name'], {
+      queryParams: { mode: this.selectedMode }
+    });
   }
 
 
@@ -145,14 +145,13 @@ export class StartPageComponent implements OnInit, OnDestroy {
   }
 
   private handleModeNavigation(direction: string): void {
-    // Toggle between classic and practice with any direction key
-    switch (direction) {
-      case 'L':
-      case 'U':
-      case 'R':
-      case 'D':
-        this.selectedMode = this.selectedMode === 'classic' ? 'practice' : 'classic';
-        break;
-    }
+    const modes = this.menuModes;
+    let idx = modes.indexOf(this.selectedMode);
+    if (idx < 0) idx = 0;
+
+    const isPrev = direction === 'L' || direction === 'U';
+    idx = isPrev ? (idx === 0 ? modes.length - 1 : idx - 1) : (idx + 1) % modes.length;
+
+    this.selectedMode = modes[idx];
   }
 }

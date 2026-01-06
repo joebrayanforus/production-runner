@@ -128,6 +128,9 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
   private bufferedDirection: string | null = null;
 
   // Basic system state
+  private bossMaxHp = 4;
+  private bossHp = 4;
+  private victory = false;
   systemHealth = 3;
   efficiency = 0;
   gameOver = false;
@@ -1075,6 +1078,13 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     const hiScorePercent = Math.min(100, Math.floor((this.getHighScore() / 1000) * 100));
     ctx.fillText(`BEST: ${hiScorePercent}%`, this.CANVAS_WIDTH - 10, 45);
 
+    // Boss HP
+    ctx.textAlign = 'right';
+    ctx.font = '10px "Press Start 2P", monospace';
+    ctx.fillStyle = '#ED6B00';
+    ctx.fillText(`BOSS HP: ${this.bossHp}/${this.bossMaxHp}`, this.CANVAS_WIDTH - 10, 58);
+
+
     // Practice Mode Status-Anzeige
     if (this.gameMode === 'practice') {
       ctx.font = '8px monospace';
@@ -1339,22 +1349,24 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
       ];
 
       for (const layer of aberrationLayers) {
+        const endTitle = this.victory ? 'VICTORY' : 'GAME OVER';
         ctx.fillStyle = layer.color;
-        ctx.fillText('GAME OVER', centerX + layer.x + Math.sin(time * 10) * 2, centerY - 30 + layer.y);
+        ctx.fillText(endTitle, centerX + layer.x + Math.sin(time * 10) * 2, centerY - 30 + layer.y);
       }
 
       // Main text with massive glow
       ctx.shadowColor = '#FF0000';
       ctx.shadowBlur = 60 + Math.sin(time * 8) * 20;
       ctx.fillStyle = `rgba(255, 255, 255, ${explosionProgress})`;
-      ctx.fillText('GAME OVER', centerX, centerY - 30);
+      const endTitle = this.victory ? 'VICTORY' : 'GAME OVER';
+      ctx.fillText(endTitle, centerX, centerY - 30);
 
       // Super intense flickering
       if (Math.floor(time * 20) % 2 === 0) {
         ctx.shadowBlur = 80;
         ctx.shadowColor = '#FFFF00';
         ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-        ctx.fillText('GAME OVER', centerX, centerY - 30);
+        ctx.fillText(endTitle, centerX, centerY - 30);
       }
 
       // Distortion effect on text
@@ -1363,7 +1375,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
         ctx.translate(centerX, centerY - 30);
         ctx.scale(1 + (Math.random() - 0.5) * 0.1, 1 + (Math.random() - 0.5) * 0.1);
         ctx.fillStyle = 'rgba(255, 122, 1, 0.5)';
-        ctx.fillText('GAME OVER', 0, 0);
+        ctx.fillText(endTitle, 0, 0);
         ctx.restore();
       }
 
@@ -1374,7 +1386,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
       const subtitleAlpha = Math.max(0, explosionProgress - 0.15) / 0.85;
       ctx.fillStyle = `rgba(255, 122, 1, ${subtitleAlpha})`;
       const subtitleY = centerY + 25 + Math.sin(time * 4) * 3;
-      ctx.fillText('>>> CRITICAL SYSTEM FAILURE <<<', centerX, subtitleY);
+      ctx.fillText(this.victory ? '>>> BOSS DEFEATED <<<' : '>>> CRITICAL SYSTEM FAILURE <<<', centerX, subtitleY);
 
       // Error code for dramatic effect
       if (subtitleAlpha > 0.5) {
@@ -1544,6 +1556,25 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.fillRect(x - 2, y - 7, 1, 1);
       ctx.fillRect(x + 1, y - 7, 1, 1);
     }
+  }
+
+  private setupBossFight(): void {
+    
+    this.bossMaxHp = 4;
+    this.bossHp = 4;
+    this.victory = false;
+
+    const boss = [...this.ghosts].find(g => g.type === 'aggressive') ?? null;
+
+    const fallback = boss ?? ([...this.ghosts][0] ?? null);
+
+    if (!fallback) return;
+
+    for (const g of [...this.ghosts]) {
+      if (g !== fallback) this.ghosts.delete(g);
+    }
+
+    this.announce('BOSS FIGHT: DEFEAT THE MALFUNCTION');
   }
 
   private createParticles(x: number, y: number, color: string, count: number = 8) {
@@ -1820,12 +1851,16 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
       aggressiveGhost.updateVelocity(this.CELL_SIZE);
     }
 
+
+    this.setupBossFight();
+
     // Speichere Gesamtanzahl der Pellets für Cherry-Spawn
     this.totalPellets = this.foods.size + this.powerPellets.size;
 
     // Initialize advanced maze features
     this.initializeAdvancedMazeFeatures();
   }
+
   ngOnInit(): void{
     console.log('🎮 GameCanvasComponent initialized');
 
@@ -2760,23 +2795,28 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
         }
 
         if (ghost.scared) {
-          // Reparatur: Störung "reparieren" (+200 Effizienz)
+          // Бьём босса вместо мгновенной смерти
           this.audioService.play('eatghost');
           this.efficiency += 200;
-          // Respawn ghost at starting position
+
+          this.bossHp -= 1;
+
+          // Победа
+          if (this.bossHp <= 0) {
+            this.triggerVictory();
+            return;
+          }
+
+          // Поведение “как у обычных” — босс отлетает на респаун,
+          // и дальше нужно новое усиление, чтобы снова снять HP
           ghost.reset();
           ghost.scared = false;
-          ghost.updateVelocity(this.CELL_SIZE); // Reset to normal speed
+          ghost.updateVelocity(this.CELL_SIZE);
+
+          this.announce(`BOSS HIT! HP: ${this.bossHp}/${this.bossMaxHp}`);
           continue;
-        } else {
-          // Systemfehler: Health verlieren
-          this.audioService.play('die');
-          this.systemHealth -= 1;
-          this.damageFlash = 0.5; // Trigger damage flash
-          this.gameState = 'dying';
-          this.stateTimer = 0;
-          return; // Stoppe weitere Bewegung
         }
+
       }
 
       // Authentische Ghost-AI bei Richtungswechsel-Punkten
@@ -2949,7 +2989,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Level complete
-    if (this.foods.size === 0 && this.powerPellets.size === 0) {
+    if (false && this.foods.size === 0 && this.powerPellets.size === 0) {
       this.score += 1000; // Level Complete Bonus
       this.currentLevel++;
       this.pelletStreak = 0;
@@ -2987,6 +3027,20 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     this.ghostHouseTimer.clear();
   }
 
+  private triggerVictory(): void {
+    this.victory = true;
+
+    this.gameOver = true;
+    this.gameState = 'gameover';
+    this.stateTimer = 0;
+
+    this.announce('BOSS DEFEATED. PRODUCTION STABILIZED');
+
+    this.loadLeaderboard();
+    this.submitScore();
+    this.stopGameLoop();
+  }
+  
   // Send final score to backend API
   private submitScore(): void {
     try {
