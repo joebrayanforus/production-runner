@@ -354,8 +354,6 @@
   animation: keyboardPulse 1.5s ease-in-out infinite;
   letter-spacing: 1px;
 }
-  letter-spacing: 1px;
-}
 
 @keyframes keyboardPulse {
   0%, 100% { opacity: 1; }

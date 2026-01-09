@@ -1217,7 +1217,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Ready Screen
-    if (this.gameState === 'ready') {
+    if ((this.gameState as string) === 'ready') {
       ctx.font = 'bold 24px "Press Start 2P", monospace';
       ctx.fillStyle = '#ED6B00';
       ctx.textAlign = 'center';
@@ -2041,7 +2041,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.fillRect(10, 22, 100, 3);
       ctx.fillStyle = '#00FF88';
       ctx.fillRect(10, 22, loadProgress, 3);
-    } else if (this.gameState === 'playing') {
+    } else if ((this.gameState as string) === 'playing') {
       // Blinking cursor effect
       const blink = Math.floor(Date.now() / 500) % 2 === 0 ? '_' : '';
       ctx.fillText(`s.FOX RUNNING${blink}`, 10, 20);
@@ -2049,7 +2049,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
       const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
       ctx.fillStyle = '#ED6B00';
       ctx.fillText(dots, 110, 20);
-    } else if (this.gameState === 'gameover') {
+    } else if ((this.gameState as string) === 'gameover') {
       ctx.fillStyle = '#FF6B6B';
       ctx.fillText('SYSTEM HALTED', 10, 20);
       // Error indicator
@@ -2234,7 +2234,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Gamepad Restart / Exit in Game Over
-    if (this.gameState === 'gameover') {
+    if ((this.gameState as string) === 'gameover') {
       if (this.inputService.isActionButtonPressed()) {
         this.restartGame();
       }
@@ -3121,7 +3121,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
         this.resumeFromPause();
       } else if (this.gameState === 'playing') {
         this.openPause();
-      } else if (this.gameState === 'gameover') {
+      } else if ((this.gameState as string) === 'gameover') {
         // allow exit confirm from gameover via pause overlay
         this.openPause();
       }
@@ -3129,7 +3129,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Restart bei Game Over
-    if (this.gameState === 'gameover') {
+    if ((this.gameState as string) === 'gameover') {
       this.restartGame();
       return;
     }

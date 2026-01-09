@@ -19,7 +19,9 @@ interface Particle {
   maxLife: number;
   color: string;
   size: number;
+
 }
+
 
 @Component({
   selector: 'app-game-canvas',
@@ -402,6 +404,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
             ctx.stroke();
           }
         }
+
         ctx.globalAlpha = 1;
 
         // Rivets/Bolts on pipes (every 40px)
@@ -2120,7 +2123,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
       ctx.fillStyle = '#ED6B00';
       ctx.fillText(dots, 110, 20);
-    } else if (this.gameState === 'gameover') {
+    } else if ((this.gameState as string) === 'gameover') {
       ctx.fillStyle = '#FF6B6B';
       ctx.fillText('SYSTEM HALTED', 10, 20);
       // Error indicator
@@ -2309,12 +2312,16 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
-    // Pause Menu Navigation
+    // Pause Menu Navigation / Game Over Menu Navigation
+    let currentDirection: string | null = null;
     if (this.showPauseOverlay) {
       // Try arcade joystick first, fallback to standard gamepad
-      let currentDirection = this.inputService.getArcadeDirection(1);
+      currentDirection = this.inputService.getArcadeDirection(1);
       if (!currentDirection) {
         currentDirection = this.inputService.getDirection();
+      }
+    }
+
     // Try to apply buffered direction for robot2 (WASD)
     if (this.isTwoPlayerMode && this.bufferedDirection2 && this.robot2 && this.gameState === 'playing') {
       const canTurn = this.canChangeTo2(this.bufferedDirection2);
@@ -2330,7 +2337,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Gamepad Restart / Exit in Game Over
-    if (this.gameState === 'gameover') {
+    if ((this.gameState as string) === 'gameover') {
       if (this.inputService.isActionButtonPressed()) {
         this.restartGame();
       }
@@ -2360,7 +2367,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           this.resumeFromPause();
         } else if (this.gameState === 'playing') {
           this.openPause();
-        } else if (this.gameState === 'gameover') {
+        } else if ((this.gameState as string) === 'gameover') {
           this.openPause();
         }
       }
@@ -2389,7 +2396,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Game Over Menu Navigation
-    if (this.gameState === 'gameover') {
+    if ((this.gameState as string) === 'gameover') {
       // Try arcade joystick first, fallback to standard gamepad
       let currentDirection = this.inputService.getArcadeDirection(1);
       if (!currentDirection) {
@@ -3512,7 +3519,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         this.resumeFromPause();
       } else if (this.gameState === 'playing') {
         this.openPause();
-      } else if (this.gameState === 'gameover') {
+      } else if ((this.gameState as string) === 'gameover') {
         // allow exit confirm from gameover via pause overlay
         this.openPause();
       }
@@ -3520,7 +3527,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Game Over Menu Navigation
-    if (this.gameState === 'gameover') {
+    if ((this.gameState as string) === 'gameover') {
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
         this.navigateGameOverMenu('L');
@@ -3948,3 +3955,5 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 }
+
+
