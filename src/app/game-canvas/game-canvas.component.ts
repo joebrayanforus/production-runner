@@ -73,7 +73,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   maintenanceStations: Set<Block> = new Set<Block>();
   malfunctions: Set<Block> = new Set<Block>();
   robot: Block | null = null;
+  robot2: Block | null = null; // Second robot for 2-player mode
   cherry: Block | null = null;
+  isTwoPlayerMode = false; // Flag for 2-player mode
 
   // Legacy aliases for compatibility during migration
   get pacman() { return this.robot; }
@@ -126,6 +128,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Buffered input for smoother corner turning
   private bufferedDirection: string | null = null;
+  private bufferedDirection2: string | null = null; // For robot2 (WASD)
 
   // Basic system state
   systemHealth = 3;
@@ -732,6 +735,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.drawDyingRobot(ctx);
     }
 
+    // Draw robot2 in 2-player mode
+    if (this.isTwoPlayerMode && this.robot2 && this.gameState !== 'dying') {
+      this.drawRobot2(ctx);
+    }
+
     // Störungen zeichnen
     this.malfunctions.forEach(malfunction => {
       this.drawMalfunction(ctx, malfunction);
@@ -936,6 +944,81 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (Math.sin(progress * 30) > 0) {
       ctx.fillStyle = '#FF0000';
       ctx.fillRect(-2, -2, 4, 4);
+    }
+
+    ctx.restore();
+  }
+
+  private drawRobot2(ctx: CanvasRenderingContext2D) {
+    if (!this.robot2) return;
+
+    const centerX = this.robot2.x + this.robot2.width / 2;
+    const centerY = this.robot2.y + this.robot2.height / 2;
+    const size = this.robot2.width - 2;
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+
+    // Smooth rotation based on direction
+    const targetRotation = this.getTargetRotation(this.robot2.direction);
+    let robot2Rotation = 0;
+    // Use a separate rotation variable for robot2 (we'll need to store this)
+    // For now, use immediate rotation
+    ctx.rotate(targetRotation);
+
+    // Draw ifm robot - Industrial AGV style (slightly different color to distinguish)
+    // Main body with metallic gradient (slightly different shade)
+    const bodyGradient = ctx.createLinearGradient(-size/2, -size/2, size/2, size/2);
+    bodyGradient.addColorStop(0, '#FFA500'); // Slightly lighter orange
+    bodyGradient.addColorStop(0.5, '#FF8C00');
+    bodyGradient.addColorStop(1, '#ED6B00');
+    ctx.fillStyle = bodyGradient;
+    ctx.fillRect(-size/2, -size/2, size, size);
+
+    // Chassis border
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-size/2, -size/2, size, size);
+
+    // Corner rivets
+    const rivetPositions = [
+      [-size/2 + 2, -size/2 + 2],
+      [size/2 - 2, -size/2 + 2],
+      [-size/2 + 2, size/2 - 2],
+      [size/2 - 2, size/2 - 2]
+    ];
+    ctx.fillStyle = '#404040';
+    rivetPositions.forEach(([rx, ry]) => {
+      ctx.beginPath();
+      ctx.arc(rx, ry, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Direction indicator (front sensor array)
+    const headSize = size * 0.4;
+    let headX = 0, headY = 0;
+
+    if (this.robot2.direction === 'U') { headX = 0; headY = -size * 0.35; }
+    else if (this.robot2.direction === 'D') { headX = 0; headY = size * 0.35; }
+    else if (this.robot2.direction === 'L') { headX = -size * 0.35; headY = 0; }
+    else if (this.robot2.direction === 'R') { headX = size * 0.35; headY = 0; }
+
+    // Front sensor housing
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
+    ctx.strokeStyle = '#00FF88';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
+
+    // Active sensor LEDs
+    const ledPulse = 0.5 + Math.sin(Date.now() / 100) * 0.5;
+    ctx.fillStyle = `rgba(0, 255, 136, ${ledPulse})`;
+    if (this.robot2.direction === 'U' || this.robot2.direction === 'D') {
+      ctx.fillRect(headX - 3, headY - 1, 2, 2);
+      ctx.fillRect(headX + 1, headY - 1, 2, 2);
+    } else {
+      ctx.fillRect(headX - 1, headY - 3, 2, 2);
+      ctx.fillRect(headX - 1, headY + 1, 2, 2);
     }
 
     ctx.restore();
@@ -1823,6 +1906,17 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     // Speichere Gesamtanzahl der Pellets für Cherry-Spawn
     this.totalPellets = this.foods.size + this.powerPellets.size;
 
+    // Create second robot for 2-player mode
+    if (this.isTwoPlayerMode && this.robot) {
+      // Position robot2 slightly offset from robot1 (to the left)
+      const robot2X = this.robot.startX - this.CELL_SIZE;
+      const robot2Y = this.robot.startY;
+      this.robot2 = new Block(robot2X, robot2Y, this.CELL_SIZE, this.CELL_SIZE, this.robotRightImage);
+      this.robot2.direction = 'R';
+      this.robot2.updateVelocity(this.CELL_SIZE);
+      console.log('🤖 Robot2 created for 2-player mode');
+    }
+
     // Initialize advanced maze features
     this.initializeAdvancedMazeFeatures();
   }
@@ -1835,6 +1929,13 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       if (mode && ['classic', 'practice'].includes(mode)) {
         this.gameMode = mode;
         this.applyGameMode();
+      }
+
+      // Check for 2-player mode
+      const players = params['players'] as string;
+      if (players === '2') {
+        this.isTwoPlayerMode = true;
+        console.log('🎮 2-Player mode activated');
       }
 
       // Lese Spielername
@@ -2136,7 +2237,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.animationFrameId) {
       return;
     }
-    this.audioService.playBackgroundMusic();
+    // Background music disabled
+    // this.audioService.playBackgroundMusic();
     const loop = (timestamp: number) => {
       const delta = timestamp - this.lastFrameTime;
       if (delta > 1000 / this.FPS) { // target FPS
@@ -2194,6 +2296,20 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         else if (this.bufferedDirection === 'L') this.pacman.image = this.pacmanLeftImage;
         else if (this.bufferedDirection === 'R') this.pacman.image = this.pacmanRightImage;
         this.bufferedDirection = null; // Clear buffer after successful turn
+      }
+    }
+
+    // Try to apply buffered direction for robot2 (WASD)
+    if (this.isTwoPlayerMode && this.bufferedDirection2 && this.robot2 && this.gameState === 'playing') {
+      const canTurn = this.canChangeTo2(this.bufferedDirection2);
+      if (canTurn) {
+        this.robot2.updateDirection(this.bufferedDirection2, this.CELL_SIZE, this.walls);
+        // Update image
+        if (this.bufferedDirection2 === 'U') this.robot2.image = this.robotUpImage;
+        else if (this.bufferedDirection2 === 'D') this.robot2.image = this.robotDownImage;
+        else if (this.bufferedDirection2 === 'L') this.robot2.image = this.robotLeftImage;
+        else if (this.bufferedDirection2 === 'R') this.robot2.image = this.robotRightImage;
+        this.bufferedDirection2 = null; // Clear buffer after successful turn
       }
     }
 
@@ -2460,6 +2576,35 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           nextX + this.pacman.width > wall.x &&
           nextY < wall.y + wall.height &&
           nextY + this.pacman.height > wall.y) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Check if robot2 can turn to a new direction (for buffered input)
+  private canChangeTo2(newDirection: string): boolean {
+    if (!this.robot2) return false;
+
+    const testX = this.robot2.x;
+    const testY = this.robot2.y;
+    let speed = this.CELL_SIZE / 4;
+
+    let nextX = testX;
+    let nextY = testY;
+
+    if (newDirection === 'U') nextY -= speed;
+    else if (newDirection === 'D') nextY += speed;
+    else if (newDirection === 'L') nextX -= speed;
+    else if (newDirection === 'R') nextX += speed;
+
+    // Check if next position would collide with wall
+    for (const wall of this.walls) {
+      if (wall.type === 'ghost-door') continue;
+      if (nextX < wall.x + wall.width &&
+          nextX + this.robot2.width > wall.x &&
+          nextY < wall.y + wall.height &&
+          nextY + this.robot2.height > wall.y) {
         return false;
       }
     }
@@ -2743,9 +2888,78 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       if (collided) break;
     }
 
-    // Check ghost collisions
+    // Move robot2 in 2-player mode
+    if (this.isTwoPlayerMode && this.robot2) {
+      const boostMultiplier = this.turboSpeed ? 2 : 1;
+      const steps = boostMultiplier;
+      for (let i = 0; i < steps; i++) {
+        const oldX = this.robot2.x;
+        const oldY = this.robot2.y;
+
+        // Move one step
+        this.robot2.x += this.robot2.velocityX;
+        this.robot2.y += this.robot2.velocityY;
+
+        // Tunnel-Wraparound für robot2
+        this.handleTunnelWraparound(this.robot2);
+
+        // Check wall collision
+        let collided = false;
+        for (const wall of this.walls) {
+          if (wall.type === 'ghost-door') continue;
+
+          if (this.collision(this.robot2, wall)) {
+            // Revert movement
+            this.robot2.x = oldX;
+            this.robot2.y = oldY;
+            collided = true;
+            break;
+          }
+        }
+
+        // Stop moving if we hit a wall
+        if (collided) break;
+      }
+    }
+
+    // Check ghost collisions with robot1
     for (const ghost of this.ghosts) {
       if (this.collision(ghost, this.pacman)) {
+        // Shield protects from collision
+        if (this.shieldActive && !ghost.scared) {
+          // Ghost bounces back with shield
+          ghost.velocityX = -ghost.velocityX;
+          ghost.velocityY = -ghost.velocityY;
+          this.efficiency += 50;
+          this.audioService.play('eatghost');
+
+          // Add ripple effect
+          this.shieldRipples.push({radius: 20, alpha: 1.0});
+          continue;
+        }
+
+        if (ghost.scared) {
+          // Reparatur: Störung "reparieren" (+200 Effizienz)
+          this.audioService.play('eatghost');
+          this.efficiency += 200;
+          // Respawn ghost at starting position
+          ghost.reset();
+          ghost.scared = false;
+          ghost.updateVelocity(this.CELL_SIZE); // Reset to normal speed
+          continue;
+        } else {
+          // Systemfehler: Health verlieren
+          this.audioService.play('die');
+          this.systemHealth -= 1;
+          this.damageFlash = 0.5; // Trigger damage flash
+          this.gameState = 'dying';
+          this.stateTimer = 0;
+          return; // Stoppe weitere Bewegung
+        }
+      }
+
+      // Check ghost collisions with robot2 in 2-player mode
+      if (this.isTwoPlayerMode && this.robot2 && this.collision(ghost, this.robot2)) {
         // Shield protects from collision
         if (this.shieldActive && !ghost.scared) {
           // Ghost bounces back with shield
@@ -2805,7 +3019,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
-    // Check food collision (Produktionsauftrag)
+    // Check food collision (Produktionsauftrag) with robot1
     let foodEaten: Block | null = null;
     for (const food of this.foods) {
       if (this.collision(this.pacman, food)) {
@@ -2840,7 +3054,44 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.foods.delete(foodEaten);
     }
 
-    // Check power pellet collision (KI-Optimierung)
+    // Check food collision with robot2 in 2-player mode
+    if (this.isTwoPlayerMode && this.robot2) {
+      let foodEaten2: Block | null = null;
+      for (const food of this.foods) {
+        if (this.collision(this.robot2, food)) {
+          this.audioService.play('waka');
+          foodEaten2 = food;
+          // Create green particles for sensor data
+          this.createParticles(food.x + 2, food.y + 2, '#00FF88', 6);
+
+          // Only count pellets after touching a checkpoint
+          if (this.pelletCountingEnabled) {
+            this.pelletStreak++;
+            this.comboResetTimer = this.COMBO_RESET_DELAY;
+
+            // Show combo display for high streaks
+            if (this.pelletStreak >= 10) {
+              this.comboDisplayTimer = 1000;
+            }
+
+            // Update streak multiplier
+            if (this.pelletStreak >= 30) {
+              this.streakMultiplier = 3.0;
+            } else if (this.pelletStreak >= 20) {
+              this.streakMultiplier = 2.0;
+            } else if (this.pelletStreak >= 10) {
+              this.streakMultiplier = 1.5;
+            }
+            this.score += Math.floor(10 * this.streakMultiplier);
+          }
+        }
+      }
+      if (foodEaten2) {
+        this.foods.delete(foodEaten2);
+      }
+    }
+
+    // Check power pellet collision (KI-Optimierung) with robot1
     let powerEaten: Block | null = null;
     for (const pellet of this.powerPellets) {
       if (this.collision(this.pacman, pellet)) {
@@ -2864,7 +3115,33 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.powerPellets.delete(powerEaten);
     }
 
-    // Quality Checkpoint collision
+    // Check power pellet collision with robot2 in 2-player mode
+    if (this.isTwoPlayerMode && this.robot2) {
+      let powerEaten2: Block | null = null;
+      for (const pellet of this.powerPellets) {
+        if (this.collision(this.robot2, pellet)) {
+          this.audioService.play('powerpill');
+          powerEaten2 = pellet;
+          // Create orange particles for power pellet
+          this.createParticles(pellet.x + 4, pellet.y + 4, '#ED6B00', 12);
+          this.score += 50;
+          // Activate scared mode for 10 seconds
+          this.scaredTimer = this.scaredDuration;
+          this.ghosts.forEach(g => {
+            g.scared = true;
+            g.updateVelocity(this.CELL_SIZE); // update speed to 80%
+          });
+
+          // Announce power mode
+          this.announce('POWER MODE ACTIVATED');
+        }
+      }
+      if (powerEaten2) {
+        this.powerPellets.delete(powerEaten2);
+      }
+    }
+
+    // Quality Checkpoint collision with robot1
     if (this.robot) {
       this.qualityCheckpoints.forEach(checkpoint => {
         if (this.collision(this.robot!, checkpoint)) {
@@ -2888,8 +3165,79 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           }
         }
       });
-    }    // Cherry/Bonus collision with effects
+    }
+
+    // Quality Checkpoint collision with robot2 in 2-player mode
+    if (this.isTwoPlayerMode && this.robot2) {
+      this.qualityCheckpoints.forEach(checkpoint => {
+        if (this.collision(this.robot2!, checkpoint)) {
+          this.score += 500;
+          this.efficiency += 500;
+          // Create blue particles for checkpoint
+          this.createParticles(checkpoint.x + 16, checkpoint.y + 16, '#4169E1', 16);
+          this.qualityCheckpoints.delete(checkpoint);
+          this.audioService.play('eatghost');
+
+          // Enable pellet counting after first checkpoint
+          this.pelletCountingEnabled = true;
+          this.checkpointsCollected++;
+
+          // Trigger success burst effect
+          this.successBurst = 1.0;
+
+          // Extra life every 2 checkpoints (max 3 lives)
+          if (this.checkpointsCollected % 2 === 0 && this.systemHealth < 3) {
+            this.systemHealth++;
+          }
+        }
+      });
+    }
+
+    // Cherry/Bonus collision with effects - robot1
     if (this.cherry && this.collision(this.pacman, this.cherry)) {
+      let bonusScore = 500;
+      let particleColor = '#FFD700';
+
+      // Apply bonus effect based on type
+      switch (this.currentBonusType) {
+        case 'iot-sensor':
+          bonusScore = 700;
+          particleColor = '#00FFFF';
+          this.dataStreak += 10; // Massive boost to data streak
+          this.audioService.play('eatghost');
+          break;
+        case 'shield':
+          bonusScore = 500;
+          particleColor = '#4169E1';
+          this.shieldActive = true;
+          this.bonusEffectTimer = 10000; // 10 seconds
+          this.audioService.play('eatghost');
+
+          // Announce shield activation
+          this.announce('DEFENSE SHIELD ACTIVATED');
+          break;
+        case 'diagnostic':
+          bonusScore = 500;
+          particleColor = '#FF69B4';
+          this.audioService.play('eatghost');
+          break;
+      }
+
+      // Create colored particles based on bonus type
+      this.createParticles(this.cherry.x + 16, this.cherry.y + 16, particleColor, 20);
+      this.efficiency += bonusScore;
+
+      // System Health bonus (capped at 3)
+      if (this.systemHealth < 3) {
+        this.systemHealth += 1;
+      }
+
+      this.cherry = null;
+      this.cherrySpawnCooldown = 300;
+    }
+
+    // Cherry/Bonus collision with effects - robot2
+    if (this.isTwoPlayerMode && this.robot2 && this.cherry && this.collision(this.robot2, this.cherry)) {
       let bonusScore = 500;
       let particleColor = '#FFD700';
 
@@ -2973,6 +3321,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.pacman.reset();
       this.pacman.velocityX = 0;
       this.pacman.velocityY = 0;
+    }
+    if (this.isTwoPlayerMode && this.robot2) {
+      this.robot2.reset();
+      this.robot2.velocityX = 0;
+      this.robot2.velocityY = 0;
     }
     for (const ghost of this.ghosts) {
       ghost.reset();
@@ -3131,37 +3484,72 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     // Keine Steuerung während Ready, Dying oder Level Complete
     if (this.gameState !== 'playing') return;
 
-    if (!this.pacman) return;
+    // Handle robot1 (Arrow keys)
+    if (this.pacman) {
+      // Buffer the direction for smoother cornering
+      if (e.key === 'ArrowUp') {
+        this.bufferedDirection = 'U';
+      } else if (e.key === 'ArrowDown') {
+        this.bufferedDirection = 'D';
+      } else if (e.key === 'ArrowLeft') {
+        this.bufferedDirection = 'L';
+      } else if (e.key === 'ArrowRight') {
+        this.bufferedDirection = 'R';
+      }
 
-    // Buffer the direction for smoother cornering
-    if (e.key === 'ArrowUp') {
-      this.bufferedDirection = 'U';
-    } else if (e.key === 'ArrowDown') {
-      this.bufferedDirection = 'D';
-    } else if (e.key === 'ArrowLeft') {
-      this.bufferedDirection = 'L';
-    } else if (e.key === 'ArrowRight') {
-      this.bufferedDirection = 'R';
+      // Try to apply immediately if possible
+      if (this.bufferedDirection) {
+        const canTurn = this.canChangeTo(this.bufferedDirection);
+        if (canTurn) {
+          this.pacman.updateDirection(this.bufferedDirection, this.CELL_SIZE, this.walls);
+          // Update pacman image
+          if (this.bufferedDirection === 'U') {
+            this.pacman.image = this.pacmanUpImage;
+          } else if (this.bufferedDirection === 'D') {
+            this.pacman.image = this.pacmanDownImage;
+          } else if (this.bufferedDirection === 'L') {
+            this.pacman.image = this.pacmanLeftImage;
+          } else if (this.bufferedDirection === 'R') {
+            this.pacman.image = this.pacmanRightImage;
+          }
+          this.bufferedDirection = null; // Clear buffer on successful turn
+        }
+        // Otherwise keep buffered for next frame
+      }
     }
 
-    // Try to apply immediately if possible
-    if (this.bufferedDirection) {
-      const canTurn = this.canChangeTo(this.bufferedDirection);
-      if (canTurn) {
-        this.pacman.updateDirection(this.bufferedDirection, this.CELL_SIZE, this.walls);
-        // Update pacman image
-        if (this.bufferedDirection === 'U') {
-          this.pacman.image = this.pacmanUpImage;
-        } else if (this.bufferedDirection === 'D') {
-          this.pacman.image = this.pacmanDownImage;
-        } else if (this.bufferedDirection === 'L') {
-          this.pacman.image = this.pacmanLeftImage;
-        } else if (this.bufferedDirection === 'R') {
-          this.pacman.image = this.pacmanRightImage;
-        }
-        this.bufferedDirection = null; // Clear buffer on successful turn
+    // Handle robot2 (WASD keys) in 2-player mode
+    if (this.isTwoPlayerMode && this.robot2) {
+      const key = e.key.toLowerCase();
+      if (key === 'w') {
+        this.bufferedDirection2 = 'U';
+      } else if (key === 's') {
+        this.bufferedDirection2 = 'D';
+      } else if (key === 'a') {
+        this.bufferedDirection2 = 'L';
+      } else if (key === 'd') {
+        this.bufferedDirection2 = 'R';
       }
-      // Otherwise keep buffered for next frame
+
+      // Try to apply immediately if possible
+      if (this.bufferedDirection2) {
+        const canTurn = this.canChangeTo2(this.bufferedDirection2);
+        if (canTurn) {
+          this.robot2.updateDirection(this.bufferedDirection2, this.CELL_SIZE, this.walls);
+          // Update robot2 image
+          if (this.bufferedDirection2 === 'U') {
+            this.robot2.image = this.robotUpImage;
+          } else if (this.bufferedDirection2 === 'D') {
+            this.robot2.image = this.robotDownImage;
+          } else if (this.bufferedDirection2 === 'L') {
+            this.robot2.image = this.robotLeftImage;
+          } else if (this.bufferedDirection2 === 'R') {
+            this.robot2.image = this.robotRightImage;
+          }
+          this.bufferedDirection2 = null; // Clear buffer on successful turn
+        }
+        // Otherwise keep buffered for next frame
+      }
     }
   }
 
