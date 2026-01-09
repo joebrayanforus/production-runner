@@ -2171,7 +2171,8 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.animationFrameId) {
       return;
     }
-    this.audioService.playBackgroundMusic();
+    // Background music disabled
+    // this.audioService.playBackgroundMusic();
     const loop = (timestamp: number) => {
       const delta = timestamp - this.lastFrameTime;
       if (delta > 1000 / this.FPS) { // target FPS

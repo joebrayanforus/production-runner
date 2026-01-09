@@ -17,6 +17,7 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   playerName = '';
   gameMode: GameMode = 'classic';
   target: 'game' | 'boss' = 'game';
+  players: string | null = null;
 
   // Virtual Keyboard Variables
   keyboardVisible = true; // Always show keyboard on this page
@@ -44,6 +45,7 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
     this.route.queryParams.subscribe(params => {
       this.gameMode = params['mode'] === 'practice' ? 'practice' : 'classic';
       this.target = params['target'] === 'boss' ? 'boss' : 'game';
+      this.players = params['players'] || null;
     });
 
     // Start gamepad polling for keyboard navigation
@@ -182,12 +184,14 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   startGame(): void {
     if (this.isPlayerNameValid()) {
       const next = this.target === 'boss' ? '/boss' : '/game';
-      this.router.navigate([next], {
-        queryParams: {
-          mode: this.gameMode,
-          playerName: this.playerName.trim()
-        }
-      });
+      const queryParams: any = {
+        mode: this.gameMode,
+        playerName: this.playerName.trim()
+      };
+      if (this.players) {
+        queryParams.players = this.players;
+      }
+      this.router.navigate([next], { queryParams });
     }
   }
 
