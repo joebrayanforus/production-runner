@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { InputService } from '../services/input.service';
 
 export type GameMode = 'classic' | 'practice';
 
@@ -35,7 +36,8 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
 
   constructor(
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private inputService: InputService
   ) {}
 
   ngOnInit(): void {
@@ -78,6 +80,46 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   }
 
   navigateKeyboard(direction: string): void {
+    if (this.focusArea === 'buttons') {
+      // Navigation within buttons
+      switch (direction) {
+        case 'L':
+          this.buttonIndex = Math.max(0, this.buttonIndex - 1);
+          break;
+        case 'R':
+          this.buttonIndex = Math.min(2, this.buttonIndex + 1);
+          break;
+        case 'U':
+            // Move from buttons back to keyboard (last row)
+            this.focusArea = 'keyboard';
+            this.selectedRowIndex = this.keyboardRows.length - 1;
+            // Map buttons back to corresponding columns on the last row
+            if (this.buttonIndex === 0) {
+              // Delete -> column 3 ("7")
+              this.selectedKeyIndex = 3;
+            } else if (this.buttonIndex === 1) {
+              // Start -> column 5 ("9")
+              this.selectedKeyIndex = 5;
+            } else if (this.buttonIndex === 2) {
+              // Back -> column 6 ("-")
+              this.selectedKeyIndex = 6;
+            } else {
+              if (this.selectedKeyIndex < 0) this.selectedKeyIndex = 0;
+            }
+            // Keep within bounds
+            this.selectedKeyIndex = Math.min(
+              this.selectedKeyIndex,
+              this.keyboardRows[this.selectedRowIndex].length - 1
+            );
+          break;
+        case 'D':
+          // Already at buttons, do nothing
+          break;
+      }
+      return;
+    }
+
+    // Navigation within keyboard
     const rowLength = this.keyboardRows[this.selectedRowIndex].length;
 
     switch (direction) {
@@ -89,14 +131,34 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
         );
         break;
       case 'D':
-        this.selectedRowIndex = Math.min(
-          this.keyboardRows.length - 1,
-          this.selectedRowIndex + 1
-        );
-        this.selectedKeyIndex = Math.min(
-          this.selectedKeyIndex,
-          this.keyboardRows[this.selectedRowIndex].length - 1
-        );
+        // If on last row, move to buttons
+        if (this.selectedRowIndex === this.keyboardRows.length - 1) {
+          this.focusArea = 'buttons';
+          // Map last-row columns to specific buttons:
+          // columns 0-3 (4,5,6,7) -> Delete (0)
+          // columns 4-5 (8,9) -> Start (1)
+          // columns 6-9 (-,_,@, ) -> Back (2)
+          const col = this.selectedKeyIndex;
+          if (col >= 0 && col <= 3) {
+            this.buttonIndex = 0; // Delete
+          } else if (col >= 4 && col <= 5) {
+            this.buttonIndex = 1; // Start
+          } else {
+            this.buttonIndex = 2; // Back
+          }
+          // Reset keyboard selection to clear highlight
+          this.selectedRowIndex = -1;
+          this.selectedKeyIndex = -1;
+        } else {
+          this.selectedRowIndex = Math.min(
+            this.keyboardRows.length - 1,
+            this.selectedRowIndex + 1
+          );
+          this.selectedKeyIndex = Math.min(
+            this.selectedKeyIndex,
+            this.keyboardRows[this.selectedRowIndex].length - 1
+          );
+        }
         break;
       case 'L':
         this.selectedKeyIndex = Math.max(0, this.selectedKeyIndex - 1);
@@ -143,17 +205,11 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
     let directionHoldTime = 0;
 
     this.gamepadPollInterval = setInterval(() => {
-      const gamepad = navigator.getGamepads()[0];
-      if (!gamepad) return;
-
-      // Detect direction from analog stick or D-pad
-      let currentDirection = '';
-      const threshold = 0.5;
-
-      if (gamepad.axes[1] < -threshold || gamepad.buttons[12]?.pressed) currentDirection = 'U';
-      else if (gamepad.axes[1] > threshold || gamepad.buttons[13]?.pressed) currentDirection = 'D';
-      else if (gamepad.axes[0] < -threshold || gamepad.buttons[14]?.pressed) currentDirection = 'L';
-      else if (gamepad.axes[0] > threshold || gamepad.buttons[15]?.pressed) currentDirection = 'R';
+      // Try arcade joystick first, fallback to standard gamepad
+      let currentDirection = this.inputService.getArcadeDirection(1);
+      if (!currentDirection) {
+        currentDirection = this.inputService.getDirection();
+      }
 
       // Handle direction input
       if (currentDirection && currentDirection === lastDirection) {
@@ -171,18 +227,22 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
         directionHoldTime = 0;
       }
 
-      // A Button (0) - Select
-      if (gamepad.buttons[0]?.pressed) {
-        this.selectKey();
+      // Arcade Select button (Button 10) or standard A Button (0) - Select
+      if (this.inputService.isArcadeSelectPressed() || this.inputService.isActionButtonPressed()) {
+        if (this.focusArea === 'buttons') {
+          this.triggerButton();
+        } else {
+          this.selectKey();
+        }
       }
 
-      // B Button (1) - Go back
-      if (gamepad.buttons[1]?.pressed) {
+      // Arcade Back button (Button 11) or standard B Button (1) - Go back
+      if (this.inputService.isArcadeBackPressed()) {
         this.goBack();
       }
 
-      // Start Button (9) - Start game
-      if (gamepad.buttons[9]?.pressed && this.isPlayerNameValid()) {
+      // Arcade Start button (Button 9) - Start game
+      if (this.inputService.isArcadeStartPressed() && this.isPlayerNameValid()) {
         this.startGame();
       }
     }, 100);
@@ -197,53 +257,39 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.focusArea === 'keyboard') {
-      if (key === 'BACKSPACE') {
-        event.preventDefault();
+    if (key === 'BACKSPACE') {
+      event.preventDefault();
+      if (this.focusArea === 'buttons' && this.buttonIndex === 0) {
         this.deleteCharacter();
-      } else if (key === 'ARROWUP') {
-        event.preventDefault();
-        this.navigateKeyboard('U');
-      } else if (key === 'ARROWDOWN') {
-        event.preventDefault();
-        // wenn letzte Zeile -> Buttons fokussieren
-        if (this.selectedRowIndex === this.keyboardRows.length - 1) {
-          this.focusArea = 'buttons';
-          this.buttonIndex = 1; // default auf Start
-        } else {
-          this.navigateKeyboard('D');
-        }
-      } else if (key === 'ARROWLEFT') {
-        event.preventDefault();
-        this.navigateKeyboard('L');
-      } else if (key === 'ARROWRIGHT') {
-        event.preventDefault();
-        this.navigateKeyboard('R');
-      } else if (key === 'ENTER') {
-        event.preventDefault();
-        this.selectKey();
-      } else if (key === ' ') {
-        event.preventDefault();
-        this.addCharacter(' ');
-      } else if (/^[A-Z0-9\-_@]$/.test(key)) {
-        event.preventDefault();
-        this.addCharacter(key);
+      } else if (this.focusArea === 'keyboard') {
+        this.deleteCharacter();
       }
-    } else {
-      // Buttons fokussiert
-      if (key === 'ARROWLEFT') {
-        event.preventDefault();
-        this.buttonIndex = Math.max(0, this.buttonIndex - 1);
-      } else if (key === 'ARROWRIGHT') {
-        event.preventDefault();
-        this.buttonIndex = Math.min(2, this.buttonIndex + 1);
-      } else if (key === 'ARROWUP') {
-        event.preventDefault();
-        this.focusArea = 'keyboard';
-      } else if (key === 'ENTER' || key === ' ') {
-        event.preventDefault();
+    } else if (key === 'ARROWUP') {
+      event.preventDefault();
+      this.navigateKeyboard('U');
+    } else if (key === 'ARROWDOWN') {
+      event.preventDefault();
+      this.navigateKeyboard('D');
+    } else if (key === 'ARROWLEFT') {
+      event.preventDefault();
+      this.navigateKeyboard('L');
+    } else if (key === 'ARROWRIGHT') {
+      event.preventDefault();
+      this.navigateKeyboard('R');
+    } else if (key === 'ENTER' || key === ' ') {
+      event.preventDefault();
+      if (this.focusArea === 'buttons') {
         this.triggerButton();
+      } else {
+        if (key === ' ') {
+          this.addCharacter(' ');
+        } else {
+          this.selectKey();
+        }
       }
+    } else if (this.focusArea === 'keyboard' && /^[A-Z0-9\-_@]$/.test(key)) {
+      event.preventDefault();
+      this.addCharacter(key);
     }
   }
 

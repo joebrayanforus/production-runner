@@ -214,6 +214,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   // IFM Logo display control
   showIfmLogo = true;
 
+  // Wall colors map (for Gantt chart bars)
+  private wallColors = new Map<Block, string>();
+
   // Ready/Game Over Screen
   gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' | 'paused' | 'finalexplosion' = 'ready';
   private stateTimer = 0;
@@ -1718,6 +1721,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   showExitConfirm = false;
   private pausedForExitConfirm = false;
   showPauseOverlay = false;
+  pauseMenuIndex = 0; // 0 = Resume, 1 = Restart, 2 = Main Menu
+  gameOverMenuIndex = 0; // 0 = Restart, 1 = Main Menu
   showSpielanleitung = false;
   spielanleitungSlide = 0;
   private gamepadPollInterval: any;
@@ -2279,8 +2284,13 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.handleSpielanleitungGamepad();
     }
 
-    // Gamepad Input
-    const gpDir = this.inputService.getDirection();
+    // Arcade Input - Try arcade joystick first, fallback to standard gamepad
+    let gpDir: string | null = null;
+    gpDir = this.inputService.getArcadeDirection(1); // Player 1 joystick
+    if (!gpDir) {
+      gpDir = this.inputService.getDirection(); // Fallback to standard gamepad
+    }
+    
     if (gpDir && this.pacman && this.gameState === 'playing') {
       this.bufferedDirection = gpDir; // Buffer the direction
     }
@@ -2299,6 +2309,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
+    // Pause Menu Navigation
+    if (this.showPauseOverlay) {
+      // Try arcade joystick first, fallback to standard gamepad
+      let currentDirection = this.inputService.getArcadeDirection(1);
+      if (!currentDirection) {
+        currentDirection = this.inputService.getDirection();
     // Try to apply buffered direction for robot2 (WASD)
     if (this.isTwoPlayerMode && this.bufferedDirection2 && this.robot2 && this.gameState === 'playing') {
       const canTurn = this.canChangeTo2(this.bufferedDirection2);
@@ -2318,21 +2334,75 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.inputService.isActionButtonPressed()) {
         this.restartGame();
       }
-      if (this.inputService.isPauseButtonPressed()) {
-        this.exitGame();
+      
+      if (currentDirection === 'L' || currentDirection === 'R') {
+        this.navigatePauseMenu(currentDirection);
+      }
+      
+      // Select button (Button 10) or standard A Button (0) - Select
+      if (this.inputService.isArcadeSelectPressed() || this.inputService.isActionButtonPressed()) {
+        this.selectPauseMenuItem();
+      }
+      
+      // Pause button (Button 8) - Resume if on Resume option
+      if (this.inputService.isArcadePausePressed() || this.inputService.isPauseButtonPressed()) {
+        if (this.pauseMenuIndex === 0) {
+          this.resumeFromPause();
+        } else {
+          this.selectPauseMenuItem();
+        }
+      }
+    } else {
+      // Arcade Button Handling
+      // Pause button (Button 8)
+      if (this.inputService.isArcadePausePressed() || this.inputService.isPauseButtonPressed()) {
+        if (this.gameState === 'paused') {
+          this.resumeFromPause();
+        } else if (this.gameState === 'playing') {
+          this.openPause();
+        } else if (this.gameState === 'gameover') {
+          this.openPause();
+        }
       }
     }
 
-    // Gamepad - Open SPIELANLEITUNG with Y button (button 3) during gameplay
-    if (this.gameState === 'playing' && !this.showSpielanleitung) {
-      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    // Boost button (Button 12) - only in playing state
+    if (this.gameState === 'playing' && this.gameMode !== 'practice') {
+      const boostPressed = this.inputService.isArcadeBoostPressed();
+      if (boostPressed && !this.isBoostKeyPressed) {
+        this.isBoostKeyPressed = true;
+        console.log('🚀 Boost aktiviert (Arcade Button)');
+      } else if (!boostPressed && this.isBoostKeyPressed) {
+        this.isBoostKeyPressed = false;
+        this.turboSpeed = false;
+        console.log('🛑 Boost deaktiviert (Arcade Button)');
+      }
+    }
+
+    // Help/Spielanleitung button (Button 13)
+    if (this.gameState === 'playing') {
       const now = Date.now();
-      for (const gp of gamepads) {
-        if (gp && gp.buttons[3]?.pressed && now - this.lastGamepadSpielanleitungAction > 300) {
-          this.toggleSpielanleitung();
-          this.lastGamepadSpielanleitungAction = now;
-          break;
-        }
+      if (this.inputService.isArcadeHelpPressed() && now - this.lastGamepadSpielanleitungAction > 300) {
+        this.toggleSpielanleitung();
+        this.lastGamepadSpielanleitungAction = now;
+      }
+    }
+
+    // Game Over Menu Navigation
+    if (this.gameState === 'gameover') {
+      // Try arcade joystick first, fallback to standard gamepad
+      let currentDirection = this.inputService.getArcadeDirection(1);
+      if (!currentDirection) {
+        currentDirection = this.inputService.getDirection();
+      }
+      
+      if (currentDirection === 'L' || currentDirection === 'R') {
+        this.navigateGameOverMenu(currentDirection);
+      }
+      
+      // Select button (Button 10) or standard A Button (0) - Select
+      if (this.inputService.isArcadeSelectPressed() || this.inputService.isActionButtonPressed()) {
+        this.selectGameOverMenuItem();
       }
     }
 
@@ -2396,6 +2466,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         if (this.stateTimer >= this.FINAL_EXPLOSION_DURATION) {
           this.gameState = 'gameover';
           this.gameOver = true;
+          this.gameOverMenuIndex = 0; // Reset to Restart
           // Load leaderboard immediately
           this.loadLeaderboard();
           // Submit final score to backend
@@ -3414,6 +3485,28 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     // Prevent key repeat events
     if (e.repeat) return;
 
+    // Pause Menu Navigation
+    if (this.showPauseOverlay) {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        this.navigatePauseMenu('L');
+        return;
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        this.navigatePauseMenu('R');
+        return;
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.selectPauseMenuItem();
+        return;
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.resumeFromPause();
+        return;
+      }
+      return; // Don't process other keys when pause menu is open
+    }
+
     if (e.key === 'Escape') {
       if (this.gameState === 'paused') {
         this.resumeFromPause();
@@ -3426,10 +3519,22 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    // Restart bei Game Over
+    // Game Over Menu Navigation
     if (this.gameState === 'gameover') {
-      this.restartGame();
-      return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        this.navigateGameOverMenu('L');
+        return;
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        this.navigateGameOverMenu('R');
+        return;
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.selectGameOverMenuItem();
+        return;
+      }
+      return; // Don't process other keys when game over menu is active
     }
 
     // === PRACTICE MODE STEUERUNG ===
@@ -3575,20 +3680,73 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private openPause() {
     this.showPauseOverlay = true;
     this.gameState = 'paused';
+    this.pauseMenuIndex = 0; // Reset to Resume
     this.stopGameLoop();
   }
 
   resumeFromPause() {
     this.showPauseOverlay = false;
     this.showExitConfirm = false;
+    this.pauseMenuIndex = 0;
     if (!this.gameOver) {
       this.gameState = 'playing';
       this.startGameLoop();
     }
   }
 
-  requestExitToMenu() {
-    this.showExitConfirm = true;
+  navigatePauseMenu(direction: string): void {
+    if (!this.showPauseOverlay) return;
+    
+    switch (direction) {
+      case 'L':
+        this.pauseMenuIndex = Math.max(0, this.pauseMenuIndex - 1);
+        break;
+      case 'R':
+        this.pauseMenuIndex = Math.min(2, this.pauseMenuIndex + 1);
+        break;
+    }
+  }
+
+  selectPauseMenuItem(): void {
+    if (!this.showPauseOverlay) return;
+    
+    switch (this.pauseMenuIndex) {
+      case 0:
+        this.resumeFromPause();
+        break;
+      case 1:
+        this.restartGame();
+        break;
+      case 2:
+        this.exitGame();
+        break;
+    }
+  }
+
+  navigateGameOverMenu(direction: string): void {
+    if (this.gameState !== 'gameover') return;
+    
+    switch (direction) {
+      case 'L':
+        this.gameOverMenuIndex = Math.max(0, this.gameOverMenuIndex - 1);
+        break;
+      case 'R':
+        this.gameOverMenuIndex = Math.min(1, this.gameOverMenuIndex + 1);
+        break;
+    }
+  }
+
+  selectGameOverMenuItem(): void {
+    if (this.gameState !== 'gameover') return;
+    
+    switch (this.gameOverMenuIndex) {
+      case 0:
+        this.restartGame();
+        break;
+      case 1:
+        this.exitGame();
+        break;
+    }
   }
 
   // ============================================================================
@@ -3701,15 +3859,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  confirmExitToMenu() {
-    this.showExitConfirm = false;
-    this.stopGameLoop();
-    this.router.navigate(['/']);
-  }
-
-  cancelExitToMenu() {
-    this.showExitConfirm = false;
-  }
 
   toggleSpielanleitung() {
     this.showSpielanleitung = !this.showSpielanleitung;
