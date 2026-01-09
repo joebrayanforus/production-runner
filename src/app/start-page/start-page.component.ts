@@ -7,7 +7,7 @@ import {
   LeaderboardEntry
 } from '../services/leaderboard.service';
 
-export type GameMode = 'classic' | 'practice' | 'spielanleitung' | 'boss';
+export type GameMode = 'classic' | '2player' | 'practice' | 'spielanleitung' | 'boss';
 
 @Component({
   selector: 'app-start-page',
@@ -20,7 +20,7 @@ export class StartPageComponent implements OnInit, OnDestroy {
   selectedMode: GameMode = 'classic';
   leaderboard: LeaderboardEntry[] = [];
   topScores: LeaderboardEntry[] = [];
-  private readonly menuModes: GameMode[] = ['spielanleitung', 'classic', 'practice', 'boss'];
+  private readonly menuModes: GameMode[] = ['spielanleitung', 'classic', '2player', 'practice', 'boss'];
   private gamepadPollInterval: any;
   private lastKeyboardSelect = 0;
 
@@ -92,9 +92,16 @@ export class StartPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.router.navigate(['/player-name'], {
-      queryParams: { mode: this.selectedMode }
-    });
+    // For 2player mode, pass it as a separate parameter
+    if (this.selectedMode === '2player') {
+      this.router.navigate(['/player-name'], {
+        queryParams: { mode: 'classic', players: '2' }
+      });
+    } else {
+      this.router.navigate(['/player-name'], {
+        queryParams: { mode: this.selectedMode }
+      });
+    }
   }
 
 
