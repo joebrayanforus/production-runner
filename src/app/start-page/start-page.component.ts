@@ -6,6 +6,7 @@ import {
   LeaderboardService,
   LeaderboardEntry
 } from '../services/leaderboard.service';
+import { InputService } from '../services/input.service';
 
 export type GameMode = 'classic' | 'practice' | 'spielanleitung' | 'boss';
 
@@ -26,7 +27,8 @@ export class StartPageComponent implements OnInit, OnDestroy {
 
   constructor(
     private leaderboardService: LeaderboardService,
-    private router: Router
+    private router: Router,
+    private inputService: InputService
   ) {}
 
   ngOnInit(): void {
@@ -105,17 +107,11 @@ export class StartPageComponent implements OnInit, OnDestroy {
     let lastSelectTime = 0;
 
     this.gamepadPollInterval = setInterval(() => {
-      const gamepad = navigator.getGamepads()[0];
-      if (!gamepad) return;
-
-      // Detect direction from analog stick or D-pad
-      let currentDirection = '';
-      const threshold = 0.5;
-
-      if (gamepad.axes[1] < -threshold || gamepad.buttons[12]?.pressed) currentDirection = 'U';
-      else if (gamepad.axes[1] > threshold || gamepad.buttons[13]?.pressed) currentDirection = 'D';
-      else if (gamepad.axes[0] < -threshold || gamepad.buttons[14]?.pressed) currentDirection = 'L';
-      else if (gamepad.axes[0] > threshold || gamepad.buttons[15]?.pressed) currentDirection = 'R';
+      // Try arcade joystick first, fallback to standard gamepad
+      let currentDirection = this.inputService.getArcadeDirection(1);
+      if (!currentDirection) {
+        currentDirection = this.inputService.getDirection();
+      }
 
       // Handle direction input
       if (currentDirection && currentDirection === lastDirection) {
@@ -133,8 +129,8 @@ export class StartPageComponent implements OnInit, OnDestroy {
         directionHoldTime = 0;
       }
 
-      // A Button (0) - Select mode and start game
-      if (gamepad.buttons[0]?.pressed) {
+      // Arcade Select button (Button 10) or standard A button (0) - Select mode and start game
+      if (this.inputService.isArcadeSelectPressed() || this.inputService.isActionButtonPressed()) {
         const now = Date.now();
         if (now - lastSelectTime > 300) {
           this.startGame();
