@@ -156,6 +156,11 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
   // Checkpoint system
   private checkpointsCollected = 0;
   private pelletCountingEnabled = false;
+  
+  // Power Pellet Respawn System
+  private powerPelletRespawnTimer = 0;
+  private readonly POWER_PELLET_RESPAWN_DELAY = 5000; // 5 Sekunden nach dem letzten sammeln
+  private powerPelletSpawnPositions: Array<{x: number, y: number}> = [];
 
   // Animation effects
   private robotRotation = 0;
@@ -231,10 +236,10 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private getMaintenanceDuration(): number {
-    // Kürzere Maintenance-Zeit: Start mit 6s (statt 10s), -1.5s pro Level
-    const baseDuration = 6000;
+    // Maintenance-Zeit: Start mit 8s, -1.5s pro Level
+    const baseDuration = 8000;
     const reduction = (this.productionLevel - 1) * 1500;
-    return Math.max(baseDuration - reduction, 1000); // Minimum 1 Sekunde
+    return Math.max(baseDuration - reduction, 3000); // Minimum 3 Sekunden
   }
 
   // Legacy function for compatibility
@@ -1558,6 +1563,38 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  private spawnPowerPellet(): void {
+    // Finde eine Position die nicht bereits ein Power Pellet hat
+    const occupiedPositions = new Set<string>();
+    this.powerPellets.forEach(p => {
+      occupiedPositions.add(`${Math.floor(p.x)},${Math.floor(p.y)}`);
+    });
+    
+    // Suche freie Spawn-Position
+    for (const pos of this.powerPelletSpawnPositions) {
+      const key = `${Math.floor(pos.x)},${Math.floor(pos.y)}`;
+      if (!occupiedPositions.has(key)) {
+        const newPowerPellet = new Block(pos.x, pos.y, 8, 8, null);
+        this.powerPellets.add(newPowerPellet);
+        
+        // Visueller Effekt beim Spawnen
+        this.createParticles(pos.x + 4, pos.y + 4, '#ED6B00', 16);
+        this.announce('⚡ WARTUNGSSTATION VERFÜGBAR');
+        console.log(`✅ Power Pellet respawned at (${Math.floor(pos.x/this.CELL_SIZE)}, ${Math.floor(pos.y/this.CELL_SIZE)})`);
+        return;
+      }
+    }
+    
+    // Fallback: Spawne am ersten Slot wenn alle belegt
+    if (this.powerPelletSpawnPositions.length > 0) {
+      const pos = this.powerPelletSpawnPositions[0];
+      const newPowerPellet = new Block(pos.x, pos.y, 8, 8, null);
+      this.powerPellets.add(newPowerPellet);
+      this.createParticles(pos.x + 4, pos.y + 4, '#ED6B00', 16);
+      console.log(`✅ Power Pellet respawned (fallback)`);
+    }
+  }
+
   private setupBossFight(): void {
     
     this.bossMaxHp = 4;
@@ -1573,6 +1610,10 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     for (const g of [...this.ghosts]) {
       if (g !== fallback) this.ghosts.delete(g);
     }
+    
+    // Initialize Boss velocity and direction
+    fallback.direction = 'L';
+    fallback.updateVelocity(this.CELL_SIZE);
 
     this.announce('BOSS FIGHT: DEFEAT THE MALFUNCTION');
   }
@@ -1853,6 +1894,14 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
 
 
     this.setupBossFight();
+
+    // Speichere Power Pellet Positionen für Respawn
+    this.powerPelletSpawnPositions = [
+      { x: 1 * this.CELL_SIZE + this.CELL_SIZE / 2 - 4, y: 3 * this.CELL_SIZE + this.CELL_SIZE / 2 - 4 }, // Oben Links
+      { x: 26 * this.CELL_SIZE + this.CELL_SIZE / 2 - 4, y: 3 * this.CELL_SIZE + this.CELL_SIZE / 2 - 4 }, // Oben Rechts
+      { x: 1 * this.CELL_SIZE + this.CELL_SIZE / 2 - 4, y: 23 * this.CELL_SIZE + this.CELL_SIZE / 2 - 4 }, // Unten Links
+      { x: 25 * this.CELL_SIZE + this.CELL_SIZE / 2 - 4, y: 23 * this.CELL_SIZE + this.CELL_SIZE / 2 - 4 } // Unten Rechts
+    ];
 
     // Speichere Gesamtanzahl der Pellets für Cherry-Spawn
     this.totalPellets = this.foods.size + this.powerPellets.size;
@@ -2812,10 +2861,35 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
           // и дальше нужно новое усиление, чтобы снова снять HP
           ghost.reset();
           ghost.scared = false;
+          ghost.direction = 'L'; // Boss startet nach Links
           ghost.updateVelocity(this.CELL_SIZE);
 
           this.announce(`BOSS HIT! HP: ${this.bossHp}/${this.bossMaxHp}`);
           continue;
+        }
+        
+        // Boss greift an! (nicht scared)
+        if (!ghost.scared) {
+          this.systemHealth -= 1;
+          this.audioService.play('die');
+          this.damageFlash = 1.0;
+          
+          if (this.systemHealth <= 0) {
+            // Game Over
+            this.gameOver = true;
+            this.gameState = 'dying';
+            this.stateTimer = 0;
+            this.announce('SYSTEM FAILURE');
+          } else {
+            // Leben verloren, aber noch nicht tot
+            this.resetPositions();
+            this.announce(`TREFFER! ${this.systemHealth} LEBEN ÜBRIG`);
+          }
+          
+          // Reset scared timer
+          this.scaredTimer = 0;
+          this.ghosts.forEach(g => g.scared = false);
+          break; // Stop processing after death
         }
 
       }
@@ -2899,10 +2973,28 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
 
         // Announce power mode
         this.announce('POWER MODE ACTIVATED');
+        
+        // Reset respawn timer
+        this.powerPelletRespawnTimer = this.POWER_PELLET_RESPAWN_DELAY;
       }
     }
     if (powerEaten) {
       this.powerPellets.delete(powerEaten);
+    }
+    
+    // Power Pellet Respawn System
+    if (this.bossHp > 0 && this.powerPellets.size <= 1) {
+      if (this.powerPelletRespawnTimer > 0) {
+        this.powerPelletRespawnTimer -= 16; // ~60fps
+      } else {
+        // Spawne neues Power Pellet an einer freien Position
+        console.log(`🔄 Respawning Power Pellet... (current count: ${this.powerPellets.size})`);
+        this.spawnPowerPellet();
+        this.powerPelletRespawnTimer = this.POWER_PELLET_RESPAWN_DELAY;
+      }
+    } else if (this.bossHp > 0 && this.powerPellets.size > 1) {
+      // Reset timer wenn genug Power Pellets da sind
+      this.powerPelletRespawnTimer = 0;
     }
 
     // Quality Checkpoint collision
