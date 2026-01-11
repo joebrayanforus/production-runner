@@ -137,7 +137,22 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   efficiency = 0;
   gameOver = false;
   playerName = ''; // Player name for leaderboard
+  playerName2 = ''; // Second player name for 2-player mode
   gameMode: GameMode = 'classic'; // Make gameMode accessible in template
+
+  // 2-Player mode enhanced stats
+  player1Score = 0;
+  player2Score = 0;
+  player1Lives = 3;
+  player2Lives = 3;
+  player1PowerUp: 'none' | 'shield' | 'speed' | 'magnet' = 'none';
+  player2PowerUp: 'none' | 'shield' | 'speed' | 'magnet' = 'none';
+  player1PowerUpTimer = 0;
+  player2PowerUpTimer = 0;
+  teamComboMultiplier = 1;
+  teamComboTimer = 0;
+  lastPelletCollector: 1 | 2 | null = null;
+  winner: 1 | 2 | null = null; // Track winner in 2-player mode
   maintenanceTimer = 0;
   maintenanceDuration = 10000; // 10 seconds in ms
   dataStreak = 0;
@@ -170,6 +185,15 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private successBurst = 0;
   private shieldRipples: Array<{radius: number, alpha: number}> = [];
   private comboDisplayTimer = 0;
+
+  // 2-Player mode visual effects
+  private player1Trail: Array<{x: number, y: number, alpha: number}> = [];
+  private player2Trail: Array<{x: number, y: number, alpha: number}> = [];
+  private connectionBeam: {active: boolean, pulse: number} = {active: false, pulse: 0};
+  private teamBonusParticles: Array<{x: number, y: number, vx: number, vy: number, alpha: number, color: string}> = [];
+  private player1Aura = 0;
+  private player2Aura = 0;
+  private victoryDance = 0;
 
   // Death animation - maze destruction
   private mazeDestruction: Map<Block, {offsetY: number, rotation: number, speed: number}> = new Map();
@@ -734,7 +758,13 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       ctx.restore();
-    }    // Robot mit Animation zeichnen
+    }    // 2-Player Mode: Draw trails behind robots
+    if (this.isTwoPlayerMode) {
+      this.drawPlayer1Trail(ctx);
+      this.drawPlayer2Trail(ctx);
+    }
+
+    // Robot mit Animation zeichnen
     if (this.robot && this.gameState !== 'dying') {
       this.drawRobot(ctx);
     } else if (this.robot && this.gameState === 'dying') {
@@ -744,6 +774,13 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     // Draw robot2 in 2-player mode
     if (this.isTwoPlayerMode && this.robot2 && this.gameState !== 'dying') {
       this.drawRobot2(ctx);
+    }
+
+    // 2-Player Mode: Draw auras and connection beam
+    if (this.isTwoPlayerMode) {
+      this.drawPlayerAuras(ctx);
+      this.drawConnectionBeam(ctx);
+      this.drawTeamBonusParticles(ctx);
     }
 
     // Störungen zeichnen
@@ -756,6 +793,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // UI Overlay
     this.drawUI(ctx);
+
+    // 2-Player Mode HUD
+    if (this.isTwoPlayerMode) {
+      this.drawTwoPlayerHUD(ctx);
+    }
 
     // Industrial scanline effect (subtle)
     this.drawIndustrialScanlines(ctx);
@@ -1029,6 +1071,422 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     ctx.restore();
   }
+
+  // ==================== 2-PLAYER MODE VISUAL EFFECTS ====================
+
+  private drawPlayer1Trail(ctx: CanvasRenderingContext2D) {
+    if (!this.isTwoPlayerMode || this.player1Trail.length === 0) return;
+
+    ctx.save();
+    for (let i = 0; i < this.player1Trail.length; i++) {
+      const trail = this.player1Trail[i];
+      const size = 8 * trail.alpha;
+
+      // Orange energy trail with glow
+      const gradient = ctx.createRadialGradient(trail.x, trail.y, 0, trail.x, trail.y, size);
+      gradient.addColorStop(0, `rgba(237, 107, 0, ${trail.alpha * 0.8})`);
+      gradient.addColorStop(0.5, `rgba(255, 165, 0, ${trail.alpha * 0.4})`);
+      gradient.addColorStop(1, `rgba(237, 107, 0, 0)`);
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(trail.x, trail.y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private drawPlayer2Trail(ctx: CanvasRenderingContext2D) {
+    if (!this.isTwoPlayerMode || this.player2Trail.length === 0) return;
+
+    ctx.save();
+    for (let i = 0; i < this.player2Trail.length; i++) {
+      const trail = this.player2Trail[i];
+      const size = 8 * trail.alpha;
+
+      // Lighter orange/gold energy trail
+      const gradient = ctx.createRadialGradient(trail.x, trail.y, 0, trail.x, trail.y, size);
+      gradient.addColorStop(0, `rgba(255, 180, 50, ${trail.alpha * 0.8})`);
+      gradient.addColorStop(0.5, `rgba(255, 200, 100, ${trail.alpha * 0.4})`);
+      gradient.addColorStop(1, `rgba(255, 180, 50, 0)`);
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(trail.x, trail.y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private drawConnectionBeam(ctx: CanvasRenderingContext2D) {
+    if (!this.isTwoPlayerMode || !this.connectionBeam.active || !this.robot || !this.robot2) return;
+
+    const x1 = this.robot.x + this.robot.width / 2;
+    const y1 = this.robot.y + this.robot.height / 2;
+    const x2 = this.robot2.x + this.robot2.width / 2;
+    const y2 = this.robot2.y + this.robot2.height / 2;
+
+    ctx.save();
+
+    // Pulsating energy beam
+    const pulseIntensity = 0.5 + Math.sin(this.connectionBeam.pulse) * 0.3;
+
+    // Outer glow
+    ctx.strokeStyle = `rgba(0, 200, 255, ${pulseIntensity * 0.3})`;
+    ctx.lineWidth = 12;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // Middle beam
+    ctx.strokeStyle = `rgba(100, 220, 255, ${pulseIntensity * 0.6})`;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // Inner core
+    ctx.strokeStyle = `rgba(255, 255, 255, ${pulseIntensity})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // Connection nodes at each robot
+    [{ x: x1, y: y1 }, { x: x2, y: y2 }].forEach(pos => {
+      const nodeGradient = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 15);
+      nodeGradient.addColorStop(0, `rgba(255, 255, 255, ${pulseIntensity})`);
+      nodeGradient.addColorStop(0.5, `rgba(100, 220, 255, ${pulseIntensity * 0.6})`);
+      nodeGradient.addColorStop(1, 'rgba(0, 200, 255, 0)');
+
+      ctx.fillStyle = nodeGradient;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 15, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Team bonus text in the middle
+    if (this.teamComboMultiplier > 1) {
+      const midX = (x1 + x2) / 2;
+      const midY = (y1 + y2) / 2;
+
+      ctx.font = 'bold 14px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Text shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.fillText(`×${this.teamComboMultiplier}`, midX + 2, midY + 2);
+
+      // Main text
+      ctx.fillStyle = `rgba(255, 255, 255, ${pulseIntensity})`;
+      ctx.fillText(`×${this.teamComboMultiplier}`, midX, midY);
+    }
+
+    ctx.restore();
+  }
+
+  private drawTeamBonusParticles(ctx: CanvasRenderingContext2D) {
+    if (!this.isTwoPlayerMode || this.teamBonusParticles.length === 0) return;
+
+    ctx.save();
+    for (const particle of this.teamBonusParticles) {
+      const size = 4 * particle.alpha;
+
+      // Colorful celebration particles
+      const gradient = ctx.createRadialGradient(particle.x, particle.y, 0, particle.x, particle.y, size);
+      gradient.addColorStop(0, particle.color.replace('rgb', 'rgba').replace(')', `, ${particle.alpha})`));
+      gradient.addColorStop(1, particle.color.replace('rgb', 'rgba').replace(')', ', 0)'));
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, size, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sparkle effect
+      if (particle.alpha > 0.7) {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${particle.alpha})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(particle.x - size * 1.5, particle.y);
+        ctx.lineTo(particle.x + size * 1.5, particle.y);
+        ctx.moveTo(particle.x, particle.y - size * 1.5);
+        ctx.lineTo(particle.x, particle.y + size * 1.5);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  private drawPlayerAuras(ctx: CanvasRenderingContext2D) {
+    if (!this.isTwoPlayerMode || !this.robot || !this.robot2) return;
+
+    const drawAura = (robot: Block, powerUp: string, baseColor: string) => {
+      if (powerUp === 'none') return;
+
+      const x = robot.x + robot.width / 2;
+      const y = robot.y + robot.height / 2;
+      const time = Date.now() * 0.003;
+
+      let auraColor = baseColor;
+      let auraSize = 30;
+
+      switch (powerUp) {
+        case 'shield':
+          auraColor = '65, 105, 225'; // Royal blue
+          auraSize = 35;
+          break;
+        case 'speed':
+          auraColor = '255, 215, 0'; // Gold
+          auraSize = 32;
+          break;
+        case 'magnet':
+          auraColor = '138, 43, 226'; // Purple
+          auraSize = 34;
+          break;
+      }
+
+      ctx.save();
+
+      // Rotating aura rings
+      for (let i = 0; i < 3; i++) {
+        const radius = auraSize + i * 8 + Math.sin(time + i) * 3;
+        const alpha = (0.4 - i * 0.1) * Math.abs(Math.sin(time * 0.5));
+
+        const gradient = ctx.createRadialGradient(x, y, radius - 5, x, y, radius + 5);
+        gradient.addColorStop(0, `rgba(${auraColor}, 0)`);
+        gradient.addColorStop(0.5, `rgba(${auraColor}, ${alpha})`);
+        gradient.addColorStop(1, `rgba(${auraColor}, 0)`);
+
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, time + i, time + i + Math.PI * 1.5);
+        ctx.stroke();
+      }
+
+      // Power-up icon above robot
+      ctx.font = '16px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+
+      const iconY = robot.y - 8 + Math.sin(time * 2) * 2;
+      let icon = '';
+
+      switch (powerUp) {
+        case 'shield': icon = '🛡️'; break;
+        case 'speed': icon = '⚡'; break;
+        case 'magnet': icon = '🧲'; break;
+      }
+
+      // Icon shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillText(icon, x + 1, iconY + 1);
+
+      // Icon
+      ctx.fillStyle = 'white';
+      ctx.fillText(icon, x, iconY);
+
+      ctx.restore();
+    };
+
+    // Draw auras for both players
+    drawAura(this.robot, this.player1PowerUp, '237, 107, 0');
+    drawAura(this.robot2, this.player2PowerUp, '255, 180, 50');
+  }
+
+  private updatePlayerTrails() {
+    if (!this.isTwoPlayerMode || !this.robot || !this.robot2) return;
+
+    const maxTrailLength = 20;
+
+    // Add new trail positions
+    if (this.robot.velocityX !== 0 || this.robot.velocityY !== 0) {
+      this.player1Trail.push({
+        x: this.robot.x + this.robot.width / 2,
+        y: this.robot.y + this.robot.height / 2,
+        alpha: 1.0
+      });
+    }
+
+    if (this.robot2.velocityX !== 0 || this.robot2.velocityY !== 0) {
+      this.player2Trail.push({
+        x: this.robot2.x + this.robot2.width / 2,
+        y: this.robot2.y + this.robot2.height / 2,
+        alpha: 1.0
+      });
+    }    // Fade and remove old trail particles
+    this.player1Trail = this.player1Trail.filter(trail => {
+      trail.alpha -= 0.05;
+      return trail.alpha > 0;
+    }).slice(-maxTrailLength);
+
+    this.player2Trail = this.player2Trail.filter(trail => {
+      trail.alpha -= 0.05;
+      return trail.alpha > 0;
+    }).slice(-maxTrailLength);
+  }
+
+  private updateConnectionBeam() {
+    if (!this.isTwoPlayerMode || !this.robot || !this.robot2) return;
+
+    const dx = this.robot.x - this.robot2.x;
+    const dy = this.robot.y - this.robot2.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Activate beam when players are within 100 pixels
+    const beamDistance = 100;
+    this.connectionBeam.active = distance < beamDistance;
+
+    if (this.connectionBeam.active) {
+      this.connectionBeam.pulse += 0.1;
+
+      // Team combo bonus when connected
+      if (this.teamComboMultiplier < 3) {
+        this.teamComboMultiplier = Math.min(3, this.teamComboMultiplier + 0.01);
+      }
+    } else {
+      // Slowly decay multiplier when disconnected
+      if (this.teamComboMultiplier > 1) {
+        this.teamComboMultiplier = Math.max(1, this.teamComboMultiplier - 0.02);
+      }
+    }
+  }
+
+  private createTeamBonusParticles(x: number, y: number) {
+    const colors = [
+      'rgb(237, 107, 0)',   // IFM Orange
+      'rgb(255, 215, 0)',   // Gold
+      'rgb(0, 200, 255)',   // Cyan
+      'rgb(255, 100, 255)', // Magenta
+      'rgb(100, 255, 100)'  // Green
+    ];
+
+    for (let i = 0; i < 15; i++) {
+      const angle = (Math.PI * 2 * i) / 15;
+      const speed = 2 + Math.random() * 3;
+
+      this.teamBonusParticles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        alpha: 1.0,
+        color: colors[Math.floor(Math.random() * colors.length)]
+      });
+    }
+  }
+
+  private updateTeamBonusParticles() {
+    this.teamBonusParticles = this.teamBonusParticles.filter(particle => {
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      particle.vy += 0.1; // Gravity
+      particle.alpha -= 0.02;
+      return particle.alpha > 0;
+    });
+  }
+
+  private drawTwoPlayerHUD(ctx: CanvasRenderingContext2D) {
+    if (!this.isTwoPlayerMode) return;
+
+    ctx.save();
+    ctx.font = 'bold 14px "Press Start 2P", monospace';
+
+    // Player 1 HUD (Top Left)
+    const p1X = 20;
+    const p1Y = 30;
+
+    // Player 1 name and score
+    ctx.fillStyle = '#ED6B00';
+    ctx.textAlign = 'left';
+    ctx.fillText(`P1: ${this.playerName}`, p1X, p1Y);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(`${this.player1Score}`, p1X, p1Y + 20);
+
+    // Player 1 lives
+    for (let i = 0; i < this.player1Lives; i++) {
+      ctx.fillStyle = '#ED6B00';
+      ctx.fillRect(p1X + i * 15, p1Y + 28, 12, 12);
+      ctx.strokeStyle = '#000';
+      ctx.strokeRect(p1X + i * 15, p1Y + 28, 12, 12);
+    }
+
+    // Player 2 HUD (Top Right)
+    const p2X = this.CANVAS_WIDTH - 20;
+    const p2Y = 30;
+
+    // Player 2 name and score
+    ctx.fillStyle = '#FFB432';
+    ctx.textAlign = 'right';
+    ctx.fillText(`P2: ${this.playerName2}`, p2X, p2Y);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(`${this.player2Score}`, p2X, p2Y + 20);
+
+    // Player 2 lives
+    for (let i = 0; i < this.player2Lives; i++) {
+      ctx.fillStyle = '#FFB432';
+      ctx.fillRect(p2X - (i + 1) * 15, p2Y + 28, 12, 12);
+      ctx.strokeStyle = '#000';
+      ctx.strokeRect(p2X - (i + 1) * 15, p2Y + 28, 12, 12);
+    }
+
+    // Team Combo Multiplier (Center Top)
+    if (this.teamComboMultiplier > 1) {
+      const centerX = this.CANVAS_WIDTH / 2;
+      const centerY = 25;
+
+      const glowIntensity = 0.5 + Math.sin(Date.now() * 0.005) * 0.3;
+
+      // Glow background
+      const glowGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 60);
+      glowGradient.addColorStop(0, `rgba(0, 200, 255, ${glowIntensity * 0.4})`);
+      glowGradient.addColorStop(1, 'rgba(0, 200, 255, 0)');
+
+      ctx.fillStyle = glowGradient;
+      ctx.fillRect(centerX - 60, centerY - 20, 120, 40);
+
+      // Text
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.fillText(`TEAM ×${this.teamComboMultiplier.toFixed(1)}`, centerX + 2, centerY + 2);
+
+      // Main text with gradient
+      const textGradient = ctx.createLinearGradient(centerX - 50, centerY, centerX + 50, centerY);
+      textGradient.addColorStop(0, '#00C8FF');
+      textGradient.addColorStop(0.5, '#FFFFFF');
+      textGradient.addColorStop(1, '#00C8FF');
+
+      ctx.fillStyle = textGradient;
+      ctx.fillText(`TEAM ×${this.teamComboMultiplier.toFixed(1)}`, centerX, centerY);
+    }
+
+    // Connection status indicator
+    if (this.connectionBeam.active) {
+      const indicatorX = this.CANVAS_WIDTH / 2;
+      const indicatorY = 50;
+
+      ctx.textAlign = 'center';
+      ctx.font = '10px "Press Start 2P", monospace';
+
+      const pulseAlpha = 0.6 + Math.sin(this.connectionBeam.pulse) * 0.4;
+      ctx.fillStyle = `rgba(0, 200, 255, ${pulseAlpha})`;
+      ctx.fillText('⚡ CONNECTED ⚡', indicatorX, indicatorY);
+    }
+
+    ctx.restore();
+  }
+
+  // ==================== END 2-PLAYER VISUAL EFFECTS ====================
 
   private drawMalfunction(ctx: CanvasRenderingContext2D, ghost: Block) {
     const x = ghost.x;
@@ -1419,6 +1877,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
+      // 2-Player Mode: Show winner instead of GAME OVER
+      const mainText = this.isTwoPlayerMode && this.winner
+        ? `PLAYER ${this.winner} WINS!`
+        : 'GAME OVER';
+
       // Multiple chromatic aberration layers
       const aberrationLayers = [
         {color: 'rgba(255, 0, 0, 0.7)', x: -6, y: -6},
@@ -1429,21 +1892,21 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
       for (const layer of aberrationLayers) {
         ctx.fillStyle = layer.color;
-        ctx.fillText('GAME OVER', centerX + layer.x + Math.sin(time * 10) * 2, centerY - 30 + layer.y);
+        ctx.fillText(mainText, centerX + layer.x + Math.sin(time * 10) * 2, centerY - 30 + layer.y);
       }
 
       // Main text with massive glow
-      ctx.shadowColor = '#FF0000';
+      ctx.shadowColor = this.isTwoPlayerMode && this.winner ? '#00FF00' : '#FF0000';
       ctx.shadowBlur = 60 + Math.sin(time * 8) * 20;
       ctx.fillStyle = `rgba(255, 255, 255, ${explosionProgress})`;
-      ctx.fillText('GAME OVER', centerX, centerY - 30);
+      ctx.fillText(mainText, centerX, centerY - 30);
 
       // Super intense flickering
       if (Math.floor(time * 20) % 2 === 0) {
         ctx.shadowBlur = 80;
-        ctx.shadowColor = '#FFFF00';
+        ctx.shadowColor = this.isTwoPlayerMode && this.winner ? '#FFD700' : '#FFFF00';
         ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-        ctx.fillText('GAME OVER', centerX, centerY - 30);
+        ctx.fillText(mainText, centerX, centerY - 30);
       }
 
       // Distortion effect on text
@@ -1452,7 +1915,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         ctx.translate(centerX, centerY - 30);
         ctx.scale(1 + (Math.random() - 0.5) * 0.1, 1 + (Math.random() - 0.5) * 0.1);
         ctx.fillStyle = 'rgba(255, 122, 1, 0.5)';
-        ctx.fillText('GAME OVER', 0, 0);
+        ctx.fillText(mainText, 0, 0);
         ctx.restore();
       }
 
@@ -1460,10 +1923,20 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.shadowBlur = 20;
       ctx.shadowColor = '#FF7A01';
       ctx.font = 'bold 20px "Press Start 2P", monospace';
+
+      // 2-Player Mode: Show loser's name
+      let subtitle = 'PRODUCTION HALTED';
+      if (this.isTwoPlayerMode && this.winner) {
+        const winnerName = this.winner === 1 ? this.playerName : this.playerName2;
+        const loserName = this.winner === 1 ? this.playerName2 : this.playerName;
+        subtitle = `${winnerName} DEFEATS ${loserName}!`;
+      }
       const subtitleAlpha = Math.max(0, explosionProgress - 0.15) / 0.85;
       ctx.fillStyle = `rgba(255, 122, 1, ${subtitleAlpha})`;
       const subtitleY = centerY + 25 + Math.sin(time * 4) * 3;
-      ctx.fillText('>>> CRITICAL SYSTEM FAILURE <<<', centerX, subtitleY);
+
+      // Display custom subtitle
+      ctx.fillText(this.isTwoPlayerMode && this.winner ? subtitle : '>>> CRITICAL SYSTEM FAILURE <<<', centerX, subtitleY);
 
       // Error code for dramatic effect
       if (subtitleAlpha > 0.5) {
@@ -1914,6 +2387,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     // Speichere Gesamtanzahl der Pellets für Cherry-Spawn
     this.totalPellets = this.foods.size + this.powerPellets.size;
 
+    // Create additional ghosts to reach 8 total
+    this.createAdditionalGhosts();
+
     // Create second robot for 2-player mode
     if (this.isTwoPlayerMode && this.robot) {
       // Position robot2 slightly offset from robot1 (to the left)
@@ -1925,9 +2401,56 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       console.log('🤖 Robot2 created for 2-player mode');
     }
 
-    // Initialize advanced maze features
-    this.initializeAdvancedMazeFeatures();
+    // Assign ghost targets in 2-player mode
+    if (this.isTwoPlayerMode) {
+      this.assignGhostTargets();
+    }
   }
+
+  private createAdditionalGhosts() {
+    const currentGhostCount = this.ghosts.size;
+    const targetGhostCount = 8;
+    const ghostsToAdd = targetGhostCount - currentGhostCount;
+
+    if (ghostsToAdd <= 0) return;
+
+    // Ghost spawn positions (around the ghost house)
+    const spawnPositions = [
+      { x: 12 * this.CELL_SIZE, y: 14 * this.CELL_SIZE },
+      { x: 15 * this.CELL_SIZE, y: 14 * this.CELL_SIZE },
+      { x: 13 * this.CELL_SIZE, y: 15 * this.CELL_SIZE },
+      { x: 14 * this.CELL_SIZE, y: 15 * this.CELL_SIZE }
+    ];
+
+    const ghostTypes: Array<'aggressive' | 'ambush' | 'patrol' | 'random'> = ['aggressive', 'ambush', 'patrol', 'random'];
+    const ghostImages = [this.redGhostImage, this.pinkGhostImage, this.blueGhostImage, this.orangeGhostImage];
+
+    for (let i = 0; i < ghostsToAdd; i++) {
+      const pos = spawnPositions[i % spawnPositions.length];
+      const typeIndex = i % ghostTypes.length;
+      const ghost = new Block(pos.x, pos.y, this.CELL_SIZE, this.CELL_SIZE, ghostImages[typeIndex]);
+      ghost.type = ghostTypes[typeIndex];
+      this.ghosts.add(ghost);
+    }
+
+    console.log(`👻 Created ${ghostsToAdd} additional ghosts. Total: ${this.ghosts.size}`);
+  }
+
+  private assignGhostTargets() {
+    const ghostArray = Array.from(this.ghosts);
+
+    // First 4 ghosts target Player 1, next 4 target Player 2
+    ghostArray.forEach((ghost, index) => {
+      if (index < 4) {
+        ghost.targetPlayer = 1;
+      } else {
+        ghost.targetPlayer = 2;
+      }
+    });
+
+    console.log('🎯 Assigned ghost targets: 4 → Player 1, 4 → Player 2');
+  }
+
   ngOnInit(): void{
     console.log('🎮 GameCanvasComponent initialized');
 
@@ -1944,13 +2467,30 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       if (players === '2') {
         this.isTwoPlayerMode = true;
         console.log('🎮 2-Player mode activated');
-      }
 
-      // Lese Spielername
+        // Initialize 2-player variables
+        this.player1Lives = 3;
+        this.player2Lives = 3;
+        this.player1Score = 0;
+        this.player2Score = 0;
+        this.teamComboMultiplier = 1;
+        this.lastPelletCollector = null;
+        this.player1Trail = [];
+        this.player2Trail = [];
+        this.teamBonusParticles = [];
+        this.connectionBeam = { active: false, pulse: 0 };
+        this.winner = null;
+      }      // Lese Spielername(n)
       const playerName = params['playerName'] as string;
       if (playerName) {
         this.playerName = playerName;
-        console.log(`👤 Player: ${this.playerName}`);
+        console.log(`👤 Player 1: ${this.playerName}`);
+      }
+
+      const playerName2 = params['playerName2'] as string;
+      if (playerName2 && this.isTwoPlayerMode) {
+        this.playerName2 = playerName2;
+        console.log(`👤 Player 2: ${this.playerName2}`);
       }
     });
 
@@ -2293,7 +2833,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!gpDir) {
       gpDir = this.inputService.getDirection(); // Fallback to standard gamepad
     }
-    
+
     if (gpDir && this.pacman && this.gameState === 'playing') {
       this.bufferedDirection = gpDir; // Buffer the direction
     }
@@ -2341,16 +2881,16 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.inputService.isActionButtonPressed()) {
         this.restartGame();
       }
-      
+
       if (currentDirection === 'L' || currentDirection === 'R') {
         this.navigatePauseMenu(currentDirection);
       }
-      
+
       // Select button (Button 10) or standard A Button (0) - Select
       if (this.inputService.isArcadeSelectPressed() || this.inputService.isActionButtonPressed()) {
         this.selectPauseMenuItem();
       }
-      
+
       // Pause button (Button 8) - Resume if on Resume option
       if (this.inputService.isArcadePausePressed() || this.inputService.isPauseButtonPressed()) {
         if (this.pauseMenuIndex === 0) {
@@ -2402,11 +2942,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       if (!currentDirection) {
         currentDirection = this.inputService.getDirection();
       }
-      
+
       if (currentDirection === 'L' || currentDirection === 'R') {
         this.navigateGameOverMenu(currentDirection);
       }
-      
+
       // Select button (Button 10) or standard A Button (0) - Select
       if (this.inputService.isArcadeSelectPressed() || this.inputService.isActionButtonPressed()) {
         this.selectGameOverMenuItem();
@@ -2551,6 +3091,13 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.powerPelletBlinkTimer = 0;
     }
 
+    // 2-Player Mode Updates
+    if (this.isTwoPlayerMode) {
+      this.updatePlayerTrails();
+      this.updateConnectionBeam();
+      this.updateTeamBonusParticles();
+    }
+
     // Scatter/Chase Mode Timer (nur wenn nicht frightened)
     if (this.scaredTimer <= 0) {
       this.modeTimer += deltaTime;
@@ -2585,6 +3132,25 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.bonusRotationTimer = 0;
       const bonusTypes: ('iot-sensor' | 'shield' | 'diagnostic')[] = ['iot-sensor', 'shield', 'diagnostic'];
       this.currentBonusType = bonusTypes[Math.floor(Math.random() * bonusTypes.length)];
+    }
+
+    // 2-Player: Update power-up timers
+    if (this.isTwoPlayerMode) {
+      if (this.player1PowerUpTimer > 0) {
+        this.player1PowerUpTimer -= deltaTime;
+        if (this.player1PowerUpTimer <= 0) {
+          this.player1PowerUp = 'none';
+          this.player1PowerUpTimer = 0;
+        }
+      }
+
+      if (this.player2PowerUpTimer > 0) {
+        this.player2PowerUpTimer -= deltaTime;
+        if (this.player2PowerUpTimer <= 0) {
+          this.player2PowerUp = 'none';
+          this.player2PowerUpTimer = 0;
+        }
+      }
     }
 
     // Bonus effect timers
@@ -2825,6 +3391,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private updateGhostAI(ghost: Block) {
     if (!this.pacman) return;
 
+    // 2-Player Mode: Select target based on ghost's assigned player
+    let targetRobot = this.pacman;
+    if (this.isTwoPlayerMode && ghost.targetPlayer === 2 && this.robot2) {
+      targetRobot = this.robot2;
+    }
+
     // Check if ghost is inside the ghost house (Box)
     // House area approx: X [10..17]*CELL_SIZE, Y [12..16]*CELL_SIZE
     const gridX = Math.floor(ghost.x / this.CELL_SIZE);
@@ -2847,8 +3419,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     const timeInHouse = this.ghostHouseTimer.get(ghost) || 0;
     const forceExit = timeInHouse > this.MAX_HOUSE_TIME;
 
-    let targetX = this.pacman.x;
-    let targetY = this.pacman.y;
+    let targetX = targetRobot.x;
+    let targetY = targetRobot.y;
 
     if (inGhostHouse || forceExit) {
       // Force target to be outside the door (Row 11, Col 13.5) to exit the box
@@ -2879,23 +3451,23 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         // Chase Mode: Individuelle Jagdstrategien gemäß Skizze
         switch (ghost.type) {
           case 'aggressive': // ROT - Verfolgt direkt den AGV
-            targetX = this.pacman.x;
-            targetY = this.pacman.y;
+            targetX = targetRobot.x;
+            targetY = targetRobot.y;
             break;
 
           case 'ambush': // ROSA - Lauert voraus (4 Tiles vor Pac-Man)
-            if (this.pacman.direction === 'U') {
-              targetX = this.pacman.x;
-              targetY = this.pacman.y - 4 * this.CELL_SIZE;
-            } else if (this.pacman.direction === 'D') {
-              targetX = this.pacman.x;
-              targetY = this.pacman.y + 4 * this.CELL_SIZE;
-            } else if (this.pacman.direction === 'L') {
-              targetX = this.pacman.x - 4 * this.CELL_SIZE;
-              targetY = this.pacman.y;
+            if (targetRobot.direction === 'U') {
+              targetX = targetRobot.x;
+              targetY = targetRobot.y - 4 * this.CELL_SIZE;
+            } else if (targetRobot.direction === 'D') {
+              targetX = targetRobot.x;
+              targetY = targetRobot.y + 4 * this.CELL_SIZE;
+            } else if (targetRobot.direction === 'L') {
+              targetX = targetRobot.x - 4 * this.CELL_SIZE;
+              targetY = targetRobot.y;
             } else {
-              targetX = this.pacman.x + 4 * this.CELL_SIZE;
-              targetY = this.pacman.y;
+              targetX = targetRobot.x + 4 * this.CELL_SIZE;
+              targetY = targetRobot.y;
             }
             break;
 
@@ -2933,10 +3505,15 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.pacman) return;
 
     // Apply boost multiplier only when turboSpeed is active
-    const boostMultiplier = this.turboSpeed ? 2 : 1;
+    let boostMultiplier = this.turboSpeed ? 2 : 1;
+
+    // 2-Player: Apply speed power-up for player 1
+    if (this.isTwoPlayerMode && this.player1PowerUp === 'speed') {
+      boostMultiplier = Math.max(boostMultiplier, 1.5);
+    }
 
     // Move pacman with boost - apply in steps to prevent wall clipping
-    const steps = boostMultiplier;
+    const steps = Math.ceil(boostMultiplier);
     for (let i = 0; i < steps; i++) {
       const oldX = this.pacman.x;
       const oldY = this.pacman.y;
@@ -2968,8 +3545,14 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Move robot2 in 2-player mode
     if (this.isTwoPlayerMode && this.robot2) {
-      const boostMultiplier = this.turboSpeed ? 2 : 1;
-      const steps = boostMultiplier;
+      let boostMultiplier2 = this.turboSpeed ? 2 : 1;
+
+      // Apply speed power-up for player 2
+      if (this.player2PowerUp === 'speed') {
+        boostMultiplier2 = Math.max(boostMultiplier2, 1.5);
+      }
+
+      const steps = Math.ceil(boostMultiplier2);
       for (let i = 0; i < steps; i++) {
         const oldX = this.robot2.x;
         const oldY = this.robot2.y;
@@ -3028,7 +3611,21 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         } else {
           // Systemfehler: Health verlieren
           this.audioService.play('die');
-          this.systemHealth -= 1;
+
+          // 2-Player Mode: Separate lives
+          if (this.isTwoPlayerMode) {
+            this.player1Lives -= 1;
+
+            // Check if Player 1 lost all lives
+            if (this.player1Lives <= 0) {
+              this.winner = 2; // Player 2 wins
+              this.systemHealth = 0; // Trigger game over
+              this.announce(`PLAYER 2 ${this.playerName2} WINS!`);
+            }
+          } else {
+            this.systemHealth -= 1;
+          }
+
           this.damageFlash = 0.5; // Trigger damage flash
           this.gameState = 'dying';
           this.stateTimer = 0;
@@ -3063,7 +3660,21 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         } else {
           // Systemfehler: Health verlieren
           this.audioService.play('die');
-          this.systemHealth -= 1;
+
+          // 2-Player Mode: Separate lives
+          if (this.isTwoPlayerMode) {
+            this.player2Lives -= 1;
+
+            // Check if Player 2 lost all lives
+            if (this.player2Lives <= 0) {
+              this.winner = 1; // Player 1 wins
+              this.systemHealth = 0; // Trigger game over
+              this.announce(`PLAYER 1 ${this.playerName} WINS!`);
+            }
+          } else {
+            this.systemHealth -= 1;
+          }
+
           this.damageFlash = 0.5; // Trigger damage flash
           this.gameState = 'dying';
           this.stateTimer = 0;
@@ -3124,7 +3735,22 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           } else if (this.pelletStreak >= 10) {
             this.streakMultiplier = 1.5;
           }
-          this.score += Math.floor(10 * this.streakMultiplier);
+
+          // 2-Player Mode: Separate scoring with team bonus
+          if (this.isTwoPlayerMode) {
+            const basePoints = Math.floor(10 * this.streakMultiplier);
+            const teamPoints = Math.floor(basePoints * this.teamComboMultiplier);
+            this.player1Score += teamPoints;
+
+            // Track last collector for team combo
+            if (this.lastPelletCollector === 2) {
+              // Consecutive collection by different players = team combo!
+              this.createTeamBonusParticles(food.x + 2, food.y + 2);
+            }
+            this.lastPelletCollector = 1;
+          } else {
+            this.score += Math.floor(10 * this.streakMultiplier);
+          }
         }
       }
     }
@@ -3160,7 +3786,17 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
             } else if (this.pelletStreak >= 10) {
               this.streakMultiplier = 1.5;
             }
-            this.score += Math.floor(10 * this.streakMultiplier);
+
+            const basePoints = Math.floor(10 * this.streakMultiplier);
+            const teamPoints = Math.floor(basePoints * this.teamComboMultiplier);
+            this.player2Score += teamPoints;
+
+            // Track last collector for team combo
+            if (this.lastPelletCollector === 1) {
+              // Consecutive collection by different players = team combo!
+              this.createTeamBonusParticles(food.x + 2, food.y + 2);
+            }
+            this.lastPelletCollector = 2;
           }
         }
       }
@@ -3283,6 +3919,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           particleColor = '#00FFFF';
           this.dataStreak += 10; // Massive boost to data streak
           this.audioService.play('eatghost');
+
+          // 2-Player: Assign magnet power-up
+          if (this.isTwoPlayerMode) {
+            this.player1PowerUp = 'magnet';
+            this.player1PowerUpTimer = 10000;
+          }
           break;
         case 'shield':
           bonusScore = 500;
@@ -3293,21 +3935,44 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
           // Announce shield activation
           this.announce('DEFENSE SHIELD ACTIVATED');
+
+          // 2-Player: Assign shield power-up
+          if (this.isTwoPlayerMode) {
+            this.player1PowerUp = 'shield';
+            this.player1PowerUpTimer = 10000;
+          }
           break;
         case 'diagnostic':
           bonusScore = 500;
           particleColor = '#FF69B4';
           this.audioService.play('eatghost');
+
+          // 2-Player: Assign speed power-up
+          if (this.isTwoPlayerMode) {
+            this.player1PowerUp = 'speed';
+            this.player1PowerUpTimer = 10000;
+          }
           break;
       }
 
       // Create colored particles based on bonus type
       this.createParticles(this.cherry.x + 16, this.cherry.y + 16, particleColor, 20);
-      this.efficiency += bonusScore;
+
+      // 2-Player: Add to individual score
+      if (this.isTwoPlayerMode) {
+        this.player1Score += bonusScore;
+      } else {
+        this.efficiency += bonusScore;
+      }
 
       // System Health bonus (capped at 3)
       if (this.systemHealth < 3) {
         this.systemHealth += 1;
+      }
+
+      // 2-Player: Extra life for player 1
+      if (this.isTwoPlayerMode && this.player1Lives < 3) {
+        this.player1Lives += 1;
       }
 
       this.cherry = null;
@@ -3324,33 +3989,42 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         case 'iot-sensor':
           bonusScore = 700;
           particleColor = '#00FFFF';
-          this.dataStreak += 10; // Massive boost to data streak
+          this.dataStreak += 10;
           this.audioService.play('eatghost');
+          this.player2PowerUp = 'magnet';
+          this.player2PowerUpTimer = 10000;
           break;
         case 'shield':
           bonusScore = 500;
           particleColor = '#4169E1';
           this.shieldActive = true;
-          this.bonusEffectTimer = 10000; // 10 seconds
+          this.bonusEffectTimer = 10000;
           this.audioService.play('eatghost');
-
-          // Announce shield activation
           this.announce('DEFENSE SHIELD ACTIVATED');
+          this.player2PowerUp = 'shield';
+          this.player2PowerUpTimer = 10000;
           break;
         case 'diagnostic':
           bonusScore = 500;
           particleColor = '#FF69B4';
           this.audioService.play('eatghost');
+          this.player2PowerUp = 'speed';
+          this.player2PowerUpTimer = 10000;
           break;
       }
 
-      // Create colored particles based on bonus type
+      // Create colored particles
       this.createParticles(this.cherry.x + 16, this.cherry.y + 16, particleColor, 20);
-      this.efficiency += bonusScore;
+      this.player2Score += bonusScore;
 
-      // System Health bonus (capped at 3)
+      // System Health bonus
       if (this.systemHealth < 3) {
         this.systemHealth += 1;
+      }
+
+      // Extra life for player 2
+      if (this.player2Lives < 3) {
+        this.player2Lives += 1;
       }
 
       this.cherry = null;
@@ -3422,15 +4096,34 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private submitScore(): void {
     try {
       const collected = Math.max(0, this.totalPellets - (this.foods.size + this.powerPellets.size));
-      const dto = {
+
+      // 2-Player Mode: Use combined score
+      const finalScore = this.isTwoPlayerMode
+        ? (this.player1Score + this.player2Score)
+        : this.score;
+
+      // 2-Player Mode: Combined lives remaining
+      const livesRemaining = this.isTwoPlayerMode
+        ? (this.player1Lives + this.player2Lives)
+        : this.lives;
+
+      const dto: any = {
         Username: this.playerName?.trim() || 'Anonymous',
-        Points: this.score,
+        Points: finalScore,
         Level: this.currentLevel,
-        LivesRemaining: this.lives,
+        LivesRemaining: livesRemaining,
         ProductionOrdersCollected: collected,
         SensorsRepaired: 0,
-        PlaytimeSeconds: 0
+        PlaytimeSeconds: 0,
+        IsTwoPlayerMode: this.isTwoPlayerMode
       };
+
+      // Add second player if in 2-player mode
+      if (this.isTwoPlayerMode && this.playerName2?.trim()) {
+        dto.Player2Username = this.playerName2.trim();
+      }
+
+      console.log(`🏆 Submitting ${this.isTwoPlayerMode ? '2-player combined' : 'single player'} score:`, finalScore);
 
       this.http.post('/api/scores', dto).subscribe({
         next: (res) => {
@@ -3469,7 +4162,21 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.resetPositions();
     this.lives = 3;
     this.score = 0;
-    this.pelletStreak = 0;
+
+    // Initialize 2-player mode variables
+    if (this.isTwoPlayerMode) {
+      this.player1Lives = 3;
+      this.player2Lives = 3;
+      this.player1Score = 0;
+      this.player2Score = 0;
+      this.teamComboMultiplier = 1;
+      this.lastPelletCollector = null;
+      this.player1Trail = [];
+      this.player2Trail = [];
+      this.teamBonusParticles = [];
+      this.connectionBeam = { active: false, pulse: 0 };
+      this.winner = null; // Reset winner
+    }    this.pelletStreak = 0;
     this.streakMultiplier = 1.0;
     this.checkpointsCollected = 0;
     this.pelletCountingEnabled = false;
@@ -3703,7 +4410,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   navigatePauseMenu(direction: string): void {
     if (!this.showPauseOverlay) return;
-    
+
     switch (direction) {
       case 'L':
         this.pauseMenuIndex = Math.max(0, this.pauseMenuIndex - 1);
@@ -3716,7 +4423,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   selectPauseMenuItem(): void {
     if (!this.showPauseOverlay) return;
-    
+
     switch (this.pauseMenuIndex) {
       case 0:
         this.resumeFromPause();
@@ -3732,7 +4439,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   navigateGameOverMenu(direction: string): void {
     if (this.gameState !== 'gameover') return;
-    
+
     switch (direction) {
       case 'L':
         this.gameOverMenuIndex = Math.max(0, this.gameOverMenuIndex - 1);
@@ -3745,7 +4452,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   selectGameOverMenuItem(): void {
     if (this.gameState !== 'gameover') return;
-    
+
     switch (this.gameOverMenuIndex) {
       case 0:
         this.restartGame();

@@ -15,9 +15,13 @@ export type GameMode = 'classic' | 'practice';
 })
 export class PlayerNameComponent implements OnInit, OnDestroy {
   playerName = '';
+  playerName2 = '';
+  currentPlayerInput: 1 | 2 = 1; // Quel joueur saisit son nom
   gameMode: GameMode = 'classic';
   target: 'game' | 'boss' = 'game';
   players: string | null = null;
+  numberOfPlayers: 1 | 2 = 1;
+  currentStep: 'players' | 'name' = 'players';
 
   // Virtual Keyboard Variables
   keyboardVisible = true; // Always show keyboard on this page
@@ -44,9 +48,17 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
     // Get game mode from route params
     this.route.queryParams.subscribe(params => {
       this.gameMode = params['mode'] === 'practice' ? 'practice' : 'classic';
-      this.target = params['target'] === 'boss' ? 'boss' : 'game';
       this.players = params['players'] || null;
+      if (this.players === '2') {
+        this.numberOfPlayers = 2;
+        this.currentStep = 'name';
+      }
     });
+
+    // Commencer par la sélection du nombre de joueurs
+    this.currentStep = 'players';
+    this.focusArea = 'buttons';
+    this.buttonIndex = 0;
 
     // Start gamepad polling for keyboard navigation
     this.startGamepadPolling();
@@ -66,20 +78,56 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   }
 
   isPlayerNameValid(): boolean {
-    return this.playerName.trim().length > 0;
+    if (this.numberOfPlayers === 1) {
+      return this.playerName.trim().length > 0;
+    } else {
+      return this.playerName.trim().length > 0 && this.playerName2.trim().length > 0;
+    }
+  }
+
+  isCurrentPlayerNameValid(): boolean {
+    if (this.currentPlayerInput === 1) {
+      return this.playerName.trim().length > 0;
+    } else {
+      return this.playerName2.trim().length > 0;
+    }
+  }
+
+  getCurrentPlayerName(): string {
+    return this.currentPlayerInput === 1 ? this.playerName : this.playerName2;
   }
 
   addCharacter(char: string): void {
-    if (this.playerName.length < 20) {
-      this.playerName += char;
+    if (this.currentPlayerInput === 1) {
+      if (this.playerName.length < 20) {
+        this.playerName += char;
+      }
+    } else {
+      if (this.playerName2.length < 20) {
+        this.playerName2 += char;
+      }
     }
   }
 
   deleteCharacter(): void {
-    this.playerName = this.playerName.slice(0, -1);
+    if (this.currentPlayerInput === 1) {
+      this.playerName = this.playerName.slice(0, -1);
+    } else {
+      this.playerName2 = this.playerName2.slice(0, -1);
+    }
   }
 
   navigateKeyboard(direction: string): void {
+    if (this.currentStep === 'players') {
+      // Navigation pour la sélection du nombre de joueurs
+      if (direction === 'L') {
+        this.buttonIndex = 0; // 1 joueur
+      } else if (direction === 'R') {
+        this.buttonIndex = 1; // 2 joueurs
+      }
+      return;
+    }
+
     if (this.focusArea === 'buttons') {
       // Navigation within buttons
       switch (direction) {
@@ -181,22 +229,60 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
     }
   }
 
+  selectNumberOfPlayers(num: 1 | 2): void {
+    this.numberOfPlayers = num;
+  }
+
   startGame(): void {
-    if (this.isPlayerNameValid()) {
-      const next = this.target === 'boss' ? '/boss' : '/game';
-      const queryParams: any = {
-        mode: this.gameMode,
-        playerName: this.playerName.trim()
-      };
-      if (this.players) {
-        queryParams.players = this.players;
+    if (this.currentStep === 'players') {
+      // Passer à la saisie du nom
+      this.currentStep = 'name';
+      this.focusArea = 'keyboard';
+      this.selectedRowIndex = 0;
+      this.selectedKeyIndex = 0;
+      this.currentPlayerInput = 1;
+    } else if (this.currentStep === 'name') {
+      // Si 2 joueurs et on n'a que le premier nom
+      if (this.numberOfPlayers === 2 && this.currentPlayerInput === 1 && this.playerName.trim().length > 0) {
+        this.currentPlayerInput = 2;
+        this.focusArea = 'keyboard';
+        this.selectedRowIndex = 0;
+        this.selectedKeyIndex = 0;
+      } else if (this.isPlayerNameValid()) {
+        // Démarrer le jeu
+        const queryParams: any = {
+          mode: this.gameMode,
+          playerName: this.playerName.trim()
+        };
+        if (this.numberOfPlayers === 2) {
+          queryParams.players = '2';
+          queryParams.playerName2 = this.playerName2.trim();
+        }
+        this.router.navigate(['/game'], { queryParams });
       }
-      this.router.navigate([next], { queryParams });
     }
   }
 
   goBack(): void {
-    this.router.navigate(['/']);
+    if (this.currentStep === 'name' && this.numberOfPlayers === 2 && this.currentPlayerInput === 2) {
+      // Retour au joueur 1
+      this.currentPlayerInput = 1;
+      this.playerName2 = '';
+      this.focusArea = 'keyboard';
+      this.selectedRowIndex = 0;
+      this.selectedKeyIndex = 0;
+    } else if (this.currentStep === 'name') {
+      // Retour à la sélection du nombre de joueurs
+      this.currentStep = 'players';
+      this.focusArea = 'buttons';
+      this.buttonIndex = this.numberOfPlayers === 1 ? 0 : 1;
+      this.playerName = '';
+      this.playerName2 = '';
+      this.currentPlayerInput = 1;
+    } else {
+      // Retour à la page d'accueil
+      this.router.navigate(['/']);
+    }
   }
 
   // Gamepad Polling
@@ -294,18 +380,32 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   }
 
   private triggerButton() {
-    switch (this.buttonIndex) {
-      case 0:
-        this.deleteCharacter();
-        break;
-      case 1:
-        if (this.isPlayerNameValid()) {
-          this.startGame();
-        }
-        break;
-      case 2:
-        this.goBack();
-        break;
+    if (this.currentStep === 'players') {
+      // Sur l'écran de sélection des joueurs
+      if (this.buttonIndex === 0) {
+        this.numberOfPlayers = 1;
+        this.startGame(); // Passe à la saisie du nom
+      } else if (this.buttonIndex === 1) {
+        this.numberOfPlayers = 2;
+        this.startGame(); // Passe à la saisie des noms
+      }
+    } else {
+      // Sur l'écran de saisie du nom
+      switch (this.buttonIndex) {
+        case 0:
+          this.deleteCharacter();
+          break;
+        case 1:
+          if (this.numberOfPlayers === 2 && this.currentPlayerInput === 1 && this.playerName.trim().length > 0) {
+            this.startGame(); // Passe au joueur 2
+          } else if (this.isCurrentPlayerNameValid()) {
+            this.startGame(); // Démarre le jeu ou passe au joueur 2
+          }
+          break;
+        case 2:
+          this.goBack();
+          break;
+      }
     }
   }
 

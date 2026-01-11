@@ -11,6 +11,7 @@ export class Block {
   velocityY: number = 0;
   scared: boolean = false;
   type: string = ''; // 'aggressive', 'ambush', 'patrol', 'random'
+  targetPlayer: 1 | 2 = 1; // Which player this ghost targets in 2-player mode
 
   constructor(x: number, y: number, width: number, height: number, image: HTMLImageElement | null) {
     this.x = x;

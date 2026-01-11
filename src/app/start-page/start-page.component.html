@@ -39,26 +39,13 @@
             [class.selected]="selectedMode === 'classic'"
             (click)="selectMode('classic')">
       <span class="menu-arrow">▶</span>
-      <span class="menu-text">1 PLAYER</span>
-    </button>
-    <button class="menu-item"
-            [class.selected]="selectedMode === '2player'"
-            (click)="selectMode('2player')">
-      <span class="menu-arrow">▶</span>
-      <span class="menu-text">2 PLAYER</span>
+      <span class="menu-text">SPIELEN</span>
     </button>
     <button class="menu-item"
             [class.selected]="selectedMode === 'practice'"
             (click)="selectMode('practice')">
       <span class="menu-arrow">▶</span>
       <span class="menu-text">SIMULATION</span>
-    </button>
-
-    <button class="menu-item"
-            [class.selected]="selectedMode === 'boss'"
-            (click)="selectMode('boss')">
-      <span class="menu-arrow">▶</span>
-      <span class="menu-text">BOSS FIGHT</span>
     </button>
 
     <button class="menu-item menu-disabled">

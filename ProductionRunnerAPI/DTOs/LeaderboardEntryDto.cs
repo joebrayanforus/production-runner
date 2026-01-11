@@ -8,4 +8,6 @@ public class LeaderboardEntryDto
     public int Level { get; set; }
     public int SensorsRepaired { get; set; }
     public string AchievedAt { get; set; } = string.Empty;
+    public bool IsTwoPlayerMode { get; set; }
+    public string? Player2Username { get; set; }
 }
