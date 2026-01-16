@@ -1665,8 +1665,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.drawDynamicLighting(ctx);
     }
 
-    // Draw Energy Gauge for Boost
-    this.drawEnergyGauge(ctx);
+    // Draw Energy Gauge for Boost (only in single player mode)
+    if (!this.isTwoPlayerMode) {
+      this.drawEnergyGauge(ctx);
+    }
 
     // System Health - bottom left
     for (let i = 0; i < this.systemHealth; i++) {
@@ -4036,9 +4038,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.cherrySpawnCooldown--;
     }
 
-    // Spawn Cherry: Nach 70 und 170 Pellets gegessen (wie im Original)
+    // Spawn Cherry: Nach 70 et 170 Pellets gegessen (wie im Original)
+    // In 2-player mode: spawn more frequently (every 40 and 100 pellets)
     const pelletsEaten = this.totalPellets - this.foods.size - this.powerPellets.size;
-    const shouldSpawnCherry = (pelletsEaten === 70 || pelletsEaten === 170) && !this.cherry && this.cherrySpawnCooldown === 0;
+    const spawnThresholds = this.isTwoPlayerMode ? [40, 100, 160, 220] : [70, 170];
+    const shouldSpawnCherry = spawnThresholds.includes(pelletsEaten) && !this.cherry && this.cherrySpawnCooldown === 0;
 
     if (shouldSpawnCherry || (!this.cherry && this.cherrySpawnCooldown === 0 && Math.random() < 0.003)) {
       // Spawn an fester Position unter der Ghost Box (wie im Original)
@@ -4662,5 +4666,4 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 }
-
 
