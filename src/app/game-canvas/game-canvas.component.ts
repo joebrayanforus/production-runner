@@ -7,6 +7,10 @@ import { GameManager } from '../models/game-manager';
 import { Block } from '../models/Block';
 import { AudioService } from '../services/audio.service';
 import { InputService } from '../services/input.service';
+import { GameStats } from '../models/game-stats';
+import { AchievementService } from '../services/achievement.service';
+
+
 
 export type GameMode = 'classic' | 'practice';
 
@@ -39,7 +43,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private ctx!: CanvasRenderingContext2D;
   private animationFrameId = 0;
   private lastFrameTime = 0;
-  private readonly FPS = 60;
+  private readonly FPS = 30;
   private onKeyDownBound = (e: KeyboardEvent) => this.onKeyDown(e);
   // Assets - Industrial Equipment
   private malfunctionBlueImage = new Image();
@@ -239,9 +243,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // IFM Logo display control
   showIfmLogo = true;
-
-  // Wall colors map (for Gantt chart bars)
-  private wallColors = new Map<Block, string>();
 
   // Ready/Game Over Screen
   gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' | 'paused' | 'finalexplosion' = 'ready';
@@ -1632,8 +1633,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         statusY += 12;
       }
       if (this.turboSpeed && this.boostEnergy > 0) {
-        ctx.fillStyle = '#ED6B00';
-        ctx.fillText('BOOST ACTIVE', this.CANVAS_WIDTH - 10, statusY);
+        ctx.fillStyle = '#FFD700';
+        ctx.fillText('⚡ TURBO', this.CANVAS_WIDTH - 10, statusY);
         statusY += 12;
       }
       if (this.slowMotion < 1.0) {
@@ -1656,9 +1657,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Draw particles
     this.drawParticles(ctx);
-
-    // Draw Advanced Maze Features
-    this.drawAdvancedMazeFeatures(ctx);
 
     // Apply dynamic lighting effect
     if (this.lightingEnabled && this.gameState === 'playing') {
@@ -2166,22 +2164,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   slowMotion = 1.0;          // Practice Mode: Zeitlupe (1.0 = normal)
   turboSpeed = false;        // Turbo Mode: 2x Geschwindigkeit
 
-  // Energy Gauge System for Turbo
-  private boostEnergy = 100;           // Current energy (0-100)
-  private readonly MAX_BOOST_ENERGY = 100;
-  private readonly BOOST_DRAIN_RATE = 40;  // Energy consumed per second (was 25)
-  private readonly BOOST_RECHARGE_RATE = 8; // Energy recharged per second when not boosting (was 15)
-  private isBoostKeyPressed = false;
-
-  // Dynamic Lighting System
-  private lightingEnabled = false;
-  private flashlightRadius = 120;
-  private ambientDarkness = 0.85; // 0 = fully dark, 1 = fully lit
-
-  // Voice Announcements
-  private lastAnnouncement = '';
-  private announcementCooldown = 0;
-
   // Practice Mode: Zeit-Rückspulung
   private gameHistory: Array<{
     pacmanX: number;
@@ -2212,15 +2194,46 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     return Math.max(...this.leaderboard.map(entry => entry.points));
   }
 
-  constructor(
-    private audioService: AudioService,
-    private route: ActivatedRoute,
-    private http: HttpClient,
-    private inputService: InputService,
-    private router: Router
-  ) {
-    this.initAssets();
+constructor(
+  private audioService: AudioService,
+  private route: ActivatedRoute,
+  private http: HttpClient,
+  private inputService: InputService,
+  private router: Router,
+  private achievements: AchievementService
+) {
+  this.initAssets();
+}
+
+
+// Updates system performance for the current level and checks achievements
+private updatePerformanceAndCheckAchievements() {
+  // Sensors collected in this level only
+  const collectedThisLevel =
+    this.stats.sensorDataCollected - this.sensorDataAtLevelStart;
+
+  // Avoid division by zero
+  if (this.levelTotalSensors <= 0) {
+    this.stats.systemPerformance = 0;
+    return;
   }
+
+  // Performance = percentage of collected sensors in this level
+  const percent = Math.round(
+    (collectedThisLevel / this.levelTotalSensors) * 100
+  );
+
+  // Clamp value between 0 and 100
+  this.stats.systemPerformance = Math.max(0, Math.min(100, percent));
+
+  // Check whether a new achievement has been unlocked
+  const newlyUnlocked = this.achievements.checkAndUnlock(this.stats);
+  if (newlyUnlocked.length > 0) {
+    this.showAchievementToast(newlyUnlocked[0]);
+  }
+}
+
+
 
   // Wendet Spielmodus-spezifische Einstellungen an
   private applyGameMode(): void {
@@ -2458,6 +2471,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Lese Spielmodus und Spielername aus Query-Parametern
     this.route.queryParams.subscribe(params => {
+
       const mode = params['mode'] as GameMode;
       if (mode && ['classic', 'practice'].includes(mode)) {
         this.gameMode = mode;
@@ -2520,11 +2534,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.gameState = 'ready';
     this.stateTimer = 0;
     this.scaredDuration = this.getFrightenedDuration();
-
-    // Announce game start
-    setTimeout(() => {
-      this.announce('PRODUCTION SEQUENCE INITIATED');
-    }, 500);
   }
 
   private onKeyUpBound = (e: KeyboardEvent) => this.onKeyUp(e);
@@ -2621,101 +2630,15 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  // Draw Industrial Frame around game area with s.FOX and moneo info
-  private drawIndustrialFrame(ctx: CanvasRenderingContext2D) {
-    ctx.save();
-
-    // Top bar - s.FOX optimization running
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 30);
-
-    // Top bar gradient with metallic effect
-    const topGradient = ctx.createLinearGradient(0, 0, 0, 28);
-    topGradient.addColorStop(0, '#333333');
-    topGradient.addColorStop(0.5, '#1a1a1a');
-    topGradient.addColorStop(1, '#2a2a2a');
-    ctx.fillStyle = topGradient;
-    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 28);
-
-    // IFM orange accent line with glow
-    ctx.shadowBlur = 5;
-    ctx.shadowColor = '#ED6B00';
-    ctx.fillStyle = '#ED6B00';
-    ctx.fillRect(0, 28, this.CANVAS_WIDTH, 2);
-    ctx.shadowBlur = 0;
-
-    // s.FOX system status
-    ctx.font = '8px "Press Start 2P", monospace';
-    ctx.fillStyle = '#00FF88';
-    ctx.textAlign = 'left';
-
-    if (this.gameState === 'ready') {
-      ctx.fillText('s.FOX INITIALIZING...', 10, 20);
-      // Loading bar
-      const loadProgress = (this.stateTimer / this.READY_DURATION) * 100;
-      ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
-      ctx.fillRect(10, 22, 100, 3);
-      ctx.fillStyle = '#00FF88';
-      ctx.fillRect(10, 22, loadProgress, 3);
-    } else if (this.gameState === 'playing') {
-      // Blinking cursor effect
-      const blink = Math.floor(Date.now() / 500) % 2 === 0 ? '_' : '';
-      ctx.fillText(`s.FOX RUNNING${blink}`, 10, 20);
-      // Activity indicator dots
-      const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
-      ctx.fillStyle = '#ED6B00';
-      ctx.fillText(dots, 110, 20);
-    } else if ((this.gameState as string) === 'gameover') {
-      ctx.fillStyle = '#FF6B6B';
-      ctx.fillText('SYSTEM HALTED', 10, 20);
-      // Error indicator
-      ctx.fillRect(5, 16, 3, 8);
-    }
-
-    // moneo AI Assistant indicator - top right
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#00FF88';
-    ctx.font = '7px "Press Start 2P", monospace';
-    ctx.fillText('moneo IAIA', this.CANVAS_WIDTH - 10, 12);
-
-    // AI status indicator with LED
-    const aiStatus = this.gameState === 'playing' ? 'ANALYZING' : 'STANDBY';
-    ctx.fillStyle = this.gameState === 'playing' ? '#ED6B00' : '#808080';
-    ctx.fillText(aiStatus, this.CANVAS_WIDTH - 10, 22);
-
-    // Animated LED indicator
-    const ledPulse = this.gameState === 'playing'
-      ? 0.5 + Math.sin(Date.now() / 200) * 0.5
-      : 0.3;
-    const ledColor = this.gameState === 'playing' ? '#ED6B00' : '#808080';
-    ctx.fillStyle = `rgba(237, 107, 0, ${ledPulse})`;
-    ctx.beginPath();
-    ctx.arc(this.CANVAS_WIDTH - 80, 19, 3, 0, Math.PI * 2);
-    ctx.fill();
-    // LED glow
-    if (this.gameState === 'playing') {
-      ctx.shadowBlur = 8;
-      ctx.shadowColor = ledColor;
-      ctx.beginPath();
-      ctx.arc(this.CANVAS_WIDTH - 80, 19, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    }
-
-    // No bottom bar - clean game area
-
-    ctx.restore();
-  }
-
   // Draw Energy Gauge
   private drawEnergyGauge(ctx: CanvasRenderingContext2D) {
     const barWidth = 150;
-    const barHeight = 15;
+    const barHeight = 20;
     const barX = this.CANVAS_WIDTH - barWidth - 15;
-    const barY = 35; // Adjusted to be below top frame
+    const barY = 15;
 
     // Background
-    ctx.fillStyle = 'rgba(26, 26, 26, 0.8)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
 
     // Border
@@ -2742,14 +2665,14 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.fillRect(barX, barY, energyWidth, barHeight);
 
     // Text
-    ctx.font = 'bold 8px "Press Start 2P", monospace';
+    ctx.font = 'bold 10px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#fff';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 3;
     const text = `BOOST: ${Math.floor(this.boostEnergy)}%`;
-    ctx.strokeText(text, barX + barWidth / 2, barY + 11);
-    ctx.fillText(text, barX + barWidth / 2, barY + 11);
+    ctx.strokeText(text, barX + barWidth / 2, barY + 14);
+    ctx.fillText(text, barX + barWidth / 2, barY + 14);
     ctx.textAlign = 'left';
   }
 
@@ -2763,11 +2686,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     this.ctx = context;
-
-    // Hide IFM logo after 5 seconds
-    setTimeout(() => {
-      this.showIfmLogo = false;
-    }, 5000);
 
     // Register keyboard input
     window.addEventListener('keydown', this.onKeyDownBound);
@@ -2811,9 +2729,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.announcementCooldown > 0) {
       this.announcementCooldown -= deltaTime;
     }
-
-    // Update Advanced Maze Features
-    this.updateAdvancedMazeFeatures(deltaTime);
 
     // Update Boost Mode based on key state and energy
     if (this.gameMode !== 'practice') {
@@ -2984,10 +2899,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
             // Trigger final explosion before game over
             this.gameState = 'finalexplosion';
             this.stateTimer = 0;
-
-            // Announce critical failure
-            this.announce('CRITICAL SYSTEM FAILURE');
-
             // Initialize more dramatic destruction
             this.mazeDestruction.clear();
             this.walls.forEach(wall => {
@@ -3001,11 +2912,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
             this.resetPositions();
             this.gameState = 'ready';
             this.stateTimer = 0;
-
-            // Announce malfunction
-            setTimeout(() => {
-              this.announce('SYSTEM MALFUNCTION DETECTED');
-            }, 500);
           }
         }
         return;
@@ -3507,15 +3413,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.pacman) return;
 
     // Apply boost multiplier only when turboSpeed is active
-    let boostMultiplier = this.turboSpeed ? 2 : 1;
-
-    // 2-Player: Apply speed power-up for player 1
-    if (this.isTwoPlayerMode && this.player1PowerUp === 'speed') {
-      boostMultiplier = Math.max(boostMultiplier, 1.5);
-    }
+    const boostMultiplier = this.turboSpeed ? 2 : 1;
 
     // Move pacman with boost - apply in steps to prevent wall clipping
-    const steps = Math.ceil(boostMultiplier);
+    const steps = boostMultiplier;
     for (let i = 0; i < steps; i++) {
       const oldX = this.pacman.x;
       const oldY = this.pacman.y;
@@ -3524,14 +3425,13 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.pacman.x += this.pacman.velocityX;
       this.pacman.y += this.pacman.velocityY;
 
-      // Tunnel-Wraparound für Pac-Man
-      this.handleTunnelWraparound(this.pacman);
+    // Tunnel-Wraparound für Pac-Man
+    this.handleTunnelWraparound(this.pacman);
 
       // Check wall collisions (außer Ghost Door)
       let collided = false;
       for (const wall of this.walls) {
         if (wall.type === 'ghost-door') continue; // Pac-Man kann NICHT durch die Tür
-
         if (this.collision(this.pacman, wall)) {
           // Revert movement
           this.pacman.x = oldX;
@@ -3605,6 +3505,19 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           // Reparatur: Störung "reparieren" (+200 Effizienz)
           this.audioService.play('eatghost');
           this.efficiency += 200;
+          // Successful repair: increment repair counter
+          this.stats.repairsSuccessful += 1;
+          // Fixed error (counts as resolved malfunction)
+          this.stats.errorsFixed += 1;
+
+          // Check whether a new achievement has been unlocked
+          const newlyUnlocked = this.achievements.checkAndUnlock(this.stats);
+
+          // Show achievement popup if one was unlocked
+          if (newlyUnlocked.length > 0) {
+            this.showAchievementToast(newlyUnlocked[0]);
+          }
+
           // Respawn ghost at starting position
           ghost.reset();
           ghost.scared = false;
@@ -3757,8 +3670,26 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
     if (foodEaten) {
-      this.foods.delete(foodEaten);
-    }
+  // Remove collected sensor data from the map
+  this.foods.delete(foodEaten);
+
+  // Increase the collected sensor data counter
+  this.stats.sensorDataCollected += 1;
+  // Update system performance based on collected pellets
+const collected =
+  this.totalPellets - (this.foods.size + this.powerPellets.size);
+
+this.stats.systemPerformance = Math.round(
+  (collected / this.totalPellets) * 100
+);
+  // Check whether a new achievement has been unlocked
+  const newlyUnlocked = this.achievements.checkAndUnlock(this.stats);
+
+  // Show achievement popup if one was unlocked
+  if (newlyUnlocked.length > 0) {
+    this.showAchievementToast(newlyUnlocked[0]);
+  }
+}
 
     // Check food collision with robot2 in 2-player mode
     if (this.isTwoPlayerMode && this.robot2) {
@@ -3822,9 +3753,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           g.scared = true;
           g.updateVelocity(this.CELL_SIZE); // update speed to 80%
         });
-
-        // Announce power mode
-        this.announce('POWER MODE ACTIVATED');
       }
     }
     if (powerEaten) {
@@ -3937,12 +3865,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
           // Announce shield activation
           this.announce('DEFENSE SHIELD ACTIVATED');
-
-          // 2-Player: Assign shield power-up
-          if (this.isTwoPlayerMode) {
-            this.player1PowerUp = 'shield';
-            this.player1PowerUpTimer = 10000;
-          }
           break;
         case 'diagnostic':
           bonusScore = 500;
@@ -4060,9 +3982,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.streakMultiplier = 1.0;
       this.gameState = 'levelcomplete';
       this.stateTimer = 0;
-
-      // Announce level complete
-      this.announce('LEVEL COMPLETE. INITIATING NEXT SEQUENCE');
     }
   }
 
@@ -4194,36 +4113,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.gameState = 'ready';
     this.stateTimer = 0;
     this.gameHistory = [];
-    this.boostEnergy = this.MAX_BOOST_ENERGY;
-    this.isBoostKeyPressed = false;
     this.startGameLoop();
   }
 
   private onKeyDown(e: KeyboardEvent) {
     // Prevent key repeat events
     if (e.repeat) return;
-
-    // Pause Menu Navigation
-    if (this.showPauseOverlay) {
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        this.navigatePauseMenu('L');
-        return;
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        this.navigatePauseMenu('R');
-        return;
-      } else if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        this.selectPauseMenuItem();
-        return;
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        this.resumeFromPause();
-        return;
-      }
-      return; // Don't process other keys when pause menu is open
-    }
 
     if (e.key === 'Escape') {
       if (this.gameState === 'paused') {
@@ -4291,34 +4186,27 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
-    // Control for boost in all modes
-    // H pour SPIELANLEITUNG (Help/Hilfe)
-    if (e.key === 'h' || e.key === 'H') {
-      this.toggleSpielanleitung();
-      return;
-    }
-
-    if (e.key === 'Control' && this.gameMode !== 'practice') {
+    // Shift for boost in all modes
+    if (e.key === 'Shift' && this.gameMode !== 'practice') {
       this.isBoostKeyPressed = true;
-      console.log('🚀 Boost aktiviert (Control gedrückt)');
       return;
     }
 
     // Keine Steuerung während Ready, Dying oder Level Complete
     if (this.gameState !== 'playing') return;
 
-    // Handle robot1 (Arrow keys)
-    if (this.pacman) {
-      // Buffer the direction for smoother cornering
-      if (e.key === 'ArrowUp') {
-        this.bufferedDirection = 'U';
-      } else if (e.key === 'ArrowDown') {
-        this.bufferedDirection = 'D';
-      } else if (e.key === 'ArrowLeft') {
-        this.bufferedDirection = 'L';
-      } else if (e.key === 'ArrowRight') {
-        this.bufferedDirection = 'R';
-      }
+    if (!this.pacman) return;
+
+    // Buffer the direction for smoother cornering
+    if (e.key === 'ArrowUp') {
+      this.bufferedDirection = 'U';
+    } else if (e.key === 'ArrowDown') {
+      this.bufferedDirection = 'D';
+    } else if (e.key === 'ArrowLeft') {
+      this.bufferedDirection = 'L';
+    } else if (e.key === 'ArrowRight') {
+      this.bufferedDirection = 'R';
+    }
 
       // Try to apply immediately if possible
       if (this.bufferedDirection) {
@@ -4387,10 +4275,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     } else {
       // Release boost in normal modes
-      if (e.key === 'Control') {
+      if (e.key === 'Shift') {
         this.isBoostKeyPressed = false;
         this.turboSpeed = false;
-        console.log('🛑 Boost deaktiviert (Control losgelassen)');
       }
     }
   }

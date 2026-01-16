@@ -1,22 +1,8 @@
 
 <div class="game-container">
-  <!-- Animated Pixel Background -->
-  <div class="pixel-bg-animation">
-    <div class="moving-stars"></div>
-    <div class="pixel-grid"></div>
-    <div class="floating-icons">
-      <div class="icon icon-1">🏭</div>
-      <div class="icon icon-2">⚙️</div>
-      <div class="icon icon-3">🤖</div>
-      <div class="icon icon-4">📊</div>
-      <div class="icon icon-5">🔧</div>
-    </div>
-  </div>
-
-  <!-- IFM Logo Top Center -->
-  <div class="game-ifm-logo" *ngIf="showIfmLogo">
+  <!-- IFM Logo Top Right Corner -->
+  <div class="game-ifm-logo">
     <img src="assets/ifm1.webp" alt="ifm" class="game-logo-img">
-    <div class="ifm-glow"></div>
   </div>
 
   <div class="arcade-cabinet">
@@ -27,28 +13,34 @@
           <span class="player-name-display">{{ playerName || 'IFM OPERATOR' }}</span>
         </div>
         <div class="game-mode-badge">
-          <span class="mode-label">MODE:</span>
-          <span class="mode-value">{{ gameMode.toUpperCase() === 'CLASSIC' ? 'CLASSIC' : 'PRACTICE' }}</span>
+          <span class="mode-label">BETRIEB:</span>
+          <span class="mode-value">{{ gameMode.toUpperCase() === 'CLASSIC' ? 'STANDARD' : 'TRAINING' }}</span>
         </div>
       </div>
       <canvas #gameCanvas></canvas>
       <div class="scanline-overlay"></div>
+      <!-- Achievement popup displayed when an achievement is unlocked -->
+      <div class="achievement-toast" *ngIf="achievementToast">
+      <div class="achievement-title">{{ achievementToast.title }}</div>
+      <div class="achievement-desc">{{ achievementToast.description }}</div>
+      </div>
+
 
       <!-- Game Over Overlay -->
       <div class="overlay" *ngIf="gameState === 'gameover'">
         <div class="overlay-panel wide">
-          <h2>GAME OVER</h2>
+          <h2>⚡ GAME OVER</h2>
           <p>PRODUCTION SCORE: <strong>{{ efficiency }} UNITS</strong></p>
 
           <div class="leaderboard-block">
-            <h3>HIGH SCORES</h3>
+            <h3>🏆 HIGH SCORES</h3>
             <table class="overlay-table" *ngIf="leaderboard.length > 0">
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>OPERATOR</th>
-                  <th>SCORE</th>
-                  <th>LEVEL</th>
+                  <th>Operator</th>
+                  <th>Effizienz</th>
+                  <th>Level</th>
                 </tr>
               </thead>
               <tbody>
@@ -60,16 +52,12 @@
                 </tr>
               </tbody>
             </table>
-            <p class="overlay-hint" *ngIf="leaderboard.length === 0">NO RESULTS AVAILABLE</p>
+            <p class="overlay-hint" *ngIf="leaderboard.length === 0">Keine Ergebnisse verfügbar.</p>
           </div>
 
           <div class="overlay-actions below">
-            <button class="btn primary" 
-                    [class.selected]="gameOverMenuIndex === 0"
-                    (click)="restartGame()">RESTART</button>
-            <button class="btn ghost" 
-                    [class.selected]="gameOverMenuIndex === 1"
-                    (click)="exitGame()">MAIN MENU</button>
+            <button class="btn primary" (click)="restartGame()">🔄 RESTART</button>
+            <button class="btn ghost" (click)="exitGame()">❌ EXIT</button>
           </div>
         </div>
       </div>
@@ -178,17 +166,19 @@
 <!-- Pause Overlay -->
 <div class="overlay" *ngIf="showPauseOverlay">
   <div class="overlay-panel">
-    <h2>PAUSED</h2>
+    <h2>⏸️ PAUSED</h2>
+    <p>GAME PAUSED</p>
     <div class="overlay-actions">
-      <button class="btn primary" 
-              [class.selected]="pauseMenuIndex === 0"
-              (click)="resumeFromPause()">RESUME</button>
-      <button class="btn ghost" 
-              [class.selected]="pauseMenuIndex === 1"
-              (click)="restartGame()">RESTART</button>
-      <button class="btn ghost" 
-              [class.selected]="pauseMenuIndex === 2"
-              (click)="exitGame()">MAIN MENU</button>
+      <button class="btn primary" (click)="resumeFromPause()">▶️ RESUME</button>
+      <button class="btn ghost" (click)="restartGame()">🔄 RESTART</button>
+      <button class="btn ghost" (click)="requestExitToMenu()">🏠 MENU</button>
+    </div>
+    <div *ngIf="showExitConfirm" class="exit-confirm">
+      <p>EXIT TO MENU?</p>
+      <div class="overlay-actions">
+        <button class="btn ghost" (click)="cancelExitToMenu()">NO</button>
+        <button class="btn primary" (click)="confirmExitToMenu()">YES</button>
+      </div>
     </div>
   </div>
 </div>
