@@ -23,7 +23,9 @@ interface Particle {
   maxLife: number;
   color: string;
   size: number;
+
 }
+
 
 @Component({
   selector: 'app-game-canvas',
@@ -42,48 +44,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private animationFrameId = 0;
   private lastFrameTime = 0;
   private readonly FPS = 30;
-    // === Performance tracking per level ===
-  private levelTotalSensors = 0;      // total number of pellets in the current level
-  private sensorDataAtLevelStart = 0; // sensor count at the beginning of the level
-
-  
-  // =========================
-  // ACHIEVEMENT SYSTEM - STATS
-  // =========================
-
-  // Stores all achievement-related statistics for the current game session
-  stats: GameStats = {
-  sensorDataCollected: 0,
-  repairsSuccessful: 0,
-  errorsFixed: 0,
-  systemPerformance: 0,
-  achievementsUnlocked: {
-    ifm_meister: false,
-    wartungsexperte: false,
-    stoerungsjaeger: false,
-    effizienz_champion: false,
-  },
-};
-
-
-
-
-  // Holds data for the achievement popup (toast)
-  achievementToast: { title: string; description: string } | null = null;
-
-  // Displays an achievement popup for a short time
-  private showAchievementToast(a: { title: string; description: string }) {
-    this.achievementToast = {
-      title: a.title,
-      description: a.description,
-    };
-
-    // Automatically hide the popup after 3.5 seconds
-    setTimeout(() => {
-      this.achievementToast = null;
-    }, 3500);
-  }
-
   private onKeyDownBound = (e: KeyboardEvent) => this.onKeyDown(e);
   // Assets - Industrial Equipment
   private malfunctionBlueImage = new Image();
@@ -119,7 +79,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   maintenanceStations: Set<Block> = new Set<Block>();
   malfunctions: Set<Block> = new Set<Block>();
   robot: Block | null = null;
+  robot2: Block | null = null; // Second robot for 2-player mode
   cherry: Block | null = null;
+  isTwoPlayerMode = false; // Flag for 2-player mode
 
   // Legacy aliases for compatibility during migration
   get pacman() { return this.robot; }
@@ -157,6 +119,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   // Missing streak system
   private pelletStreak = 0;
   private streakMultiplier = 1.0;
+  private comboResetTimer = 0;
+  private readonly COMBO_RESET_DELAY = 3000; // 3 secondes sans pellet = reset combo
   private cherrySpawnCooldown = 0;
   private ghostReleaseTimer = 0;
   private ghostsReleased = 0;
@@ -170,13 +134,29 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Buffered input for smoother corner turning
   private bufferedDirection: string | null = null;
+  private bufferedDirection2: string | null = null; // For robot2 (WASD)
 
   // Basic system state
   systemHealth = 3;
   efficiency = 0;
   gameOver = false;
   playerName = ''; // Player name for leaderboard
+  playerName2 = ''; // Second player name for 2-player mode
   gameMode: GameMode = 'classic'; // Make gameMode accessible in template
+
+  // 2-Player mode enhanced stats
+  player1Score = 0;
+  player2Score = 0;
+  player1Lives = 3;
+  player2Lives = 3;
+  player1PowerUp: 'none' | 'shield' | 'speed' | 'magnet' = 'none';
+  player2PowerUp: 'none' | 'shield' | 'speed' | 'magnet' = 'none';
+  player1PowerUpTimer = 0;
+  player2PowerUpTimer = 0;
+  teamComboMultiplier = 1;
+  teamComboTimer = 0;
+  lastPelletCollector: 1 | 2 | null = null;
+  winner: 1 | 2 | null = null; // Track winner in 2-player mode
   maintenanceTimer = 0;
   maintenanceDuration = 10000; // 10 seconds in ms
   dataStreak = 0;
@@ -210,12 +190,26 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private shieldRipples: Array<{radius: number, alpha: number}> = [];
   private comboDisplayTimer = 0;
 
+  // 2-Player mode visual effects
+  private player1Trail: Array<{x: number, y: number, alpha: number}> = [];
+  private player2Trail: Array<{x: number, y: number, alpha: number}> = [];
+  private connectionBeam: {active: boolean, pulse: number} = {active: false, pulse: 0};
+  private teamBonusParticles: Array<{x: number, y: number, vx: number, vy: number, alpha: number, color: string}> = [];
+  private player1Aura = 0;
+  private player2Aura = 0;
+  private victoryDance = 0;
+
   // Death animation - maze destruction
   private mazeDestruction: Map<Block, {offsetY: number, rotation: number, speed: number}> = new Map();
+  private gameOverParticles: Array<{x: number, y: number, vx: number, vy: number, size: number, color: string, alpha: number}> = [];
   private mazeRedIntensity = 0;
 
   // Particle System for visual effects
   private particles: Particle[] = [];
+
+  // Decorative Industrial Elements
+  private warningSignsPositions: Array<{x: number, y: number, type: 'achtung' | 'verboten' | 'warnung'}> = [];
+  private statusLEDPositions: Array<{x: number, y: number, color: 'green' | 'red' | 'orange', blinkSpeed: number}> = [];
 
   // Malfunction Spawning Timer
   private malfunctionSpawnTimer = 0;
@@ -247,13 +241,16 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private powerPelletVisible = true;
   private powerPelletBlinkTimer = 0;
 
+  // IFM Logo display control
+  showIfmLogo = true;
+
   // Ready/Game Over Screen
   gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' | 'paused' | 'finalexplosion' = 'ready';
   private stateTimer = 0;
-  private readonly READY_DURATION = 2000; // 2 Sekunden "READY!"
-  private readonly DEATH_DURATION = 1500; // 1.5 Sekunden Todesanimation
-  private readonly FINAL_EXPLOSION_DURATION = 3000; // 3 seconds final explosion
-  private readonly LEVELCOMPLETE_DURATION = 2000; // 2 Sekunden Level-Übergang
+  private readonly READY_DURATION = 500; // 0.5 seconde "READY!"
+  private readonly DEATH_DURATION = 300; // 0.3 seconde animation mort
+  private readonly FINAL_EXPLOSION_DURATION = 1500; // 1.5 seconds final explosion
+  private readonly LEVELCOMPLETE_DURATION = 1000; // 1 seconde Level-Übergang
 
   // Level-Progression: Geschwindigkeit und Frighten-Dauer pro Level
   private getGhostSpeed(): number {
@@ -292,12 +289,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ];
   }
   private draw(ctx: CanvasRenderingContext2D) {
-    // Industrial grid background
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+    // Transparent background - no fill
+    // ctx.fillStyle = '#1E2A3A';
+    // ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
 
     // Subtle grid pattern
-    ctx.strokeStyle = 'rgba(0, 255, 136, 0.05)';
+    ctx.strokeStyle = 'rgba(245, 245, 245, 0.05)';
     ctx.lineWidth = 0.5;
     for (let x = 0; x < this.CANVAS_WIDTH; x += this.CELL_SIZE) {
       ctx.beginPath();
@@ -312,7 +309,38 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.stroke();
     }
 
-    // Wände zeichnen (optimiert sans shadow)
+    // Thicker grid every 5 cells
+    ctx.strokeStyle = 'rgba(245, 245, 245, 0.1)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < this.CANVAS_WIDTH; x += this.CELL_SIZE * 5) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, this.CANVAS_HEIGHT);
+      ctx.stroke();
+    }
+    for (let y = 0; y < this.CANVAS_HEIGHT; y += this.CELL_SIZE * 5) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(this.CANVAS_WIDTH, y);
+      ctx.stroke();
+    }
+
+    // Coordinate annotations - transparent (hidden)
+    ctx.font = '6px monospace';
+    ctx.fillStyle = 'rgba(51, 51, 51, 0)';
+    ctx.textAlign = 'center';
+    for (let x = 100; x < this.CANVAS_WIDTH; x += 100) {
+      ctx.fillText(`${x}`, x, 42);
+    }
+    ctx.textAlign = 'left';
+    for (let y = 100; y < this.CANVAS_HEIGHT - 40; y += 100) {
+      ctx.fillText(`${y}`, 5, y + 3);
+    }
+
+    // Draw decorative industrial elements
+    this.drawIndustrialDecorations(ctx);
+
+    // Draw production line walls (pipes, conveyors, machinery)
     this.walls.forEach(wall => {
       ctx.save();
 
@@ -332,107 +360,323 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         if (this.ghostDoorImage.complete) {
           ctx.drawImage(this.ghostDoorImage, 0, 0, wall.width, wall.height);
         } else {
-          // Fallback: pinke Linie
-          ctx.fillStyle = '#FFB8FF';
-          ctx.fillRect(0, wall.height / 2 - 2, wall.width, 4);
+          // Industrial gate fallback
+          ctx.fillStyle = '#505050';
+          ctx.fillRect(0, 0, wall.width, wall.height);
+          ctx.strokeStyle = '#ED6B00';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(0, 0, wall.width, wall.height);
         }
       } else if (wall.image && wall.image.complete) {
-        // Walls drawing
+        // Walls drawing with images
         if ((this.gameState === 'dying' || this.gameState === 'finalexplosion') && this.mazeRedIntensity > 0) {
-          // Red tint overlay
           ctx.globalCompositeOperation = 'source-over';
-          if (this.mazeDestruction.has(wall)) {
-            ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
-          } else {
-            ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
-          }
+          ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
           ctx.fillStyle = `rgba(255, 0, 0, ${this.mazeRedIntensity * 0.5})`;
           ctx.fillRect(0, 0, wall.width, wall.height);
         } else {
-          if (this.mazeDestruction.has(wall)) {
-            ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
-          } else {
-            ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
-          }
+          ctx.drawImage(wall.image, 0, 0, wall.width, wall.height);
         }
       } else {
-        // Fallback: Blaue Wände mit 3D-Effekt
-        ctx.fillStyle = '#2121DE';
+        // Fallback: Industrial pipe/conveyor style
+        // Determine if horizontal or vertical
+        const isHorizontal = wall.width > wall.height;
+
+        // Main pipe/conveyor body - IFM orange
+        const pipeGradient = isHorizontal
+          ? ctx.createLinearGradient(0, 0, 0, wall.height)
+          : ctx.createLinearGradient(0, 0, wall.width, 0);
+        pipeGradient.addColorStop(0, '#FF9A33');
+        pipeGradient.addColorStop(0.5, '#FF7A01');
+        pipeGradient.addColorStop(1, '#E66A00');
+        ctx.fillStyle = pipeGradient;
         ctx.fillRect(0, 0, wall.width, wall.height);
-        // Inner highlight für 3D-Effekt
-        ctx.fillStyle = '#4A4AFF';
-        ctx.fillRect(2, 2, wall.width - 4, wall.height - 4);
+
+        // Metallic edge highlight
+        ctx.fillStyle = '#FF9A33';
+        if (isHorizontal) {
+          ctx.fillRect(0, 0, wall.width, 2);
+        } else {
+          ctx.fillRect(0, 0, 2, wall.height);
+        }
+
+        // Shadow edge
+        ctx.fillStyle = '#CC6100';
+        if (isHorizontal) {
+          ctx.fillRect(0, wall.height - 2, wall.width, 2);
+        } else {
+          ctx.fillRect(wall.width - 2, 0, 2, wall.height);
+        }
+
+        // Subtle accent stripes with flow animation
+        const flowOffset = (Date.now() / 100) % 20;
+        ctx.strokeStyle = 'rgba(245, 245, 245, 0.2)';
+        ctx.lineWidth = 1;
+        if (isHorizontal) {
+          for (let x = -flowOffset; x < wall.width; x += 20) {
+            ctx.globalAlpha = 0.3 + Math.sin((x + flowOffset) / 10) * 0.2;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, wall.height);
+            ctx.stroke();
+          }
+        } else {
+          for (let y = -flowOffset; y < wall.height; y += 20) {
+            ctx.globalAlpha = 0.3 + Math.sin((y + flowOffset) / 10) * 0.2;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(wall.width, y);
+            ctx.stroke();
+          }
+        }
+
+        ctx.globalAlpha = 1;
+
+        // Rivets/Bolts on pipes (every 40px)
+        ctx.fillStyle = '#707070';
+        if (isHorizontal && wall.width > 40) {
+          for (let x = 20; x < wall.width; x += 40) {
+            // Top rivet
+            ctx.beginPath();
+            ctx.arc(x, 4, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#404040';
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+            // Bottom rivet
+            ctx.beginPath();
+            ctx.arc(x, wall.height - 4, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          }
+        } else if (!isHorizontal && wall.height > 40) {
+          for (let y = 20; y < wall.height; y += 40) {
+            // Left rivet
+            ctx.beginPath();
+            ctx.arc(4, y, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#404040';
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+            // Right rivet
+            ctx.beginPath();
+            ctx.arc(wall.width - 4, y, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+
+        // Corner connectors/sensors at wall intersections
+        if (wall.width === wall.height || (wall.width <= this.CELL_SIZE && wall.height <= this.CELL_SIZE)) {
+          // Draw sensor/connector at corner with LED
+          const sensorPulse = 0.7 + Math.sin(Date.now() / 300) * 0.3;
+          ctx.fillStyle = '#ED6B00';
+          ctx.fillRect(wall.width / 2 - 3, wall.height / 2 - 3, 6, 6);
+          ctx.strokeStyle = '#00FF88';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(wall.width / 2 - 3, wall.height / 2 - 3, 6, 6);
+          // LED indicator
+          ctx.fillStyle = `rgba(0, 255, 136, ${sensorPulse})`;
+          ctx.fillRect(wall.width / 2 - 1, wall.height / 2 - 1, 2, 2);
+        }
       }
 
       ctx.restore();
     });
 
-    // Sensordaten zeichnen (kleine ifm-Symbole)
+    // Sensordaten zeichnen (IoT sensor nodes - IFM style)
     this.sensorData.forEach(food => {
-      // Draw sensor data pellet (small green dot)
+      ctx.save();
+      // Draw sensor data pellet with glow effect
       if (this.sensorDataImage.complete) {
         ctx.drawImage(this.sensorDataImage, food.x, food.y, 8, 8);
       } else {
-        // Fallback
+        // Fallback: Industrial IoT sensor node
+        const sensorPulse = 0.6 + Math.sin(Date.now() / 200 + food.x + food.y) * 0.4;
+
+        // Outer glow
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = `rgba(0, 255, 136, ${sensorPulse * 0.5})`;
         ctx.fillStyle = '#00FF88';
-        ctx.fillRect(food.x + 1, food.y + 1, 3, 3);
+        ctx.beginPath();
+        ctx.arc(food.x + 4, food.y + 4, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Inner core
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(food.x + 4, food.y + 4, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Data transmission rings (animated)
+        if (Math.random() < 0.05) {
+          ctx.strokeStyle = `rgba(0, 255, 136, ${sensorPulse})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(food.x + 4, food.y + 4, 6, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
+      ctx.restore();
     });
 
-    // Wartungsstationen zeichnen (blinkend)
+    // Wartungsstationen zeichnen (Industrial Power Hubs)
     if (this.powerPelletVisible) {
       this.maintenanceStations.forEach(pellet => {
+        ctx.save();
         if (this.maintenanceStationImage.complete) {
           // Pulse animation
           const scale = 1 + Math.sin(this.maintenancePulse) * 0.15;
           const offset = (pellet.width * (1 - scale)) / 2;
 
-          // Orange glow
+          // Orange glow with multiple layers
           ctx.shadowColor = '#ED6B00';
-          ctx.shadowBlur = 12;
+          ctx.shadowBlur = 20;
           ctx.drawImage(this.maintenanceStationImage,
             pellet.x + offset, pellet.y + offset,
             pellet.width * scale, pellet.height * scale);
           ctx.shadowBlur = 0;
         } else {
-          // Fallback: orange square
+          // Fallback: Industrial maintenance hub with rotating elements
+          const centerX = pellet.x + pellet.width / 2;
+          const centerY = pellet.y + pellet.height / 2;
+          const rotation = (Date.now() / 1000) % (Math.PI * 2);
+          const pulse = 0.8 + Math.sin(this.maintenancePulse) * 0.2;
+
+          // Outer glow
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = '#ED6B00';
+
+          // Main hub body
           ctx.fillStyle = '#ED6B00';
-          ctx.fillRect(pellet.x + 2, pellet.y + 2, pellet.width - 4, pellet.height - 4);
+          ctx.fillRect(pellet.x + 4, pellet.y + 4, pellet.width - 8, pellet.height - 8);
+
+          // Rotating segments
+          ctx.translate(centerX, centerY);
+          ctx.rotate(rotation);
+          for (let i = 0; i < 4; i++) {
+            ctx.rotate(Math.PI / 2);
+            ctx.fillStyle = `rgba(0, 255, 136, ${pulse})`;
+            ctx.fillRect(-2, -pellet.width / 2 + 2, 4, 6);
+          }
+          ctx.rotate(-rotation);
+          ctx.translate(-centerX, -centerY);
+
+          ctx.shadowBlur = 0;
+
+          // Center core
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Energy border
+          ctx.strokeStyle = '#00FF88';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(pellet.x + 2, pellet.y + 2, pellet.width - 4, pellet.height - 4);
         }
+        ctx.restore();
       });
     }
 
-    // Control Panels zeichnen (decorative)
+    // Control Panels zeichnen (Industrial HMI panels)
     this.controlPanels.forEach(panel => {
+      ctx.save();
       if (this.controlPanelImage.complete) {
         ctx.drawImage(this.controlPanelImage, panel.x, panel.y, this.CELL_SIZE, this.CELL_SIZE);
+      } else {
+        // Fallback: Industrial control panel
+        // Panel body
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(panel.x, panel.y, this.CELL_SIZE, this.CELL_SIZE);
 
-        // LED indicator (blinking) - simplified
-        if (Math.floor(this.ledBlinkTimer / 500) % 2 === 0) {
-          ctx.fillStyle = '#00FF88';
-          ctx.beginPath();
-          ctx.arc(panel.x + this.CELL_SIZE - 5, panel.y + 5, 2, 0, Math.PI * 2);
-          ctx.fill();
+        // LCD screen area
+        ctx.fillStyle = '#1a3a1a';
+        ctx.fillRect(panel.x + 3, panel.y + 3, this.CELL_SIZE - 6, 10);
+
+        // LCD text
+        ctx.font = '5px monospace';
+        ctx.fillStyle = '#00FF88';
+        ctx.fillText('OK', panel.x + 5, panel.y + 10);
+
+        // Button array
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = '#404040';
+          ctx.fillRect(panel.x + 4 + i * 6, panel.y + 16, 4, 4);
         }
       }
-    });    // Quality Checkpoints zeichnen (blinkend)
-    const checkpointVisible = Math.floor(Date.now() / 300) % 2 === 0;
-    if (checkpointVisible) {
-      this.qualityCheckpoints.forEach(checkpoint => {
-        if (this.qualityCheckpointImage.complete) {
-          ctx.drawImage(this.qualityCheckpointImage, checkpoint.x + 8, checkpoint.y + 8, 16, 16);
-          // Glow effect
-          ctx.strokeStyle = '#4169E1';
-          ctx.lineWidth = 2;
+
+      // Multi-color LED indicators
+      const leds = [
+        { x: panel.x + this.CELL_SIZE - 5, y: panel.y + 5, color: '#00FF88', blink: 500 },
+        { x: panel.x + this.CELL_SIZE - 5, y: panel.y + 10, color: '#ED6B00', blink: 700 },
+        { x: panel.x + this.CELL_SIZE - 5, y: panel.y + 15, color: '#FFD700', blink: 900 }
+      ];
+
+      leds.forEach(led => {
+        if (Math.floor(this.ledBlinkTimer / led.blink) % 2 === 0) {
+          ctx.shadowBlur = 5;
+          ctx.shadowColor = led.color;
+          ctx.fillStyle = led.color;
           ctx.beginPath();
-          ctx.arc(checkpoint.x + 16, checkpoint.y + 16, 12, 0, Math.PI * 2);
-          ctx.stroke();
+          ctx.arc(led.x, led.y, 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
         }
       });
-    }
+      ctx.restore();
+    });    // Quality Checkpoints zeichnen (Quality inspection stations)
+    this.qualityCheckpoints.forEach(checkpoint => {
+      ctx.save();
+      if (this.qualityCheckpointImage.complete) {
+        ctx.drawImage(this.qualityCheckpointImage, checkpoint.x + 8, checkpoint.y + 8, 16, 16);
+      }
 
-    // Cherry/Bonus zeichnen mit aktuellem Bonus-Typ
+      // Rotating scanner ring
+      const rotation = (Date.now() / 500) % (Math.PI * 2);
+      const centerX = checkpoint.x + 16;
+      const centerY = checkpoint.y + 16;
+
+      // Outer scanning ring
+      ctx.translate(centerX, centerY);
+      ctx.rotate(rotation);
+      ctx.strokeStyle = '#4169E1';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 12, 0, Math.PI / 2);
+      ctx.stroke();
+      ctx.rotate(-rotation);
+      ctx.translate(-centerX, -centerY);
+
+      // Pulse rings (expanding)
+      const pulsePhase = (Date.now() % 2000) / 2000;
+      for (let i = 0; i < 3; i++) {
+        const phase = (pulsePhase + i * 0.33) % 1;
+        const radius = 8 + phase * 8;
+        const alpha = 1 - phase;
+        ctx.strokeStyle = `rgba(65, 105, 225, ${alpha * 0.5})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Center indicator
+      ctx.fillStyle = '#4169E1';
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#4169E1';
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      ctx.restore();
+    });
+
+    // Cherry/Bonus zeichnen mit aktuellem Bonus-Typ (Industrial upgrades)
     if (this.cherry) {
+      ctx.save();
       let bonusImage = this.cherryImage;
       switch (this.currentBonusType) {
         case 'iot-sensor':
@@ -445,17 +689,99 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           bonusImage = this.cherryImage;
           break;
       }
-      if (bonusImage.complete) {
-        // Bounce animation
-        const bounceOffset = Math.sin(this.bonusBounce) * 3;
 
-        ctx.drawImage(bonusImage, this.cherry.x + 4, this.cherry.y + 4 + bounceOffset, 24, 24);
+      // Bounce animation
+      const bounceOffset = Math.sin(this.bonusBounce) * 4;
+      const centerX = this.cherry.x + 16;
+      const centerY = this.cherry.y + 16 + bounceOffset;
+
+      // Rotating energy ring
+      const rotation = (Date.now() / 1000) % (Math.PI * 2);
+      ctx.translate(centerX, centerY);
+      ctx.rotate(rotation);
+
+      // Energy ring
+      ctx.strokeStyle = '#ED6B00';
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.6 + Math.sin(Date.now() / 200) * 0.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, 16, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Segments
+      for (let i = 0; i < 6; i++) {
+        ctx.rotate(Math.PI / 3);
+        ctx.fillStyle = '#00FF88';
+        ctx.fillRect(-2, -18, 4, 4);
       }
-    }    // Robot mit Animation zeichnen
+
+      ctx.rotate(-rotation);
+      ctx.translate(-centerX, -centerY);
+      ctx.globalAlpha = 1;
+
+      // Bonus item with glow
+      if (bonusImage.complete) {
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ED6B00';
+        ctx.drawImage(bonusImage, this.cherry.x + 4, this.cherry.y + 4 + bounceOffset, 24, 24);
+        ctx.shadowBlur = 0;
+      } else {
+        // Fallback: industrial upgrade icon
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ED6B00';
+        ctx.fillStyle = '#ED6B00';
+        ctx.fillRect(this.cherry.x + 8, this.cherry.y + 8 + bounceOffset, 16, 16);
+        ctx.strokeStyle = '#00FF88';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.cherry.x + 8, this.cherry.y + 8 + bounceOffset, 16, 16);
+        ctx.shadowBlur = 0;
+
+        // Type indicator
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center';
+        const icon = this.currentBonusType === 'shield' ? 'S' :
+                     this.currentBonusType === 'iot-sensor' ? 'I' : 'D';
+        ctx.fillText(icon, centerX, centerY + 3);
+      }
+
+      // Particle effects around bonus
+      for (let i = 0; i < 4; i++) {
+        const angle = (Date.now() / 500 + i * Math.PI / 2) % (Math.PI * 2);
+        const dist = 20 + Math.sin(Date.now() / 300) * 5;
+        const px = centerX + Math.cos(angle) * dist;
+        const py = centerY + Math.sin(angle) * dist;
+
+        ctx.fillStyle = `rgba(0, 255, 136, ${0.5 + Math.sin(Date.now() / 200) * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(px, py, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }    // 2-Player Mode: Draw trails behind robots
+    if (this.isTwoPlayerMode) {
+      this.drawPlayer1Trail(ctx);
+      this.drawPlayer2Trail(ctx);
+    }
+
+    // Robot mit Animation zeichnen
     if (this.robot && this.gameState !== 'dying') {
       this.drawRobot(ctx);
     } else if (this.robot && this.gameState === 'dying') {
       this.drawDyingRobot(ctx);
+    }
+
+    // Draw robot2 in 2-player mode
+    if (this.isTwoPlayerMode && this.robot2 && this.gameState !== 'dying') {
+      this.drawRobot2(ctx);
+    }
+
+    // 2-Player Mode: Draw auras and connection beam
+    if (this.isTwoPlayerMode) {
+      this.drawPlayerAuras(ctx);
+      this.drawConnectionBeam(ctx);
+      this.drawTeamBonusParticles(ctx);
     }
 
     // Störungen zeichnen
@@ -468,6 +794,37 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // UI Overlay
     this.drawUI(ctx);
+
+    // 2-Player Mode HUD
+    if (this.isTwoPlayerMode) {
+      this.drawTwoPlayerHUD(ctx);
+    }
+
+    // Industrial scanline effect (subtle)
+    this.drawIndustrialScanlines(ctx);
+  }
+
+  private drawIndustrialScanlines(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+
+    // Horizontal scanlines
+    ctx.globalAlpha = 0.03;
+    ctx.fillStyle = '#000000';
+    for (let y = 30; y < this.CANVAS_HEIGHT - 35; y += 4) {
+      ctx.fillRect(0, y, this.CANVAS_WIDTH, 2);
+    }
+
+    // Moving scan beam
+    const scanY = 30 + ((Date.now() / 20) % (this.CANVAS_HEIGHT - 65));
+    const scanGradient = ctx.createLinearGradient(0, scanY - 20, 0, scanY + 20);
+    scanGradient.addColorStop(0, 'rgba(0, 255, 136, 0)');
+    scanGradient.addColorStop(0.5, 'rgba(0, 255, 136, 0.05)');
+    scanGradient.addColorStop(1, 'rgba(0, 255, 136, 0)');
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = scanGradient;
+    ctx.fillRect(0, scanY - 20, this.CANVAS_WIDTH, 40);
+
+    ctx.restore();
   }
 
   private drawRobot(ctx: CanvasRenderingContext2D) {
@@ -485,54 +842,117 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.robotRotation += (targetRotation - this.robotRotation) * 0.2;
     ctx.rotate(this.robotRotation);
 
-    // Draw ifm robot instead of pacman
-    // Robot body (orange square)
-    ctx.fillStyle = '#ED6B00';
-    ctx.fillRect(-size/2, -size/2, size, size);
-    ctx.strokeStyle = '#1a1a1a';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(-size/2, -size/2, size, size);
-
-    // Robot head (smaller square, positioned based on direction)
-    const headSize = size * 0.6;
-    let headX = 0, headY = 0;
-
-    if (this.robot.direction === 'U') { headX = 0; headY = -size * 0.3; }
-    else if (this.robot.direction === 'D') { headX = 0; headY = size * 0.3; }
-    else if (this.robot.direction === 'L') { headX = -size * 0.3; headY = 0; }
-    else if (this.robot.direction === 'R') { headX = size * 0.3; headY = 0; }
-
-    ctx.fillStyle = '#ED6B00';
-    ctx.fillRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
-    ctx.strokeRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
-
-    // Robot eyes (sensors)
-    ctx.fillStyle = '#1a1a1a';
-    if (this.robot.direction === 'U' || this.robot.direction === 'D') {
-      ctx.beginPath();
-      ctx.arc(headX - 2, headY, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(headX + 2, headY, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.arc(headX, headY - 2, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(headX, headY + 2, 1.5, 0, Math.PI * 2);
-      ctx.fill();
+    // Boost trail effect
+    if (this.turboSpeed && this.boostEnergy > 0) {
+      const trailLength = 3;
+      for (let i = 1; i <= trailLength; i++) {
+        const alpha = 0.3 - (i * 0.1);
+        const offset = -i * 4;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#ED6B00';
+        ctx.fillRect(offset - size/2, -size/2, size, size);
+      }
+      ctx.globalAlpha = 1;
     }
 
-    // Central ifm indicator
+    // Draw ifm robot - Industrial AGV style
+    // Main body with metallic gradient
+    const bodyGradient = ctx.createLinearGradient(-size/2, -size/2, size/2, size/2);
+    bodyGradient.addColorStop(0, '#FF8C00');
+    bodyGradient.addColorStop(0.5, '#ED6B00');
+    bodyGradient.addColorStop(1, '#D05500');
+    ctx.fillStyle = bodyGradient;
+    ctx.fillRect(-size/2, -size/2, size, size);
+
+    // Chassis border
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-size/2, -size/2, size, size);
+
+    // Corner rivets
+    const rivetPositions = [
+      [-size/2 + 2, -size/2 + 2],
+      [size/2 - 2, -size/2 + 2],
+      [-size/2 + 2, size/2 - 2],
+      [size/2 - 2, size/2 - 2]
+    ];
+    ctx.fillStyle = '#404040';
+    rivetPositions.forEach(([rx, ry]) => {
+      ctx.beginPath();
+      ctx.arc(rx, ry, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Direction indicator (front sensor array)
+    const headSize = size * 0.4;
+    let headX = 0, headY = 0;
+
+    if (this.robot.direction === 'U') { headX = 0; headY = -size * 0.35; }
+    else if (this.robot.direction === 'D') { headX = 0; headY = size * 0.35; }
+    else if (this.robot.direction === 'L') { headX = -size * 0.35; headY = 0; }
+    else if (this.robot.direction === 'R') { headX = size * 0.35; headY = 0; }
+
+    // Front sensor housing
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
+    ctx.strokeStyle = '#00FF88';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
+
+    // Active sensor LEDs
+    const ledPulse = 0.5 + Math.sin(Date.now() / 100) * 0.5;
+    ctx.fillStyle = `rgba(0, 255, 136, ${ledPulse})`;
+    if (this.robot.direction === 'U' || this.robot.direction === 'D') {
+      ctx.fillRect(headX - 3, headY - 1, 2, 2);
+      ctx.fillRect(headX + 1, headY - 1, 2, 2);
+    } else {
+      ctx.fillRect(headX - 1, headY - 3, 2, 2);
+      ctx.fillRect(headX - 1, headY + 1, 2, 2);
+    }
+
+    // Central IFM logo/indicator
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+    ctx.arc(0, 0, 4, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 1;
     ctx.stroke();
 
+    // IFM letters (simplified)
+    ctx.fillStyle = '#ED6B00';
+    ctx.font = 'bold 4px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('ifm', 0, 1);
+
+    // Boost glow effect
+    if (this.turboSpeed && this.boostEnergy > 0) {
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#ED6B00';
+      ctx.strokeStyle = '#ED6B00';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-size/2 - 2, -size/2 - 2, size + 4, size + 4);
+      ctx.shadowBlur = 0;
+    }
+
     ctx.restore();
+
+    // Speed lines when boosting
+    if (this.turboSpeed && this.boostEnergy > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = '#ED6B00';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 5; i++) {
+        const angle = this.robotRotation + Math.PI + (Math.random() - 0.5) * 0.5;
+        const dist = 15 + Math.random() * 10;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(centerX + Math.cos(angle) * dist, centerY + Math.sin(angle) * dist);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
 
   private getTargetRotation(direction: string): number {
@@ -577,6 +997,497 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     ctx.restore();
   }
+
+  private drawRobot2(ctx: CanvasRenderingContext2D) {
+    if (!this.robot2) return;
+
+    const centerX = this.robot2.x + this.robot2.width / 2;
+    const centerY = this.robot2.y + this.robot2.height / 2;
+    const size = this.robot2.width - 2;
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+
+    // Smooth rotation based on direction
+    const targetRotation = this.getTargetRotation(this.robot2.direction);
+    let robot2Rotation = 0;
+    // Use a separate rotation variable for robot2 (we'll need to store this)
+    // For now, use immediate rotation
+    ctx.rotate(targetRotation);
+
+    // Draw ifm robot - Industrial AGV style (slightly different color to distinguish)
+    // Main body with metallic gradient (slightly different shade)
+    const bodyGradient = ctx.createLinearGradient(-size/2, -size/2, size/2, size/2);
+    bodyGradient.addColorStop(0, '#FFA500'); // Slightly lighter orange
+    bodyGradient.addColorStop(0.5, '#FF8C00');
+    bodyGradient.addColorStop(1, '#ED6B00');
+    ctx.fillStyle = bodyGradient;
+    ctx.fillRect(-size/2, -size/2, size, size);
+
+    // Chassis border
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-size/2, -size/2, size, size);
+
+    // Corner rivets
+    const rivetPositions = [
+      [-size/2 + 2, -size/2 + 2],
+      [size/2 - 2, -size/2 + 2],
+      [-size/2 + 2, size/2 - 2],
+      [size/2 - 2, size/2 - 2]
+    ];
+    ctx.fillStyle = '#404040';
+    rivetPositions.forEach(([rx, ry]) => {
+      ctx.beginPath();
+      ctx.arc(rx, ry, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Direction indicator (front sensor array)
+    const headSize = size * 0.4;
+    let headX = 0, headY = 0;
+
+    if (this.robot2.direction === 'U') { headX = 0; headY = -size * 0.35; }
+    else if (this.robot2.direction === 'D') { headX = 0; headY = size * 0.35; }
+    else if (this.robot2.direction === 'L') { headX = -size * 0.35; headY = 0; }
+    else if (this.robot2.direction === 'R') { headX = size * 0.35; headY = 0; }
+
+    // Front sensor housing
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
+    ctx.strokeStyle = '#00FF88';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
+
+    // Active sensor LEDs
+    const ledPulse = 0.5 + Math.sin(Date.now() / 100) * 0.5;
+    ctx.fillStyle = `rgba(0, 255, 136, ${ledPulse})`;
+    if (this.robot2.direction === 'U' || this.robot2.direction === 'D') {
+      ctx.fillRect(headX - 3, headY - 1, 2, 2);
+      ctx.fillRect(headX + 1, headY - 1, 2, 2);
+    } else {
+      ctx.fillRect(headX - 1, headY - 3, 2, 2);
+      ctx.fillRect(headX - 1, headY + 1, 2, 2);
+    }
+
+    ctx.restore();
+  }
+
+  // ==================== 2-PLAYER MODE VISUAL EFFECTS ====================
+
+  private drawPlayer1Trail(ctx: CanvasRenderingContext2D) {
+    if (!this.isTwoPlayerMode || this.player1Trail.length === 0) return;
+
+    ctx.save();
+    for (let i = 0; i < this.player1Trail.length; i++) {
+      const trail = this.player1Trail[i];
+      const size = 8 * trail.alpha;
+
+      // Orange energy trail with glow
+      const gradient = ctx.createRadialGradient(trail.x, trail.y, 0, trail.x, trail.y, size);
+      gradient.addColorStop(0, `rgba(237, 107, 0, ${trail.alpha * 0.8})`);
+      gradient.addColorStop(0.5, `rgba(255, 165, 0, ${trail.alpha * 0.4})`);
+      gradient.addColorStop(1, `rgba(237, 107, 0, 0)`);
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(trail.x, trail.y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private drawPlayer2Trail(ctx: CanvasRenderingContext2D) {
+    if (!this.isTwoPlayerMode || this.player2Trail.length === 0) return;
+
+    ctx.save();
+    for (let i = 0; i < this.player2Trail.length; i++) {
+      const trail = this.player2Trail[i];
+      const size = 8 * trail.alpha;
+
+      // Lighter orange/gold energy trail
+      const gradient = ctx.createRadialGradient(trail.x, trail.y, 0, trail.x, trail.y, size);
+      gradient.addColorStop(0, `rgba(255, 180, 50, ${trail.alpha * 0.8})`);
+      gradient.addColorStop(0.5, `rgba(255, 200, 100, ${trail.alpha * 0.4})`);
+      gradient.addColorStop(1, `rgba(255, 180, 50, 0)`);
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(trail.x, trail.y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private drawConnectionBeam(ctx: CanvasRenderingContext2D) {
+    if (!this.isTwoPlayerMode || !this.connectionBeam.active || !this.robot || !this.robot2) return;
+
+    const x1 = this.robot.x + this.robot.width / 2;
+    const y1 = this.robot.y + this.robot.height / 2;
+    const x2 = this.robot2.x + this.robot2.width / 2;
+    const y2 = this.robot2.y + this.robot2.height / 2;
+
+    ctx.save();
+
+    // Pulsating energy beam
+    const pulseIntensity = 0.5 + Math.sin(this.connectionBeam.pulse) * 0.3;
+
+    // Outer glow
+    ctx.strokeStyle = `rgba(0, 200, 255, ${pulseIntensity * 0.3})`;
+    ctx.lineWidth = 12;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // Middle beam
+    ctx.strokeStyle = `rgba(100, 220, 255, ${pulseIntensity * 0.6})`;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // Inner core
+    ctx.strokeStyle = `rgba(255, 255, 255, ${pulseIntensity})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // Connection nodes at each robot
+    [{ x: x1, y: y1 }, { x: x2, y: y2 }].forEach(pos => {
+      const nodeGradient = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 15);
+      nodeGradient.addColorStop(0, `rgba(255, 255, 255, ${pulseIntensity})`);
+      nodeGradient.addColorStop(0.5, `rgba(100, 220, 255, ${pulseIntensity * 0.6})`);
+      nodeGradient.addColorStop(1, 'rgba(0, 200, 255, 0)');
+
+      ctx.fillStyle = nodeGradient;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 15, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Team bonus text in the middle
+    if (this.teamComboMultiplier > 1) {
+      const midX = (x1 + x2) / 2;
+      const midY = (y1 + y2) / 2;
+
+      ctx.font = 'bold 14px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Text shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.fillText(`×${this.teamComboMultiplier}`, midX + 2, midY + 2);
+
+      // Main text
+      ctx.fillStyle = `rgba(255, 255, 255, ${pulseIntensity})`;
+      ctx.fillText(`×${this.teamComboMultiplier}`, midX, midY);
+    }
+
+    ctx.restore();
+  }
+
+  private drawTeamBonusParticles(ctx: CanvasRenderingContext2D) {
+    if (!this.isTwoPlayerMode || this.teamBonusParticles.length === 0) return;
+
+    ctx.save();
+    for (const particle of this.teamBonusParticles) {
+      const size = 4 * particle.alpha;
+
+      // Colorful celebration particles
+      const gradient = ctx.createRadialGradient(particle.x, particle.y, 0, particle.x, particle.y, size);
+      gradient.addColorStop(0, particle.color.replace('rgb', 'rgba').replace(')', `, ${particle.alpha})`));
+      gradient.addColorStop(1, particle.color.replace('rgb', 'rgba').replace(')', ', 0)'));
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, size, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sparkle effect
+      if (particle.alpha > 0.7) {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${particle.alpha})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(particle.x - size * 1.5, particle.y);
+        ctx.lineTo(particle.x + size * 1.5, particle.y);
+        ctx.moveTo(particle.x, particle.y - size * 1.5);
+        ctx.lineTo(particle.x, particle.y + size * 1.5);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  private drawPlayerAuras(ctx: CanvasRenderingContext2D) {
+    if (!this.isTwoPlayerMode || !this.robot || !this.robot2) return;
+
+    const drawAura = (robot: Block, powerUp: string, baseColor: string) => {
+      if (powerUp === 'none') return;
+
+      const x = robot.x + robot.width / 2;
+      const y = robot.y + robot.height / 2;
+      const time = Date.now() * 0.003;
+
+      let auraColor = baseColor;
+      let auraSize = 30;
+
+      switch (powerUp) {
+        case 'shield':
+          auraColor = '65, 105, 225'; // Royal blue
+          auraSize = 35;
+          break;
+        case 'speed':
+          auraColor = '255, 215, 0'; // Gold
+          auraSize = 32;
+          break;
+        case 'magnet':
+          auraColor = '138, 43, 226'; // Purple
+          auraSize = 34;
+          break;
+      }
+
+      ctx.save();
+
+      // Rotating aura rings
+      for (let i = 0; i < 3; i++) {
+        const radius = auraSize + i * 8 + Math.sin(time + i) * 3;
+        const alpha = (0.4 - i * 0.1) * Math.abs(Math.sin(time * 0.5));
+
+        const gradient = ctx.createRadialGradient(x, y, radius - 5, x, y, radius + 5);
+        gradient.addColorStop(0, `rgba(${auraColor}, 0)`);
+        gradient.addColorStop(0.5, `rgba(${auraColor}, ${alpha})`);
+        gradient.addColorStop(1, `rgba(${auraColor}, 0)`);
+
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, time + i, time + i + Math.PI * 1.5);
+        ctx.stroke();
+      }
+
+      // Power-up icon above robot
+      ctx.font = '16px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+
+      const iconY = robot.y - 8 + Math.sin(time * 2) * 2;
+      let icon = '';
+
+      switch (powerUp) {
+        case 'shield': icon = '🛡️'; break;
+        case 'speed': icon = '⚡'; break;
+        case 'magnet': icon = '🧲'; break;
+      }
+
+      // Icon shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillText(icon, x + 1, iconY + 1);
+
+      // Icon
+      ctx.fillStyle = 'white';
+      ctx.fillText(icon, x, iconY);
+
+      ctx.restore();
+    };
+
+    // Draw auras for both players
+    drawAura(this.robot, this.player1PowerUp, '237, 107, 0');
+    drawAura(this.robot2, this.player2PowerUp, '255, 180, 50');
+  }
+
+  private updatePlayerTrails() {
+    if (!this.isTwoPlayerMode || !this.robot || !this.robot2) return;
+
+    const maxTrailLength = 20;
+
+    // Add new trail positions
+    if (this.robot.velocityX !== 0 || this.robot.velocityY !== 0) {
+      this.player1Trail.push({
+        x: this.robot.x + this.robot.width / 2,
+        y: this.robot.y + this.robot.height / 2,
+        alpha: 1.0
+      });
+    }
+
+    if (this.robot2.velocityX !== 0 || this.robot2.velocityY !== 0) {
+      this.player2Trail.push({
+        x: this.robot2.x + this.robot2.width / 2,
+        y: this.robot2.y + this.robot2.height / 2,
+        alpha: 1.0
+      });
+    }    // Fade and remove old trail particles
+    this.player1Trail = this.player1Trail.filter(trail => {
+      trail.alpha -= 0.05;
+      return trail.alpha > 0;
+    }).slice(-maxTrailLength);
+
+    this.player2Trail = this.player2Trail.filter(trail => {
+      trail.alpha -= 0.05;
+      return trail.alpha > 0;
+    }).slice(-maxTrailLength);
+  }
+
+  private updateConnectionBeam() {
+    if (!this.isTwoPlayerMode || !this.robot || !this.robot2) return;
+
+    const dx = this.robot.x - this.robot2.x;
+    const dy = this.robot.y - this.robot2.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Activate beam when players are within 100 pixels
+    const beamDistance = 100;
+    this.connectionBeam.active = distance < beamDistance;
+
+    if (this.connectionBeam.active) {
+      this.connectionBeam.pulse += 0.1;
+
+      // Team combo bonus when connected
+      if (this.teamComboMultiplier < 3) {
+        this.teamComboMultiplier = Math.min(3, this.teamComboMultiplier + 0.01);
+      }
+    } else {
+      // Slowly decay multiplier when disconnected
+      if (this.teamComboMultiplier > 1) {
+        this.teamComboMultiplier = Math.max(1, this.teamComboMultiplier - 0.02);
+      }
+    }
+  }
+
+  private createTeamBonusParticles(x: number, y: number) {
+    const colors = [
+      'rgb(237, 107, 0)',   // IFM Orange
+      'rgb(255, 215, 0)',   // Gold
+      'rgb(0, 200, 255)',   // Cyan
+      'rgb(255, 100, 255)', // Magenta
+      'rgb(100, 255, 100)'  // Green
+    ];
+
+    for (let i = 0; i < 15; i++) {
+      const angle = (Math.PI * 2 * i) / 15;
+      const speed = 2 + Math.random() * 3;
+
+      this.teamBonusParticles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        alpha: 1.0,
+        color: colors[Math.floor(Math.random() * colors.length)]
+      });
+    }
+  }
+
+  private updateTeamBonusParticles() {
+    this.teamBonusParticles = this.teamBonusParticles.filter(particle => {
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      particle.vy += 0.1; // Gravity
+      particle.alpha -= 0.02;
+      return particle.alpha > 0;
+    });
+  }
+
+  private drawTwoPlayerHUD(ctx: CanvasRenderingContext2D) {
+    if (!this.isTwoPlayerMode) return;
+
+    ctx.save();
+    ctx.font = 'bold 14px "Press Start 2P", monospace';
+
+    // Player 1 HUD (Top Left)
+    const p1X = 20;
+    const p1Y = 30;
+
+    // Player 1 name and score
+    ctx.fillStyle = '#ED6B00';
+    ctx.textAlign = 'left';
+    ctx.fillText(`P1: ${this.playerName}`, p1X, p1Y);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(`${this.player1Score}`, p1X, p1Y + 20);
+
+    // Player 1 lives
+    for (let i = 0; i < this.player1Lives; i++) {
+      ctx.fillStyle = '#ED6B00';
+      ctx.fillRect(p1X + i * 15, p1Y + 28, 12, 12);
+      ctx.strokeStyle = '#000';
+      ctx.strokeRect(p1X + i * 15, p1Y + 28, 12, 12);
+    }
+
+    // Player 2 HUD (Top Right)
+    const p2X = this.CANVAS_WIDTH - 20;
+    const p2Y = 30;
+
+    // Player 2 name and score
+    ctx.fillStyle = '#FFB432';
+    ctx.textAlign = 'right';
+    ctx.fillText(`P2: ${this.playerName2}`, p2X, p2Y);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(`${this.player2Score}`, p2X, p2Y + 20);
+
+    // Player 2 lives
+    for (let i = 0; i < this.player2Lives; i++) {
+      ctx.fillStyle = '#FFB432';
+      ctx.fillRect(p2X - (i + 1) * 15, p2Y + 28, 12, 12);
+      ctx.strokeStyle = '#000';
+      ctx.strokeRect(p2X - (i + 1) * 15, p2Y + 28, 12, 12);
+    }
+
+    // Team Combo Multiplier (Center Top)
+    if (this.teamComboMultiplier > 1) {
+      const centerX = this.CANVAS_WIDTH / 2;
+      const centerY = 25;
+
+      const glowIntensity = 0.5 + Math.sin(Date.now() * 0.005) * 0.3;
+
+      // Glow background
+      const glowGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 60);
+      glowGradient.addColorStop(0, `rgba(0, 200, 255, ${glowIntensity * 0.4})`);
+      glowGradient.addColorStop(1, 'rgba(0, 200, 255, 0)');
+
+      ctx.fillStyle = glowGradient;
+      ctx.fillRect(centerX - 60, centerY - 20, 120, 40);
+
+      // Text
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.fillText(`TEAM ×${this.teamComboMultiplier.toFixed(1)}`, centerX + 2, centerY + 2);
+
+      // Main text with gradient
+      const textGradient = ctx.createLinearGradient(centerX - 50, centerY, centerX + 50, centerY);
+      textGradient.addColorStop(0, '#00C8FF');
+      textGradient.addColorStop(0.5, '#FFFFFF');
+      textGradient.addColorStop(1, '#00C8FF');
+
+      ctx.fillStyle = textGradient;
+      ctx.fillText(`TEAM ×${this.teamComboMultiplier.toFixed(1)}`, centerX, centerY);
+    }
+
+    // Connection status indicator
+    if (this.connectionBeam.active) {
+      const indicatorX = this.CANVAS_WIDTH / 2;
+      const indicatorY = 50;
+
+      ctx.textAlign = 'center';
+      ctx.font = '10px "Press Start 2P", monospace';
+
+      const pulseAlpha = 0.6 + Math.sin(this.connectionBeam.pulse) * 0.4;
+      ctx.fillStyle = `rgba(0, 200, 255, ${pulseAlpha})`;
+      ctx.fillText('⚡ CONNECTED ⚡', indicatorX, indicatorY);
+    }
+
+    ctx.restore();
+  }
+
+  // ==================== END 2-PLAYER VISUAL EFFECTS ====================
 
   private drawMalfunction(ctx: CanvasRenderingContext2D, ghost: Block) {
     const x = ghost.x;
@@ -655,63 +1566,115 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private drawUI(ctx: CanvasRenderingContext2D) {
-    // Score oben - Start bei y=50 um unter der game-info-bar zu bleiben
-    ctx.font = 'bold 16px "Press Start 2P", monospace';
-    ctx.fillStyle = 'white';
-    ctx.textAlign = 'left';
-    ctx.fillText(`EFFIZIENZ: ${this.efficiency}`, 10, 50);
-    ctx.fillText(`PROD-LVL: ${this.productionLevel}`, this.CANVAS_WIDTH / 2 - 50, 50);
+    // Draw industrial frame around game area
+    this.drawIndustrialFrame(ctx);
 
-    // High Score anzeigen
+    // IFM Logo on the score bar - very visible
+    ctx.save();
+
+    // Logo background plate - WHITE for maximum visibility
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(5, 32, 60, 20);
+
+    // Border - thick orange border
+    ctx.strokeStyle = '#ED6B00';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(5, 32, 60, 20);
+
+    // IFM letters - BIG with strong glow
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#ED6B00';
+    ctx.fillStyle = '#ED6B00';
+
+    // Letter I
+    ctx.fillRect(11, 36, 5, 12);
+
+    // Letter F
+    ctx.fillRect(21, 36, 5, 12);
+    ctx.fillRect(21, 36, 12, 4);
+    ctx.fillRect(21, 42, 9, 3);
+
+    // Letter M
+    ctx.fillRect(38, 36, 5, 12);
+    ctx.fillRect(38, 36, 4, 4);
+    ctx.fillRect(44, 38, 3, 3);
+    ctx.fillRect(49, 36, 4, 4);
+    ctx.fillRect(53, 36, 5, 12);
+
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    // Score as industrial KPIs - Start at y=45 to be below logo
+    ctx.font = 'bold 10px "Press Start 2P", monospace';
+    ctx.fillStyle = '#1a1a1a';
+    ctx.textAlign = 'left';
+
+    // Production Efficiency KPI
+    const efficiencyPercent = Math.min(100, Math.floor((this.efficiency / 1000) * 100));
+    ctx.fillText(`EFFICIENCY: ${efficiencyPercent}%`, 70, 45);
+
+    // Production Level
+    ctx.fillText(`LEVEL: ${this.productionLevel}`, this.CANVAS_WIDTH / 2 - 60, 45);
+
+    // High Score as "Best Performance"
     ctx.textAlign = 'right';
-    ctx.font = '14px "Press Start 2P", monospace';
-    ctx.fillStyle = '#FFD700';
-    ctx.fillText(`HI: ${this.getHighScore()}`, this.CANVAS_WIDTH - 10, 50);
+    ctx.font = '10px "Press Start 2P", monospace';
+    ctx.fillStyle = '#ED6B00';
+    const hiScorePercent = Math.min(100, Math.floor((this.getHighScore() / 1000) * 100));
+    ctx.fillText(`BEST: ${hiScorePercent}%`, this.CANVAS_WIDTH - 10, 45);
 
     // Practice Mode Status-Anzeige
     if (this.gameMode === 'practice') {
-      ctx.font = '10px monospace';
-      let statusY = 67;
+      ctx.font = '8px monospace';
+      let statusY = 30;
       if (this.isInvincible) {
-        ctx.fillStyle = '#00FF00';
-        ctx.fillText('🛡️ INVINCIBLE', this.CANVAS_WIDTH - 10, statusY);
+        ctx.fillStyle = '#00FF88';
+        ctx.fillText('SAFETY MODE', this.CANVAS_WIDTH - 10, statusY);
         statusY += 12;
       }
-      if (this.turboSpeed) {
+      if (this.turboSpeed && this.boostEnergy > 0) {
         ctx.fillStyle = '#FFD700';
         ctx.fillText('⚡ TURBO', this.CANVAS_WIDTH - 10, statusY);
         statusY += 12;
       }
       if (this.slowMotion < 1.0) {
-        ctx.fillStyle = '#FF69B4';
-        ctx.fillText(`🐌 ${this.slowMotion}x`, this.CANVAS_WIDTH - 10, statusY);
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillText(`SLOW ${this.slowMotion}x`, this.CANVAS_WIDTH - 10, statusY);
       }
     }
     ctx.textAlign = 'left';
 
-    // Combo counter display
+    // Combo counter display - adjusted position
     if (this.pelletStreak >= 10 && this.comboDisplayTimer > 0) {
       ctx.save();
-      ctx.font = 'bold 20px monospace';
+      ctx.font = 'bold 16px "Press Start 2P", monospace';
       ctx.textAlign = 'center';
       const comboAlpha = this.comboDisplayTimer / 1000;
-      ctx.fillStyle = `rgba(255, 215, 0, ${comboAlpha})`;
-      ctx.fillText(`${this.pelletStreak}x COMBO!`, this.CANVAS_WIDTH / 2, 100);
+      ctx.fillStyle = `rgba(237, 107, 0, ${comboAlpha})`; // IFM Orange
+      ctx.fillText(`${this.pelletStreak}x COMBO!`, this.CANVAS_WIDTH / 2, 60);
       ctx.restore();
     }
 
     // Draw particles
     this.drawParticles(ctx);
 
-    // System Health unten links
+    // Apply dynamic lighting effect
+    if (this.lightingEnabled && this.gameState === 'playing') {
+      this.drawDynamicLighting(ctx);
+    }
+
+    // Draw Energy Gauge for Boost
+    this.drawEnergyGauge(ctx);
+
+    // System Health - bottom left
     for (let i = 0; i < this.systemHealth; i++) {
-      this.drawRobotIcon(ctx, 20 + i * 25, this.CANVAS_HEIGHT - 15);
+      this.drawRobotIcon(ctx, 20 + i * 25, this.CANVAS_HEIGHT - 20);
     }
 
     // Active bonus effects display with circular progress
     ctx.font = '12px monospace';
     ctx.textAlign = 'right';
-    let effectY = this.CANVAS_HEIGHT - 40;
+    let effectY = this.CANVAS_HEIGHT - 30;
 
     if (this.shieldActive) {
       // Shield text
@@ -805,20 +1768,246 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Game Over Screen wird jetzt im HTML-Overlay angezeigt, nicht mehr im Canvas
 
-    // Final explosion screen
+    // Final explosion screen - ULTRA ENHANCED with massive effects
     if (this.gameState === 'finalexplosion') {
       ctx.save();
       const explosionProgress = this.stateTimer / this.FINAL_EXPLOSION_DURATION;
-      ctx.font = 'bold 32px "Press Start 2P", monospace';
-      ctx.fillStyle = `rgba(255, 0, 0, ${explosionProgress})`;
-      ctx.textAlign = 'center';
-      ctx.fillText('GAME OVER', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      const time = Date.now() / 1000;
 
-      // Flickering effect
-      if (Math.floor(Date.now() / 100) % 2 === 0) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${explosionProgress * 0.5})`;
-        ctx.fillText('GAME OVER', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      // Generate MASSIVE particle explosion
+      if (this.stateTimer < 100 && this.gameOverParticles.length === 0) {
+        for (let i = 0; i < 150; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 3 + Math.random() * 8;
+          const colors = ['#FF0000', '#FF7A01', '#FFAA00', '#FF3300', '#FFFFFF'];
+          this.gameOverParticles.push({
+            x: this.CANVAS_WIDTH / 2,
+            y: this.CANVAS_HEIGHT / 2,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            size: 2 + Math.random() * 8,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            alpha: 1.0
+          });
+        }
       }
+
+      // Dramatic screen shake with decay
+      const shakeIntensity = explosionProgress < 0.4 ? (0.4 - explosionProgress) / 0.4 : 0;
+      const shake = (Math.random() - 0.5) * 20 * shakeIntensity;
+      ctx.translate(shake, shake * 0.7);
+
+      // Radial gradient explosion background
+      const centerX = this.CANVAS_WIDTH / 2;
+      const centerY = this.CANVAS_HEIGHT / 2;
+      const radius = Math.max(this.CANVAS_WIDTH, this.CANVAS_HEIGHT) * explosionProgress * 1.5;
+      const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+      gradient.addColorStop(0, `rgba(255, 0, 0, ${0.6 * explosionProgress})`);
+      gradient.addColorStop(0.5, `rgba(255, 122, 1, ${0.4 * explosionProgress})`);
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+
+      // Pulsating wave rings
+      for (let i = 0; i < 3; i++) {
+        const waveProgress = (explosionProgress + i * 0.2) % 1;
+        const waveRadius = waveProgress * 400;
+        const waveAlpha = (1 - waveProgress) * 0.5;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, waveRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 122, 1, ${waveAlpha})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+
+      // Update and draw particles with trails
+      for (let i = this.gameOverParticles.length - 1; i >= 0; i--) {
+        const p = this.gameOverParticles[i];
+
+        // Draw trail
+        ctx.fillStyle = p.color.replace(')', `, ${p.alpha * 0.3})`.replace('#', 'rgba(').replace(/([0-9A-F]{2})/gi, (m) => parseInt(m, 16) + ','));
+        ctx.fillRect(p.x - p.vx, p.y - p.vy, p.size * 0.5, p.size * 0.5);
+
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.15; // gravity
+        p.vx *= 0.99; // air resistance
+        p.alpha -= 0.008;
+
+        if (p.alpha > 0) {
+          // Main particle with glow
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 10;
+          ctx.fillStyle = p.color.replace(')', `, ${p.alpha})`.replace('#', 'rgba(').replace(/([0-9A-F]{2})/gi, (m) => parseInt(m, 16) + ','));
+          ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+        } else {
+          this.gameOverParticles.splice(i, 1);
+        }
+      }
+      ctx.shadowBlur = 0;
+
+      // Intense RGB split glitch effect
+      if (Math.random() > 0.6) {
+        const glitchY = Math.random() * this.CANVAS_HEIGHT;
+        const glitchHeight = 30 + Math.random() * 60;
+        const glitchOffset = (Math.random() - 0.5) * 20;
+        ctx.fillStyle = `rgba(255, 0, 0, 0.3)`;
+        ctx.fillRect(glitchOffset, glitchY, this.CANVAS_WIDTH, glitchHeight);
+        ctx.fillStyle = `rgba(0, 255, 255, 0.3)`;
+        ctx.fillRect(-glitchOffset, glitchY, this.CANVAS_WIDTH, glitchHeight);
+      }
+
+      // Lightning effect
+      if (explosionProgress < 0.6 && Math.random() > 0.8) {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * (0.6 - explosionProgress)})`;
+        ctx.lineWidth = 2 + Math.random() * 3;
+        ctx.beginPath();
+        const startX = Math.random() * this.CANVAS_WIDTH;
+        ctx.moveTo(startX, 0);
+        for (let y = 0; y < this.CANVAS_HEIGHT; y += 20) {
+          ctx.lineTo(startX + (Math.random() - 0.5) * 40, y);
+        }
+        ctx.stroke();
+      }
+
+      // GAME OVER text with extreme effects
+      ctx.font = 'bold 56px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // 2-Player Mode: Show winner instead of GAME OVER
+      const mainText = this.isTwoPlayerMode && this.winner
+        ? `PLAYER ${this.winner} WINS!`
+        : 'GAME OVER';
+
+      // Multiple chromatic aberration layers
+      const aberrationLayers = [
+        {color: 'rgba(255, 0, 0, 0.7)', x: -6, y: -6},
+        {color: 'rgba(0, 255, 0, 0.5)', x: 0, y: 6},
+        {color: 'rgba(0, 255, 255, 0.7)', x: 6, y: -3},
+        {color: 'rgba(255, 0, 255, 0.5)', x: -3, y: 3}
+      ];
+
+      for (const layer of aberrationLayers) {
+        ctx.fillStyle = layer.color;
+        ctx.fillText(mainText, centerX + layer.x + Math.sin(time * 10) * 2, centerY - 30 + layer.y);
+      }
+
+      // Main text with massive glow
+      ctx.shadowColor = this.isTwoPlayerMode && this.winner ? '#00FF00' : '#FF0000';
+      ctx.shadowBlur = 60 + Math.sin(time * 8) * 20;
+      ctx.fillStyle = `rgba(255, 255, 255, ${explosionProgress})`;
+      ctx.fillText(mainText, centerX, centerY - 30);
+
+      // Super intense flickering
+      if (Math.floor(time * 20) % 2 === 0) {
+        ctx.shadowBlur = 80;
+        ctx.shadowColor = this.isTwoPlayerMode && this.winner ? '#FFD700' : '#FFFF00';
+        ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+        ctx.fillText(mainText, centerX, centerY - 30);
+      }
+
+      // Distortion effect on text
+      if (explosionProgress < 0.5 && Math.random() > 0.7) {
+        ctx.save();
+        ctx.translate(centerX, centerY - 30);
+        ctx.scale(1 + (Math.random() - 0.5) * 0.1, 1 + (Math.random() - 0.5) * 0.1);
+        ctx.fillStyle = 'rgba(255, 122, 1, 0.5)';
+        ctx.fillText(mainText, 0, 0);
+        ctx.restore();
+      }
+
+      // Animated subtitle with intense glow
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#FF7A01';
+      ctx.font = 'bold 20px "Press Start 2P", monospace';
+
+      // 2-Player Mode: Show loser's name
+      let subtitle = 'PRODUCTION HALTED';
+      if (this.isTwoPlayerMode && this.winner) {
+        const winnerName = this.winner === 1 ? this.playerName : this.playerName2;
+        const loserName = this.winner === 1 ? this.playerName2 : this.playerName;
+        subtitle = `${winnerName} DEFEATS ${loserName}!`;
+      }
+      const subtitleAlpha = Math.max(0, explosionProgress - 0.15) / 0.85;
+      ctx.fillStyle = `rgba(255, 122, 1, ${subtitleAlpha})`;
+      const subtitleY = centerY + 25 + Math.sin(time * 4) * 3;
+
+      // Display custom subtitle
+      ctx.fillText(this.isTwoPlayerMode && this.winner ? subtitle : '>>> CRITICAL SYSTEM FAILURE <<<', centerX, subtitleY);
+
+      // Error code for dramatic effect
+      if (subtitleAlpha > 0.5) {
+        ctx.shadowBlur = 5;
+        ctx.font = 'bold 12px "Press Start 2P", monospace';
+        ctx.fillStyle = `rgba(255, 0, 0, ${subtitleAlpha * 0.7})`;
+        ctx.fillText(`ERROR CODE: 0x${Math.floor(time * 100).toString(16).toUpperCase()}`, centerX, subtitleY + 25);
+      }
+
+      // Animated score with extreme pulsing
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#FFFFFF';
+      ctx.font = 'bold 18px "Press Start 2P", monospace';
+      const scoreScale = 1 + Math.sin(time * 6) * 0.15;
+      ctx.save();
+      ctx.translate(centerX, centerY + 75);
+      ctx.scale(scoreScale, scoreScale);
+      ctx.fillStyle = `rgba(255, 255, 255, ${subtitleAlpha})`;
+      ctx.fillText(`FINAL SCORE: ${this.score}`, 0, 0);
+      ctx.restore();
+
+      // Warning bars with animation
+      if (explosionProgress > 0.2) {
+        const barAlpha = (explosionProgress - 0.2) / 0.8;
+        const barHeight = 8;
+        const barPulse = Math.sin(time * 10) * 0.3 + 0.7;
+        ctx.fillStyle = `rgba(255, 122, 1, ${barAlpha * barPulse})`;
+        ctx.fillRect(0, 0, this.CANVAS_WIDTH, barHeight);
+        ctx.fillRect(0, this.CANVAS_HEIGHT - barHeight, this.CANVAS_WIDTH, barHeight);
+
+        // Animated corner brackets
+        ctx.strokeStyle = `rgba(255, 122, 1, ${barAlpha})`;
+        ctx.lineWidth = 3;
+        const cornerSize = 40;
+        // Top-left
+        ctx.beginPath();
+        ctx.moveTo(0, cornerSize);
+        ctx.lineTo(0, 0);
+        ctx.lineTo(cornerSize, 0);
+        ctx.stroke();
+        // Top-right
+        ctx.beginPath();
+        ctx.moveTo(this.CANVAS_WIDTH - cornerSize, 0);
+        ctx.lineTo(this.CANVAS_WIDTH, 0);
+        ctx.lineTo(this.CANVAS_WIDTH, cornerSize);
+        ctx.stroke();
+        // Bottom-left
+        ctx.beginPath();
+        ctx.moveTo(0, this.CANVAS_HEIGHT - cornerSize);
+        ctx.lineTo(0, this.CANVAS_HEIGHT);
+        ctx.lineTo(cornerSize, this.CANVAS_HEIGHT);
+        ctx.stroke();
+        // Bottom-right
+        ctx.beginPath();
+        ctx.moveTo(this.CANVAS_WIDTH - cornerSize, this.CANVAS_HEIGHT);
+        ctx.lineTo(this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+        ctx.lineTo(this.CANVAS_WIDTH, this.CANVAS_HEIGHT - cornerSize);
+        ctx.stroke();
+      }
+
+      // CRT scanlines
+      for (let y = 0; y < this.CANVAS_HEIGHT; y += 3) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${0.15 * explosionProgress})`;
+        ctx.fillRect(0, y, this.CANVAS_WIDTH, 1);
+      }
+
+      // Vignette effect
+      const vignetteGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(this.CANVAS_WIDTH, this.CANVAS_HEIGHT) * 0.8);
+      vignetteGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vignetteGradient.addColorStop(1, `rgba(0, 0, 0, ${0.5 * explosionProgress})`);
+      ctx.fillStyle = vignetteGradient;
+      ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+
       ctx.restore();
     }
 
@@ -990,6 +2179,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   showExitConfirm = false;
   private pausedForExitConfirm = false;
   showPauseOverlay = false;
+  pauseMenuIndex = 0; // 0 = Resume, 1 = Restart, 2 = Main Menu
+  gameOverMenuIndex = 0; // 0 = Restart, 1 = Main Menu
+  showSpielanleitung = false;
+  spielanleitungSlide = 0;
+  private gamepadPollInterval: any;
+  private lastGamepadSpielanleitungAction = 0;
 
   // Get high score from leaderboard
   private getHighScore(): number {
@@ -1204,7 +2399,71 @@ private updatePerformanceAndCheckAchievements() {
 
     // Speichere Gesamtanzahl der Pellets für Cherry-Spawn
     this.totalPellets = this.foods.size + this.powerPellets.size;
+
+    // Create additional ghosts to reach 8 total
+    this.createAdditionalGhosts();
+
+    // Create second robot for 2-player mode
+    if (this.isTwoPlayerMode && this.robot) {
+      // Position robot2 slightly offset from robot1 (to the left)
+      const robot2X = this.robot.startX - this.CELL_SIZE;
+      const robot2Y = this.robot.startY;
+      this.robot2 = new Block(robot2X, robot2Y, this.CELL_SIZE, this.CELL_SIZE, this.robotRightImage);
+      this.robot2.direction = 'R';
+      this.robot2.updateVelocity(this.CELL_SIZE);
+      console.log('🤖 Robot2 created for 2-player mode');
+    }
+
+    // Assign ghost targets in 2-player mode
+    if (this.isTwoPlayerMode) {
+      this.assignGhostTargets();
+    }
   }
+
+  private createAdditionalGhosts() {
+    const currentGhostCount = this.ghosts.size;
+    const targetGhostCount = 8;
+    const ghostsToAdd = targetGhostCount - currentGhostCount;
+
+    if (ghostsToAdd <= 0) return;
+
+    // Ghost spawn positions (around the ghost house)
+    const spawnPositions = [
+      { x: 12 * this.CELL_SIZE, y: 14 * this.CELL_SIZE },
+      { x: 15 * this.CELL_SIZE, y: 14 * this.CELL_SIZE },
+      { x: 13 * this.CELL_SIZE, y: 15 * this.CELL_SIZE },
+      { x: 14 * this.CELL_SIZE, y: 15 * this.CELL_SIZE }
+    ];
+
+    const ghostTypes: Array<'aggressive' | 'ambush' | 'patrol' | 'random'> = ['aggressive', 'ambush', 'patrol', 'random'];
+    const ghostImages = [this.redGhostImage, this.pinkGhostImage, this.blueGhostImage, this.orangeGhostImage];
+
+    for (let i = 0; i < ghostsToAdd; i++) {
+      const pos = spawnPositions[i % spawnPositions.length];
+      const typeIndex = i % ghostTypes.length;
+      const ghost = new Block(pos.x, pos.y, this.CELL_SIZE, this.CELL_SIZE, ghostImages[typeIndex]);
+      ghost.type = ghostTypes[typeIndex];
+      this.ghosts.add(ghost);
+    }
+
+    console.log(`👻 Created ${ghostsToAdd} additional ghosts. Total: ${this.ghosts.size}`);
+  }
+
+  private assignGhostTargets() {
+    const ghostArray = Array.from(this.ghosts);
+
+    // First 4 ghosts target Player 1, next 4 target Player 2
+    ghostArray.forEach((ghost, index) => {
+      if (index < 4) {
+        ghost.targetPlayer = 1;
+      } else {
+        ghost.targetPlayer = 2;
+      }
+    });
+
+    console.log('🎯 Assigned ghost targets: 4 → Player 1, 4 → Player 2');
+  }
+
   ngOnInit(): void{
     console.log('🎮 GameCanvasComponent initialized');
 
@@ -1217,11 +2476,35 @@ private updatePerformanceAndCheckAchievements() {
         this.applyGameMode();
       }
 
-      // Lese Spielername
+      // Check for 2-player mode
+      const players = params['players'] as string;
+      if (players === '2') {
+        this.isTwoPlayerMode = true;
+        console.log('🎮 2-Player mode activated');
+
+        // Initialize 2-player variables
+        this.player1Lives = 3;
+        this.player2Lives = 3;
+        this.player1Score = 0;
+        this.player2Score = 0;
+        this.teamComboMultiplier = 1;
+        this.lastPelletCollector = null;
+        this.player1Trail = [];
+        this.player2Trail = [];
+        this.teamBonusParticles = [];
+        this.connectionBeam = { active: false, pulse: 0 };
+        this.winner = null;
+      }      // Lese Spielername(n)
       const playerName = params['playerName'] as string;
       if (playerName) {
         this.playerName = playerName;
-        console.log(`👤 Player: ${this.playerName}`);
+        console.log(`👤 Player 1: ${this.playerName}`);
+      }
+
+      const playerName2 = params['playerName2'] as string;
+      if (playerName2 && this.isTwoPlayerMode) {
+        this.playerName2 = playerName2;
+        console.log(`👤 Player 2: ${this.playerName2}`);
       }
     });
 
@@ -1232,6 +2515,9 @@ private updatePerformanceAndCheckAchievements() {
 
     // Initialisiere Patrol-Route für CYAN Sensor
     this.initPatrolRoute();
+
+    // Initialize decorative industrial elements
+    this.initializeIndustrialDecorations();
 
     this.loadMap();
 
@@ -1249,6 +2535,144 @@ private updatePerformanceAndCheckAchievements() {
   }
 
   private onKeyUpBound = (e: KeyboardEvent) => this.onKeyUp(e);
+
+  // Voice Announcement System
+  private announce(text: string) {
+    if (this.lastAnnouncement === text && this.announcementCooldown > 0) {
+      return; // Avoid repeating same announcement too quickly
+    }
+
+    this.lastAnnouncement = text;
+    this.announcementCooldown = 2000; // 2 second cooldown
+
+    // Use Web Speech API for robotic voice
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.2; // Slightly faster
+      utterance.pitch = 0.8; // Lower pitch for robotic effect
+      utterance.volume = 0.7;
+      window.speechSynthesis.cancel(); // Cancel any ongoing speech
+      window.speechSynthesis.speak(utterance);
+    }
+
+    console.log(`🤖 ANNOUNCEMENT: ${text}`);
+  }
+
+  // Update Energy Gauge
+  private updateEnergyGauge(deltaTime: number) {
+    const deltaSeconds = deltaTime / 1000;
+
+    if (this.isBoostKeyPressed && this.boostEnergy > 0 && this.gameState === 'playing') {
+      // Drain energy when boosting
+      this.boostEnergy -= this.BOOST_DRAIN_RATE * deltaSeconds;
+
+      // Warn when energy is low
+      if (this.boostEnergy <= 20 && this.boostEnergy > 15) {
+        this.announce('LOW ENERGY');
+      }
+      if (this.boostEnergy < 0) {
+        this.boostEnergy = 0;
+      }
+    } else if (!this.isBoostKeyPressed && this.boostEnergy < this.MAX_BOOST_ENERGY) {
+      // Recharge energy when not boosting
+      this.boostEnergy += this.BOOST_RECHARGE_RATE * deltaSeconds;
+      if (this.boostEnergy > this.MAX_BOOST_ENERGY) {
+        this.boostEnergy = this.MAX_BOOST_ENERGY;
+      }
+    }
+  }
+
+  // Draw Dynamic Lighting (Flashlight Effect)
+  private drawDynamicLighting(ctx: CanvasRenderingContext2D) {
+    if (!this.pacman) return;
+
+    const centerX = this.pacman.x + this.pacman.width / 2;
+    const centerY = this.pacman.y + this.pacman.height / 2;
+
+    // Create darkness overlay
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = `rgba(0, 0, 0, ${this.ambientDarkness})`;
+    ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+    ctx.restore();
+
+    // Create flashlight effect
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+
+    // Main flashlight beam
+    const gradient = ctx.createRadialGradient(
+      centerX, centerY, 0,
+      centerX, centerY, this.flashlightRadius
+    );
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+    gradient.addColorStop(0.6, 'rgba(0, 0, 0, 0.8)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+
+    // Add flickering effect for realism
+    if (Math.random() < 0.1) {
+      const flicker = Math.random() * 10 - 5;
+      const flickerGradient = ctx.createRadialGradient(
+        centerX, centerY, 0,
+        centerX, centerY, this.flashlightRadius + flicker
+      );
+      flickerGradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)');
+      flickerGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = flickerGradient;
+      ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+    }
+
+    ctx.restore();
+  }
+
+  // Draw Energy Gauge
+  private drawEnergyGauge(ctx: CanvasRenderingContext2D) {
+    const barWidth = 150;
+    const barHeight = 20;
+    const barX = this.CANVAS_WIDTH - barWidth - 15;
+    const barY = 15;
+
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
+
+    // Border
+    ctx.strokeStyle = '#ED6B00';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
+
+    // Energy bar
+    const energyWidth = (this.boostEnergy / this.MAX_BOOST_ENERGY) * barWidth;
+    const gradient = ctx.createLinearGradient(barX, barY, barX + energyWidth, barY);
+
+    if (this.boostEnergy > 60) {
+      gradient.addColorStop(0, '#00FF88');
+      gradient.addColorStop(1, '#00CC6A');
+    } else if (this.boostEnergy > 30) {
+      gradient.addColorStop(0, '#FFD700');
+      gradient.addColorStop(1, '#FFA500');
+    } else {
+      gradient.addColorStop(0, '#FF6B6B');
+      gradient.addColorStop(1, '#FF0000');
+    }
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(barX, barY, energyWidth, barHeight);
+
+    // Text
+    ctx.font = 'bold 10px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    const text = `BOOST: ${Math.floor(this.boostEnergy)}%`;
+    ctx.strokeText(text, barX + barWidth / 2, barY + 14);
+    ctx.fillText(text, barX + barWidth / 2, barY + 14);
+    ctx.textAlign = 'left';
+  }
 
   ngAfterViewInit(): void {
     const canvasEl = this.gameCanvas.nativeElement;
@@ -1279,7 +2703,8 @@ private updatePerformanceAndCheckAchievements() {
     if (this.animationFrameId) {
       return;
     }
-    this.audioService.playBackgroundMusic();
+    // Background music disabled
+    // this.audioService.playBackgroundMusic();
     const loop = (timestamp: number) => {
       const delta = timestamp - this.lastFrameTime;
       if (delta > 1000 / this.FPS) { // target FPS
@@ -1295,8 +2720,35 @@ private updatePerformanceAndCheckAchievements() {
   private update() {
     const deltaTime = 1000 / this.FPS;
 
-    // Gamepad Input
-    const gpDir = this.inputService.getDirection();
+    // Update Energy Gauge
+    this.updateEnergyGauge(deltaTime);
+
+    // Update announcement cooldown
+    if (this.announcementCooldown > 0) {
+      this.announcementCooldown -= deltaTime;
+    }
+
+    // Update Boost Mode based on key state and energy
+    if (this.gameMode !== 'practice') {
+      if (this.isBoostKeyPressed && this.boostEnergy > 0) {
+        this.turboSpeed = true;
+      } else {
+        this.turboSpeed = false;
+      }
+    }
+
+    // Gamepad Input for SPIELANLEITUNG
+    if (this.showSpielanleitung) {
+      this.handleSpielanleitungGamepad();
+    }
+
+    // Arcade Input - Try arcade joystick first, fallback to standard gamepad
+    let gpDir: string | null = null;
+    gpDir = this.inputService.getArcadeDirection(1); // Player 1 joystick
+    if (!gpDir) {
+      gpDir = this.inputService.getDirection(); // Fallback to standard gamepad
+    }
+
     if (gpDir && this.pacman && this.gameState === 'playing') {
       this.bufferedDirection = gpDir; // Buffer the direction
     }
@@ -1315,13 +2767,104 @@ private updatePerformanceAndCheckAchievements() {
       }
     }
 
+    // Pause Menu Navigation / Game Over Menu Navigation
+    let currentDirection: string | null = null;
+    if (this.showPauseOverlay) {
+      // Try arcade joystick first, fallback to standard gamepad
+      currentDirection = this.inputService.getArcadeDirection(1);
+      if (!currentDirection) {
+        currentDirection = this.inputService.getDirection();
+      }
+    }
+
+    // Try to apply buffered direction for robot2 (WASD)
+    if (this.isTwoPlayerMode && this.bufferedDirection2 && this.robot2 && this.gameState === 'playing') {
+      const canTurn = this.canChangeTo2(this.bufferedDirection2);
+      if (canTurn) {
+        this.robot2.updateDirection(this.bufferedDirection2, this.CELL_SIZE, this.walls);
+        // Update image
+        if (this.bufferedDirection2 === 'U') this.robot2.image = this.robotUpImage;
+        else if (this.bufferedDirection2 === 'D') this.robot2.image = this.robotDownImage;
+        else if (this.bufferedDirection2 === 'L') this.robot2.image = this.robotLeftImage;
+        else if (this.bufferedDirection2 === 'R') this.robot2.image = this.robotRightImage;
+        this.bufferedDirection2 = null; // Clear buffer after successful turn
+      }
+    }
+
     // Gamepad Restart / Exit in Game Over
-    if (this.gameState === 'gameover') {
+    if ((this.gameState as string) === 'gameover') {
       if (this.inputService.isActionButtonPressed()) {
         this.restartGame();
       }
-      if (this.inputService.isPauseButtonPressed()) {
-        this.exitGame();
+
+      if (currentDirection === 'L' || currentDirection === 'R') {
+        this.navigatePauseMenu(currentDirection);
+      }
+
+      // Select button (Button 10) or standard A Button (0) - Select
+      if (this.inputService.isArcadeSelectPressed() || this.inputService.isActionButtonPressed()) {
+        this.selectPauseMenuItem();
+      }
+
+      // Pause button (Button 8) - Resume if on Resume option
+      if (this.inputService.isArcadePausePressed() || this.inputService.isPauseButtonPressed()) {
+        if (this.pauseMenuIndex === 0) {
+          this.resumeFromPause();
+        } else {
+          this.selectPauseMenuItem();
+        }
+      }
+    } else {
+      // Arcade Button Handling
+      // Pause button (Button 8)
+      if (this.inputService.isArcadePausePressed() || this.inputService.isPauseButtonPressed()) {
+        if (this.gameState === 'paused') {
+          this.resumeFromPause();
+        } else if (this.gameState === 'playing') {
+          this.openPause();
+        } else if ((this.gameState as string) === 'gameover') {
+          this.openPause();
+        }
+      }
+    }
+
+    // Boost button (Button 12) - only in playing state
+    if (this.gameState === 'playing' && this.gameMode !== 'practice') {
+      const boostPressed = this.inputService.isArcadeBoostPressed();
+      if (boostPressed && !this.isBoostKeyPressed) {
+        this.isBoostKeyPressed = true;
+        console.log('🚀 Boost aktiviert (Arcade Button)');
+      } else if (!boostPressed && this.isBoostKeyPressed) {
+        this.isBoostKeyPressed = false;
+        this.turboSpeed = false;
+        console.log('🛑 Boost deaktiviert (Arcade Button)');
+      }
+    }
+
+    // Help/Spielanleitung button (Button 13)
+    if (this.gameState === 'playing') {
+      const now = Date.now();
+      if (this.inputService.isArcadeHelpPressed() && now - this.lastGamepadSpielanleitungAction > 300) {
+        this.toggleSpielanleitung();
+        this.lastGamepadSpielanleitungAction = now;
+      }
+    }
+
+    // Game Over Menu Navigation
+    if ((this.gameState as string) === 'gameover') {
+      // Try arcade joystick first, fallback to standard gamepad
+      let currentDirection = this.inputService.getArcadeDirection(1);
+      if (!currentDirection) {
+        currentDirection = this.inputService.getDirection();
+      }
+
+      if (currentDirection === 'L' || currentDirection === 'R') {
+        this.navigateGameOverMenu(currentDirection);
+      }
+
+      // Select button (Button 10) or standard A Button (0) - Select
+      if (this.inputService.isArcadeSelectPressed() || this.inputService.isActionButtonPressed()) {
+        this.selectGameOverMenuItem();
       }
     }
 
@@ -1376,6 +2919,7 @@ private updatePerformanceAndCheckAchievements() {
         if (this.stateTimer >= this.FINAL_EXPLOSION_DURATION) {
           this.gameState = 'gameover';
           this.gameOver = true;
+          this.gameOverMenuIndex = 0; // Reset to Restart
           // Load leaderboard immediately
           this.loadLeaderboard();
           // Submit final score to backend
@@ -1419,6 +2963,16 @@ private updatePerformanceAndCheckAchievements() {
       this.comboDisplayTimer -= deltaTime;
     }
 
+    // Décrémenter le timer de combo reset
+    if (this.comboResetTimer > 0) {
+      this.comboResetTimer -= deltaTime;
+      if (this.comboResetTimer <= 0) {
+        // Reset combo si trop de temps sans pellet
+        this.pelletStreak = 0;
+        this.streakMultiplier = 1.0;
+      }
+    }
+
     // Update shield ripples
     for (let i = this.shieldRipples.length - 1; i >= 0; i--) {
       this.shieldRipples[i].radius += 2;
@@ -1441,6 +2995,13 @@ private updatePerformanceAndCheckAchievements() {
     if (this.powerPelletBlinkTimer >= 200) {
       this.powerPelletVisible = !this.powerPelletVisible;
       this.powerPelletBlinkTimer = 0;
+    }
+
+    // 2-Player Mode Updates
+    if (this.isTwoPlayerMode) {
+      this.updatePlayerTrails();
+      this.updateConnectionBeam();
+      this.updateTeamBonusParticles();
     }
 
     // Scatter/Chase Mode Timer (nur wenn nicht frightened)
@@ -1477,6 +3038,25 @@ private updatePerformanceAndCheckAchievements() {
       this.bonusRotationTimer = 0;
       const bonusTypes: ('iot-sensor' | 'shield' | 'diagnostic')[] = ['iot-sensor', 'shield', 'diagnostic'];
       this.currentBonusType = bonusTypes[Math.floor(Math.random() * bonusTypes.length)];
+    }
+
+    // 2-Player: Update power-up timers
+    if (this.isTwoPlayerMode) {
+      if (this.player1PowerUpTimer > 0) {
+        this.player1PowerUpTimer -= deltaTime;
+        if (this.player1PowerUpTimer <= 0) {
+          this.player1PowerUp = 'none';
+          this.player1PowerUpTimer = 0;
+        }
+      }
+
+      if (this.player2PowerUpTimer > 0) {
+        this.player2PowerUpTimer -= deltaTime;
+        if (this.player2PowerUpTimer <= 0) {
+          this.player2PowerUp = 'none';
+          this.player2PowerUpTimer = 0;
+        }
+      }
     }
 
     // Bonus effect timers
@@ -1552,6 +3132,35 @@ private updatePerformanceAndCheckAchievements() {
     return true;
   }
 
+  // Check if robot2 can turn to a new direction (for buffered input)
+  private canChangeTo2(newDirection: string): boolean {
+    if (!this.robot2) return false;
+
+    const testX = this.robot2.x;
+    const testY = this.robot2.y;
+    let speed = this.CELL_SIZE / 4;
+
+    let nextX = testX;
+    let nextY = testY;
+
+    if (newDirection === 'U') nextY -= speed;
+    else if (newDirection === 'D') nextY += speed;
+    else if (newDirection === 'L') nextX -= speed;
+    else if (newDirection === 'R') nextX += speed;
+
+    // Check if next position would collide with wall
+    for (const wall of this.walls) {
+      if (wall.type === 'ghost-door') continue;
+      if (nextX < wall.x + wall.width &&
+          nextX + this.robot2.width > wall.x &&
+          nextY < wall.y + wall.height &&
+          nextY + this.robot2.height > wall.y) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private loadNextLevel() {
     this.walls.clear();
     this.foods.clear();
@@ -1566,7 +3175,24 @@ private updatePerformanceAndCheckAchievements() {
     this.scaredDuration = this.getFrightenedDuration();
     this.gameState = 'ready';
     this.stateTimer = 0;
-  }  private render() {
+
+    // Reinitialize advanced features for new level
+    this.initializeAdvancedMazeFeatures();
+  }
+
+  // ========== ADVANCED MAZE FEATURES ==========
+
+  private initializeAdvancedMazeFeatures() {
+    // No advanced features currently
+  }  private updateAdvancedMazeFeatures(deltaTime: number) {
+    // No advanced features to update
+  }
+
+  private drawAdvancedMazeFeatures(ctx: CanvasRenderingContext2D) {
+    // No advanced features to draw
+  }
+
+  private render() {
     if (!this.ctx) return;
     // Fill with black background
     this.ctx.fillStyle = '#000000';
@@ -1671,6 +3297,12 @@ private updatePerformanceAndCheckAchievements() {
   private updateGhostAI(ghost: Block) {
     if (!this.pacman) return;
 
+    // 2-Player Mode: Select target based on ghost's assigned player
+    let targetRobot = this.pacman;
+    if (this.isTwoPlayerMode && ghost.targetPlayer === 2 && this.robot2) {
+      targetRobot = this.robot2;
+    }
+
     // Check if ghost is inside the ghost house (Box)
     // House area approx: X [10..17]*CELL_SIZE, Y [12..16]*CELL_SIZE
     const gridX = Math.floor(ghost.x / this.CELL_SIZE);
@@ -1693,8 +3325,8 @@ private updatePerformanceAndCheckAchievements() {
     const timeInHouse = this.ghostHouseTimer.get(ghost) || 0;
     const forceExit = timeInHouse > this.MAX_HOUSE_TIME;
 
-    let targetX = this.pacman.x;
-    let targetY = this.pacman.y;
+    let targetX = targetRobot.x;
+    let targetY = targetRobot.y;
 
     if (inGhostHouse || forceExit) {
       // Force target to be outside the door (Row 11, Col 13.5) to exit the box
@@ -1725,23 +3357,23 @@ private updatePerformanceAndCheckAchievements() {
         // Chase Mode: Individuelle Jagdstrategien gemäß Skizze
         switch (ghost.type) {
           case 'aggressive': // ROT - Verfolgt direkt den AGV
-            targetX = this.pacman.x;
-            targetY = this.pacman.y;
+            targetX = targetRobot.x;
+            targetY = targetRobot.y;
             break;
 
           case 'ambush': // ROSA - Lauert voraus (4 Tiles vor Pac-Man)
-            if (this.pacman.direction === 'U') {
-              targetX = this.pacman.x;
-              targetY = this.pacman.y - 4 * this.CELL_SIZE;
-            } else if (this.pacman.direction === 'D') {
-              targetX = this.pacman.x;
-              targetY = this.pacman.y + 4 * this.CELL_SIZE;
-            } else if (this.pacman.direction === 'L') {
-              targetX = this.pacman.x - 4 * this.CELL_SIZE;
-              targetY = this.pacman.y;
+            if (targetRobot.direction === 'U') {
+              targetX = targetRobot.x;
+              targetY = targetRobot.y - 4 * this.CELL_SIZE;
+            } else if (targetRobot.direction === 'D') {
+              targetX = targetRobot.x;
+              targetY = targetRobot.y + 4 * this.CELL_SIZE;
+            } else if (targetRobot.direction === 'L') {
+              targetX = targetRobot.x - 4 * this.CELL_SIZE;
+              targetY = targetRobot.y;
             } else {
-              targetX = this.pacman.x + 4 * this.CELL_SIZE;
-              targetY = this.pacman.y;
+              targetX = targetRobot.x + 4 * this.CELL_SIZE;
+              targetY = targetRobot.y;
             }
             break;
 
@@ -1778,24 +3410,80 @@ private updatePerformanceAndCheckAchievements() {
   private move() {
     if (!this.pacman) return;
 
-    // Move pacman
-    this.pacman.x += this.pacman.velocityX;
-    this.pacman.y += this.pacman.velocityY;
+    // Apply boost multiplier only when turboSpeed is active
+    const boostMultiplier = this.turboSpeed ? 2 : 1;
+
+    // Move pacman with boost - apply in steps to prevent wall clipping
+    const steps = boostMultiplier;
+    for (let i = 0; i < steps; i++) {
+      const oldX = this.pacman.x;
+      const oldY = this.pacman.y;
+
+      // Move one step
+      this.pacman.x += this.pacman.velocityX;
+      this.pacman.y += this.pacman.velocityY;
 
     // Tunnel-Wraparound für Pac-Man
     this.handleTunnelWraparound(this.pacman);
 
-    // Check wall collisions (außer Ghost Door)
-    for (const wall of this.walls) {
-      if (wall.type === 'ghost-door') continue; // Pac-Man kann NICHT durch die Tür
-      if (this.collision(this.pacman, wall)) {
-        this.pacman.x -= this.pacman.velocityX;
-        this.pacman.y -= this.pacman.velocityY;
-        break;
+      // Check wall collisions (außer Ghost Door)
+      let collided = false;
+      for (const wall of this.walls) {
+        if (wall.type === 'ghost-door') continue; // Pac-Man kann NICHT durch die Tür
+        if (this.collision(this.pacman, wall)) {
+          // Revert movement
+          this.pacman.x = oldX;
+          this.pacman.y = oldY;
+          collided = true;
+          break;
+        }
+      }
+
+      // Stop moving if we hit a wall
+      if (collided) break;
+    }
+
+    // Move robot2 in 2-player mode
+    if (this.isTwoPlayerMode && this.robot2) {
+      let boostMultiplier2 = this.turboSpeed ? 2 : 1;
+
+      // Apply speed power-up for player 2
+      if (this.player2PowerUp === 'speed') {
+        boostMultiplier2 = Math.max(boostMultiplier2, 1.5);
+      }
+
+      const steps = Math.ceil(boostMultiplier2);
+      for (let i = 0; i < steps; i++) {
+        const oldX = this.robot2.x;
+        const oldY = this.robot2.y;
+
+        // Move one step
+        this.robot2.x += this.robot2.velocityX;
+        this.robot2.y += this.robot2.velocityY;
+
+        // Tunnel-Wraparound für robot2
+        this.handleTunnelWraparound(this.robot2);
+
+        // Check wall collision
+        let collided = false;
+        for (const wall of this.walls) {
+          if (wall.type === 'ghost-door') continue;
+
+          if (this.collision(this.robot2, wall)) {
+            // Revert movement
+            this.robot2.x = oldX;
+            this.robot2.y = oldY;
+            collided = true;
+            break;
+          }
+        }
+
+        // Stop moving if we hit a wall
+        if (collided) break;
       }
     }
 
-    // Check ghost collisions
+    // Check ghost collisions with robot1
     for (const ghost of this.ghosts) {
       if (this.collision(ghost, this.pacman)) {
         // Shield protects from collision
@@ -1836,7 +3524,70 @@ private updatePerformanceAndCheckAchievements() {
         } else {
           // Systemfehler: Health verlieren
           this.audioService.play('die');
-          this.systemHealth -= 1;
+
+          // 2-Player Mode: Separate lives
+          if (this.isTwoPlayerMode) {
+            this.player1Lives -= 1;
+
+            // Check if Player 1 lost all lives
+            if (this.player1Lives <= 0) {
+              this.winner = 2; // Player 2 wins
+              this.systemHealth = 0; // Trigger game over
+              this.announce(`PLAYER 2 ${this.playerName2} WINS!`);
+            }
+          } else {
+            this.systemHealth -= 1;
+          }
+
+          this.damageFlash = 0.5; // Trigger damage flash
+          this.gameState = 'dying';
+          this.stateTimer = 0;
+          return; // Stoppe weitere Bewegung
+        }
+      }
+
+      // Check ghost collisions with robot2 in 2-player mode
+      if (this.isTwoPlayerMode && this.robot2 && this.collision(ghost, this.robot2)) {
+        // Shield protects from collision
+        if (this.shieldActive && !ghost.scared) {
+          // Ghost bounces back with shield
+          ghost.velocityX = -ghost.velocityX;
+          ghost.velocityY = -ghost.velocityY;
+          this.efficiency += 50;
+          this.audioService.play('eatghost');
+
+          // Add ripple effect
+          this.shieldRipples.push({radius: 20, alpha: 1.0});
+          continue;
+        }
+
+        if (ghost.scared) {
+          // Reparatur: Störung "reparieren" (+200 Effizienz)
+          this.audioService.play('eatghost');
+          this.efficiency += 200;
+          // Respawn ghost at starting position
+          ghost.reset();
+          ghost.scared = false;
+          ghost.updateVelocity(this.CELL_SIZE); // Reset to normal speed
+          continue;
+        } else {
+          // Systemfehler: Health verlieren
+          this.audioService.play('die');
+
+          // 2-Player Mode: Separate lives
+          if (this.isTwoPlayerMode) {
+            this.player2Lives -= 1;
+
+            // Check if Player 2 lost all lives
+            if (this.player2Lives <= 0) {
+              this.winner = 1; // Player 1 wins
+              this.systemHealth = 0; // Trigger game over
+              this.announce(`PLAYER 1 ${this.playerName} WINS!`);
+            }
+          } else {
+            this.systemHealth -= 1;
+          }
+
           this.damageFlash = 0.5; // Trigger damage flash
           this.gameState = 'dying';
           this.stateTimer = 0;
@@ -1870,7 +3621,7 @@ private updatePerformanceAndCheckAchievements() {
       }
     }
 
-    // Check food collision (Produktionsauftrag)
+    // Check food collision (Produktionsauftrag) with robot1
     let foodEaten: Block | null = null;
     for (const food of this.foods) {
       if (this.collision(this.pacman, food)) {
@@ -1882,6 +3633,7 @@ private updatePerformanceAndCheckAchievements() {
         // Only count pellets after touching a checkpoint
         if (this.pelletCountingEnabled) {
           this.pelletStreak++;
+          this.comboResetTimer = this.COMBO_RESET_DELAY; // Reset le timer à chaque pellet
 
           // Show combo display for high streaks
           if (this.pelletStreak >= 10) {
@@ -1896,7 +3648,22 @@ private updatePerformanceAndCheckAchievements() {
           } else if (this.pelletStreak >= 10) {
             this.streakMultiplier = 1.5;
           }
-          this.score += Math.floor(10 * this.streakMultiplier);
+
+          // 2-Player Mode: Separate scoring with team bonus
+          if (this.isTwoPlayerMode) {
+            const basePoints = Math.floor(10 * this.streakMultiplier);
+            const teamPoints = Math.floor(basePoints * this.teamComboMultiplier);
+            this.player1Score += teamPoints;
+
+            // Track last collector for team combo
+            if (this.lastPelletCollector === 2) {
+              // Consecutive collection by different players = team combo!
+              this.createTeamBonusParticles(food.x + 2, food.y + 2);
+            }
+            this.lastPelletCollector = 1;
+          } else {
+            this.score += Math.floor(10 * this.streakMultiplier);
+          }
         }
       }
     }
@@ -1922,7 +3689,54 @@ this.stats.systemPerformance = Math.round(
   }
 }
 
-    // Check power pellet collision (KI-Optimierung)
+    // Check food collision with robot2 in 2-player mode
+    if (this.isTwoPlayerMode && this.robot2) {
+      let foodEaten2: Block | null = null;
+      for (const food of this.foods) {
+        if (this.collision(this.robot2, food)) {
+          this.audioService.play('waka');
+          foodEaten2 = food;
+          // Create green particles for sensor data
+          this.createParticles(food.x + 2, food.y + 2, '#00FF88', 6);
+
+          // Only count pellets after touching a checkpoint
+          if (this.pelletCountingEnabled) {
+            this.pelletStreak++;
+            this.comboResetTimer = this.COMBO_RESET_DELAY;
+
+            // Show combo display for high streaks
+            if (this.pelletStreak >= 10) {
+              this.comboDisplayTimer = 1000;
+            }
+
+            // Update streak multiplier
+            if (this.pelletStreak >= 30) {
+              this.streakMultiplier = 3.0;
+            } else if (this.pelletStreak >= 20) {
+              this.streakMultiplier = 2.0;
+            } else if (this.pelletStreak >= 10) {
+              this.streakMultiplier = 1.5;
+            }
+
+            const basePoints = Math.floor(10 * this.streakMultiplier);
+            const teamPoints = Math.floor(basePoints * this.teamComboMultiplier);
+            this.player2Score += teamPoints;
+
+            // Track last collector for team combo
+            if (this.lastPelletCollector === 1) {
+              // Consecutive collection by different players = team combo!
+              this.createTeamBonusParticles(food.x + 2, food.y + 2);
+            }
+            this.lastPelletCollector = 2;
+          }
+        }
+      }
+      if (foodEaten2) {
+        this.foods.delete(foodEaten2);
+      }
+    }
+
+    // Check power pellet collision (KI-Optimierung) with robot1
     let powerEaten: Block | null = null;
     for (const pellet of this.powerPellets) {
       if (this.collision(this.pacman, pellet)) {
@@ -1943,7 +3757,33 @@ this.stats.systemPerformance = Math.round(
       this.powerPellets.delete(powerEaten);
     }
 
-    // Quality Checkpoint collision
+    // Check power pellet collision with robot2 in 2-player mode
+    if (this.isTwoPlayerMode && this.robot2) {
+      let powerEaten2: Block | null = null;
+      for (const pellet of this.powerPellets) {
+        if (this.collision(this.robot2, pellet)) {
+          this.audioService.play('powerpill');
+          powerEaten2 = pellet;
+          // Create orange particles for power pellet
+          this.createParticles(pellet.x + 4, pellet.y + 4, '#ED6B00', 12);
+          this.score += 50;
+          // Activate scared mode for 10 seconds
+          this.scaredTimer = this.scaredDuration;
+          this.ghosts.forEach(g => {
+            g.scared = true;
+            g.updateVelocity(this.CELL_SIZE); // update speed to 80%
+          });
+
+          // Announce power mode
+          this.announce('POWER MODE ACTIVATED');
+        }
+      }
+      if (powerEaten2) {
+        this.powerPellets.delete(powerEaten2);
+      }
+    }
+
+    // Quality Checkpoint collision with robot1
     if (this.robot) {
       this.qualityCheckpoints.forEach(checkpoint => {
         if (this.collision(this.robot!, checkpoint)) {
@@ -1967,7 +3807,35 @@ this.stats.systemPerformance = Math.round(
           }
         }
       });
-    }    // Cherry/Bonus collision with effects
+    }
+
+    // Quality Checkpoint collision with robot2 in 2-player mode
+    if (this.isTwoPlayerMode && this.robot2) {
+      this.qualityCheckpoints.forEach(checkpoint => {
+        if (this.collision(this.robot2!, checkpoint)) {
+          this.score += 500;
+          this.efficiency += 500;
+          // Create blue particles for checkpoint
+          this.createParticles(checkpoint.x + 16, checkpoint.y + 16, '#4169E1', 16);
+          this.qualityCheckpoints.delete(checkpoint);
+          this.audioService.play('eatghost');
+
+          // Enable pellet counting after first checkpoint
+          this.pelletCountingEnabled = true;
+          this.checkpointsCollected++;
+
+          // Trigger success burst effect
+          this.successBurst = 1.0;
+
+          // Extra life every 2 checkpoints (max 3 lives)
+          if (this.checkpointsCollected % 2 === 0 && this.systemHealth < 3) {
+            this.systemHealth++;
+          }
+        }
+      });
+    }
+
+    // Cherry/Bonus collision with effects - robot1
     if (this.cherry && this.collision(this.pacman, this.cherry)) {
       let bonusScore = 500;
       let particleColor = '#FFD700';
@@ -1979,6 +3847,12 @@ this.stats.systemPerformance = Math.round(
           particleColor = '#00FFFF';
           this.dataStreak += 10; // Massive boost to data streak
           this.audioService.play('eatghost');
+
+          // 2-Player: Assign magnet power-up
+          if (this.isTwoPlayerMode) {
+            this.player1PowerUp = 'magnet';
+            this.player1PowerUpTimer = 10000;
+          }
           break;
         case 'shield':
           bonusScore = 500;
@@ -1986,21 +3860,93 @@ this.stats.systemPerformance = Math.round(
           this.shieldActive = true;
           this.bonusEffectTimer = 10000; // 10 seconds
           this.audioService.play('eatghost');
+
+          // Announce shield activation
+          this.announce('DEFENSE SHIELD ACTIVATED');
           break;
         case 'diagnostic':
           bonusScore = 500;
           particleColor = '#FF69B4';
           this.audioService.play('eatghost');
+
+          // 2-Player: Assign speed power-up
+          if (this.isTwoPlayerMode) {
+            this.player1PowerUp = 'speed';
+            this.player1PowerUpTimer = 10000;
+          }
           break;
       }
 
       // Create colored particles based on bonus type
       this.createParticles(this.cherry.x + 16, this.cherry.y + 16, particleColor, 20);
-      this.efficiency += bonusScore;
+
+      // 2-Player: Add to individual score
+      if (this.isTwoPlayerMode) {
+        this.player1Score += bonusScore;
+      } else {
+        this.efficiency += bonusScore;
+      }
 
       // System Health bonus (capped at 3)
       if (this.systemHealth < 3) {
         this.systemHealth += 1;
+      }
+
+      // 2-Player: Extra life for player 1
+      if (this.isTwoPlayerMode && this.player1Lives < 3) {
+        this.player1Lives += 1;
+      }
+
+      this.cherry = null;
+      this.cherrySpawnCooldown = 300;
+    }
+
+    // Cherry/Bonus collision with effects - robot2
+    if (this.isTwoPlayerMode && this.robot2 && this.cherry && this.collision(this.robot2, this.cherry)) {
+      let bonusScore = 500;
+      let particleColor = '#FFD700';
+
+      // Apply bonus effect based on type
+      switch (this.currentBonusType) {
+        case 'iot-sensor':
+          bonusScore = 700;
+          particleColor = '#00FFFF';
+          this.dataStreak += 10;
+          this.audioService.play('eatghost');
+          this.player2PowerUp = 'magnet';
+          this.player2PowerUpTimer = 10000;
+          break;
+        case 'shield':
+          bonusScore = 500;
+          particleColor = '#4169E1';
+          this.shieldActive = true;
+          this.bonusEffectTimer = 10000;
+          this.audioService.play('eatghost');
+          this.announce('DEFENSE SHIELD ACTIVATED');
+          this.player2PowerUp = 'shield';
+          this.player2PowerUpTimer = 10000;
+          break;
+        case 'diagnostic':
+          bonusScore = 500;
+          particleColor = '#FF69B4';
+          this.audioService.play('eatghost');
+          this.player2PowerUp = 'speed';
+          this.player2PowerUpTimer = 10000;
+          break;
+      }
+
+      // Create colored particles
+      this.createParticles(this.cherry.x + 16, this.cherry.y + 16, particleColor, 20);
+      this.player2Score += bonusScore;
+
+      // System Health bonus
+      if (this.systemHealth < 3) {
+        this.systemHealth += 1;
+      }
+
+      // Extra life for player 2
+      if (this.player2Lives < 3) {
+        this.player2Lives += 1;
       }
 
       this.cherry = null;
@@ -2050,6 +3996,11 @@ this.stats.systemPerformance = Math.round(
       this.pacman.velocityX = 0;
       this.pacman.velocityY = 0;
     }
+    if (this.isTwoPlayerMode && this.robot2) {
+      this.robot2.reset();
+      this.robot2.velocityX = 0;
+      this.robot2.velocityY = 0;
+    }
     for (const ghost of this.ghosts) {
       ghost.reset();
       const directions = ['U', 'D', 'L', 'R'];
@@ -2067,15 +4018,34 @@ this.stats.systemPerformance = Math.round(
   private submitScore(): void {
     try {
       const collected = Math.max(0, this.totalPellets - (this.foods.size + this.powerPellets.size));
-      const dto = {
+
+      // 2-Player Mode: Use combined score
+      const finalScore = this.isTwoPlayerMode
+        ? (this.player1Score + this.player2Score)
+        : this.score;
+
+      // 2-Player Mode: Combined lives remaining
+      const livesRemaining = this.isTwoPlayerMode
+        ? (this.player1Lives + this.player2Lives)
+        : this.lives;
+
+      const dto: any = {
         Username: this.playerName?.trim() || 'Anonymous',
-        Points: this.score,
+        Points: finalScore,
         Level: this.currentLevel,
-        LivesRemaining: this.lives,
+        LivesRemaining: livesRemaining,
         ProductionOrdersCollected: collected,
         SensorsRepaired: 0,
-        PlaytimeSeconds: 0
+        PlaytimeSeconds: 0,
+        IsTwoPlayerMode: this.isTwoPlayerMode
       };
+
+      // Add second player if in 2-player mode
+      if (this.isTwoPlayerMode && this.playerName2?.trim()) {
+        dto.Player2Username = this.playerName2.trim();
+      }
+
+      console.log(`🏆 Submitting ${this.isTwoPlayerMode ? '2-player combined' : 'single player'} score:`, finalScore);
 
       this.http.post('/api/scores', dto).subscribe({
         next: (res) => {
@@ -2114,7 +4084,21 @@ this.stats.systemPerformance = Math.round(
     this.resetPositions();
     this.lives = 3;
     this.score = 0;
-    this.pelletStreak = 0;
+
+    // Initialize 2-player mode variables
+    if (this.isTwoPlayerMode) {
+      this.player1Lives = 3;
+      this.player2Lives = 3;
+      this.player1Score = 0;
+      this.player2Score = 0;
+      this.teamComboMultiplier = 1;
+      this.lastPelletCollector = null;
+      this.player1Trail = [];
+      this.player2Trail = [];
+      this.teamBonusParticles = [];
+      this.connectionBeam = { active: false, pulse: 0 };
+      this.winner = null; // Reset winner
+    }    this.pelletStreak = 0;
     this.streakMultiplier = 1.0;
     this.checkpointsCollected = 0;
     this.pelletCountingEnabled = false;
@@ -2132,22 +4116,37 @@ this.stats.systemPerformance = Math.round(
   }
 
   private onKeyDown(e: KeyboardEvent) {
+    // Prevent key repeat events
+    if (e.repeat) return;
+
     if (e.key === 'Escape') {
       if (this.gameState === 'paused') {
         this.resumeFromPause();
       } else if (this.gameState === 'playing') {
         this.openPause();
-      } else if (this.gameState === 'gameover') {
+      } else if ((this.gameState as string) === 'gameover') {
         // allow exit confirm from gameover via pause overlay
         this.openPause();
       }
       return;
     }
 
-    // Restart bei Game Over
-    if (this.gameState === 'gameover') {
-      this.restartGame();
-      return;
+    // Game Over Menu Navigation
+    if ((this.gameState as string) === 'gameover') {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        this.navigateGameOverMenu('L');
+        return;
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        this.navigateGameOverMenu('R');
+        return;
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.selectGameOverMenuItem();
+        return;
+      }
+      return; // Don't process other keys when game over menu is active
     }
 
     // === PRACTICE MODE STEUERUNG ===
@@ -2186,13 +4185,16 @@ this.stats.systemPerformance = Math.round(
       }
     }
 
+    // Shift for boost in all modes
+    if (e.key === 'Shift' && this.gameMode !== 'practice') {
+      this.isBoostKeyPressed = true;
+      return;
+    }
+
     // Keine Steuerung während Ready, Dying oder Level Complete
     if (this.gameState !== 'playing') return;
 
     if (!this.pacman) return;
-
-    // Turbo Mode: Geschwindigkeits-Multiplikator
-    const speedMultiplier = this.turboSpeed ? 2 : 1;
 
     // Buffer the direction for smoother cornering
     if (e.key === 'ArrowUp') {
@@ -2205,24 +4207,59 @@ this.stats.systemPerformance = Math.round(
       this.bufferedDirection = 'R';
     }
 
-    // Try to apply immediately if possible
-    if (this.bufferedDirection) {
-      const canTurn = this.canChangeTo(this.bufferedDirection);
-      if (canTurn) {
-        this.pacman.updateDirection(this.bufferedDirection, this.CELL_SIZE, this.walls);
-        // Update pacman image
-        if (this.bufferedDirection === 'U') {
-          this.pacman.image = this.pacmanUpImage;
-        } else if (this.bufferedDirection === 'D') {
-          this.pacman.image = this.pacmanDownImage;
-        } else if (this.bufferedDirection === 'L') {
-          this.pacman.image = this.pacmanLeftImage;
-        } else if (this.bufferedDirection === 'R') {
-          this.pacman.image = this.pacmanRightImage;
+      // Try to apply immediately if possible
+      if (this.bufferedDirection) {
+        const canTurn = this.canChangeTo(this.bufferedDirection);
+        if (canTurn) {
+          this.pacman.updateDirection(this.bufferedDirection, this.CELL_SIZE, this.walls);
+          // Update pacman image
+          if (this.bufferedDirection === 'U') {
+            this.pacman.image = this.pacmanUpImage;
+          } else if (this.bufferedDirection === 'D') {
+            this.pacman.image = this.pacmanDownImage;
+          } else if (this.bufferedDirection === 'L') {
+            this.pacman.image = this.pacmanLeftImage;
+          } else if (this.bufferedDirection === 'R') {
+            this.pacman.image = this.pacmanRightImage;
+          }
+          this.bufferedDirection = null; // Clear buffer on successful turn
         }
-        this.bufferedDirection = null; // Clear buffer on successful turn
+        // Otherwise keep buffered for next frame
       }
-      // Otherwise keep buffered for next frame
+    }
+
+    // Handle robot2 (WASD keys) in 2-player mode
+    if (this.isTwoPlayerMode && this.robot2) {
+      const key = e.key.toLowerCase();
+      if (key === 'w') {
+        this.bufferedDirection2 = 'U';
+      } else if (key === 's') {
+        this.bufferedDirection2 = 'D';
+      } else if (key === 'a') {
+        this.bufferedDirection2 = 'L';
+      } else if (key === 'd') {
+        this.bufferedDirection2 = 'R';
+      }
+
+      // Try to apply immediately if possible
+      if (this.bufferedDirection2) {
+        const canTurn = this.canChangeTo2(this.bufferedDirection2);
+        if (canTurn) {
+          this.robot2.updateDirection(this.bufferedDirection2, this.CELL_SIZE, this.walls);
+          // Update robot2 image
+          if (this.bufferedDirection2 === 'U') {
+            this.robot2.image = this.robotUpImage;
+          } else if (this.bufferedDirection2 === 'D') {
+            this.robot2.image = this.robotDownImage;
+          } else if (this.bufferedDirection2 === 'L') {
+            this.robot2.image = this.robotLeftImage;
+          } else if (this.bufferedDirection2 === 'R') {
+            this.robot2.image = this.robotRightImage;
+          }
+          this.bufferedDirection2 = null; // Clear buffer on successful turn
+        }
+        // Otherwise keep buffered for next frame
+      }
     }
   }
 
@@ -2235,35 +4272,285 @@ this.stats.systemPerformance = Math.round(
       if (e.key === '1' || e.key === '2') {
         this.slowMotion = 1.0;
       }
+    } else {
+      // Release boost in normal modes
+      if (e.key === 'Shift') {
+        this.isBoostKeyPressed = false;
+        this.turboSpeed = false;
+      }
     }
   }
 
   private openPause() {
     this.showPauseOverlay = true;
     this.gameState = 'paused';
+    this.pauseMenuIndex = 0; // Reset to Resume
     this.stopGameLoop();
   }
 
   resumeFromPause() {
     this.showPauseOverlay = false;
     this.showExitConfirm = false;
+    this.pauseMenuIndex = 0;
     if (!this.gameOver) {
       this.gameState = 'playing';
       this.startGameLoop();
     }
   }
 
-  requestExitToMenu() {
-    this.showExitConfirm = true;
+  navigatePauseMenu(direction: string): void {
+    if (!this.showPauseOverlay) return;
+
+    switch (direction) {
+      case 'L':
+        this.pauseMenuIndex = Math.max(0, this.pauseMenuIndex - 1);
+        break;
+      case 'R':
+        this.pauseMenuIndex = Math.min(2, this.pauseMenuIndex + 1);
+        break;
+    }
   }
 
-  confirmExitToMenu() {
-    this.showExitConfirm = false;
-    this.stopGameLoop();
-    this.router.navigate(['/']);
+  selectPauseMenuItem(): void {
+    if (!this.showPauseOverlay) return;
+
+    switch (this.pauseMenuIndex) {
+      case 0:
+        this.resumeFromPause();
+        break;
+      case 1:
+        this.restartGame();
+        break;
+      case 2:
+        this.exitGame();
+        break;
+    }
   }
 
-  cancelExitToMenu() {
-    this.showExitConfirm = false;
+  navigateGameOverMenu(direction: string): void {
+    if (this.gameState !== 'gameover') return;
+
+    switch (direction) {
+      case 'L':
+        this.gameOverMenuIndex = Math.max(0, this.gameOverMenuIndex - 1);
+        break;
+      case 'R':
+        this.gameOverMenuIndex = Math.min(1, this.gameOverMenuIndex + 1);
+        break;
+    }
+  }
+
+  selectGameOverMenuItem(): void {
+    if (this.gameState !== 'gameover') return;
+
+    switch (this.gameOverMenuIndex) {
+      case 0:
+        this.restartGame();
+        break;
+      case 1:
+        this.exitGame();
+        break;
+    }
+  }
+
+  // ============================================================================
+  // DECORATIVE INDUSTRIAL ELEMENTS
+  // ============================================================================
+
+  private initializeIndustrialDecorations() {
+    // Warning Signs - Positioned near corners and danger zones (keep only ACHTUNG)
+    this.warningSignsPositions = [
+      { x: 2 * this.CELL_SIZE, y: 3 * this.CELL_SIZE, type: 'achtung' },
+      { x: 25 * this.CELL_SIZE, y: 3 * this.CELL_SIZE, type: 'achtung' },
+      { x: 2 * this.CELL_SIZE, y: 24 * this.CELL_SIZE, type: 'achtung' },
+      { x: 25 * this.CELL_SIZE, y: 24 * this.CELL_SIZE, type: 'achtung' }
+    ];
+
+    // Status LEDs - Blinking indicators (keep blinking dots)
+    this.statusLEDPositions = [
+      { x: 3 * this.CELL_SIZE, y: 6 * this.CELL_SIZE, color: 'green', blinkSpeed: 1000 },
+      { x: 24 * this.CELL_SIZE, y: 6 * this.CELL_SIZE, color: 'green', blinkSpeed: 1200 },
+      { x: 3 * this.CELL_SIZE, y: 21 * this.CELL_SIZE, color: 'orange', blinkSpeed: 800 },
+      { x: 24 * this.CELL_SIZE, y: 21 * this.CELL_SIZE, color: 'red', blinkSpeed: 600 },
+      { x: 10 * this.CELL_SIZE, y: 14 * this.CELL_SIZE, color: 'green', blinkSpeed: 1500 },
+      { x: 17 * this.CELL_SIZE, y: 14 * this.CELL_SIZE, color: 'green', blinkSpeed: 1300 }
+    ];
+  }
+
+  private drawIndustrialDecorations(ctx: CanvasRenderingContext2D) {
+    // Draw Warning Signs
+    this.drawWarningSigns(ctx);
+
+    // Draw Status LEDs (blinking dots)
+    this.drawStatusLEDs(ctx);
+  }
+
+  private drawWarningSigns(ctx: CanvasRenderingContext2D) {
+    this.warningSignsPositions.forEach(sign => {
+      ctx.save();
+      ctx.translate(sign.x, sign.y);
+
+      // Triangle warning sign (ACHTUNG only)
+      ctx.fillStyle = '#FFD700';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -12);
+      ctx.lineTo(-10, 8);
+      ctx.lineTo(10, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Exclamation mark
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(-1.5, -6, 3, 8);
+      ctx.beginPath();
+      ctx.arc(0, 6, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Text below
+      ctx.font = 'bold 5px Arial';
+      ctx.fillStyle = '#000000';
+      ctx.textAlign = 'center';
+      ctx.fillText('ACHTUNG', 0, 16);
+
+      ctx.restore();
+    });
+  }
+
+  private drawStatusLEDs(ctx: CanvasRenderingContext2D) {
+    const time = Date.now();
+    this.statusLEDPositions.forEach(led => {
+      ctx.save();
+      ctx.translate(led.x, led.y);
+
+      // Blink effect
+      const blinkPhase = (time % led.blinkSpeed) / led.blinkSpeed;
+      const isOn = blinkPhase < 0.5;
+      const intensity = isOn ? 1 : 0.3;
+
+      // LED housing - dark gray
+      ctx.fillStyle = '#333333';
+      ctx.beginPath();
+      ctx.arc(0, 0, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // LED light
+      let ledColor = '';
+      if (led.color === 'green') {
+        ledColor = `rgba(0, 255, 0, ${intensity})`;
+      } else if (led.color === 'red') {
+        ledColor = `rgba(255, 0, 0, ${intensity})`;
+      } else if (led.color === 'orange') {
+        ledColor = `rgba(255, 165, 0, ${intensity})`;
+      }
+
+      ctx.fillStyle = ledColor;
+      ctx.beginPath();
+      ctx.arc(0, 0, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Glow effect when on
+      if (isOn) {
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = ledColor;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      ctx.restore();
+    });
+  }
+
+
+  toggleSpielanleitung() {
+    this.showSpielanleitung = !this.showSpielanleitung;
+    if (this.showSpielanleitung) {
+      this.spielanleitungSlide = 0;
+      this.gameState = 'paused';
+      this.stopGameLoop();
+    } else {
+      if (!this.gameOver) {
+        this.gameState = 'playing';
+        this.startGameLoop();
+      }
+    }
+  }
+
+  nextSpielanleitungSlide() {
+    if (this.spielanleitungSlide < 4) {
+      this.spielanleitungSlide++;
+    }
+  }
+
+  prevSpielanleitungSlide() {
+    if (this.spielanleitungSlide > 0) {
+      this.spielanleitungSlide--;
+    }
+  }
+
+  closeSpielanleitung() {
+    this.showSpielanleitung = false;
+    if (!this.gameOver) {
+      this.gameState = 'playing';
+      this.startGameLoop();
+    }
+  }
+
+  // Gamepad control for SPIELANLEITUNG
+  private handleSpielanleitungGamepad() {
+    const now = Date.now();
+    if (now - this.lastGamepadSpielanleitungAction < 300) {
+      return; // Debounce
+    }
+
+    // Left shoulder (L1/LB) - Previous slide
+    if (this.inputService.isLeftShoulderPressed()) {
+      this.prevSpielanleitungSlide();
+      this.lastGamepadSpielanleitungAction = now;
+      return;
+    }
+
+    // Right shoulder (R1/RB) - Next slide
+    if (this.inputService.isRightShoulderPressed()) {
+      this.nextSpielanleitungSlide();
+      this.lastGamepadSpielanleitungAction = now;
+      return;
+    }
+
+    // D-Pad Left - Previous slide
+    const dir = this.inputService.getDirection();
+    if (dir === 'L') {
+      this.prevSpielanleitungSlide();
+      this.lastGamepadSpielanleitungAction = now;
+      return;
+    }
+
+    // D-Pad Right - Next slide
+    if (dir === 'R') {
+      this.nextSpielanleitungSlide();
+      this.lastGamepadSpielanleitungAction = now;
+      return;
+    }
+
+    // Back button (View/Select) - Close SPIELANLEITUNG
+    if (this.inputService.isBackButtonPressed()) {
+      this.closeSpielanleitung();
+      this.lastGamepadSpielanleitungAction = now;
+      return;
+    }
+
+    // B button (button 1) - Close SPIELANLEITUNG
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const gp of gamepads) {
+      if (gp && gp.buttons[1]?.pressed) {
+        this.closeSpielanleitung();
+        this.lastGamepadSpielanleitungAction = now;
+        return;
+      }
+    }
   }
 }
+
+

@@ -291,6 +291,43 @@ canvas {
   border: 1px solid #555;
 }
 
+.btn.selected {
+  border-color: #fff;
+  color: #fff;
+  transform: scale(1.1);
+  box-shadow:
+    0 6px 25px rgba(0, 0, 0, 0.7),
+    0 0 40px rgba(255, 255, 255, 0.6),
+    inset 0 0 20px rgba(255, 255, 255, 0.2);
+  animation: buttonPulse 0.3s ease;
+}
+
+.btn.primary.selected {
+  background: #00FF88;
+  border-color: #fff;
+  color: #000;
+  box-shadow:
+    0 6px 25px rgba(0, 0, 0, 0.7),
+    0 0 40px rgba(0, 255, 136, 1),
+    inset 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+.btn.ghost.selected {
+  background: #ED6B00;
+  border-color: #fff;
+  color: #fff;
+  box-shadow:
+    0 6px 25px rgba(0, 0, 0, 0.7),
+    0 0 40px rgba(237, 107, 0, 1),
+    inset 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+@keyframes buttonPulse {
+  0% { transform: scale(1.05); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1.1); }
+}
+
 .leaderboard-block {
   margin-top: 12px;
 }
@@ -376,34 +413,3 @@ canvas {
   color: #000;
   font-weight: bold;
 }
-/* =========================
-   Achievement popup (toast)
-   ========================= */
-
-/* Achievement popup container */
-.achievement-toast {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.92);
-  color: #ffffff;
-  z-index: 2147483647; /* Always on top */
-  pointer-events: none;
-  width: 320px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-}
-
-/* Achievement title */
-.achievement-title {
-  font-weight: 800;
-  margin-bottom: 4px;
-}
-
-/* Achievement description */
-.achievement-desc {
-  font-size: 13px;
-  opacity: 0.92;
-}
-

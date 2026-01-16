@@ -3,11 +3,15 @@ import { StartPageComponent } from './start-page/start-page.component';
 import { PlayerNameComponent } from './player-name/player-name.component';
 import { GameCanvasComponent } from './game-canvas/game-canvas.component';
 import { InfoComponent } from './info/info.component';
+import { PresentationComponent } from './presentation/presentation.component';
+import { BossFightComponent } from './boss-fight/boss-fight.component';
 
 export const routes: Routes = [
   { path: '', component: StartPageComponent },        // Startseite (mode selection)
+  { path: 'spielanleitung', component: PresentationComponent }, // Spielanleitung (Instructions)
   { path: 'player-name', component: PlayerNameComponent }, // Player name input
   { path: 'game', component: GameCanvasComponent },   // Game
+  { path: 'boss', component: BossFightComponent },      // Boss Fight
   { path: 'info', component: InfoComponent },         // Info-Seite (About & Sensors)
   { path: '**', redirectTo: '' }                      // Fallback
 

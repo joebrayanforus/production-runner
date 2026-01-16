@@ -30,10 +30,16 @@
   <!-- Retro Menu -->
   <nav class="retro-menu">
     <button class="menu-item"
+            [class.selected]="selectedMode === 'spielanleitung'"
+            (click)="selectMode('spielanleitung')">
+      <span class="menu-arrow">▶</span>
+      <span class="menu-text">SPIELANLEITUNG</span>
+    </button>
+    <button class="menu-item"
             [class.selected]="selectedMode === 'classic'"
             (click)="selectMode('classic')">
       <span class="menu-arrow">▶</span>
-      <span class="menu-text">1 PLAYER</span>
+      <span class="menu-text">SPIELEN</span>
     </button>
     <button class="menu-item"
             [class.selected]="selectedMode === 'practice'"
@@ -41,6 +47,7 @@
       <span class="menu-arrow">▶</span>
       <span class="menu-text">SIMULATION</span>
     </button>
+
     <button class="menu-item menu-disabled">
       <span class="menu-arrow"></span>
       <span class="menu-text">EXIT</span>

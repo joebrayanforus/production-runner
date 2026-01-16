@@ -6,13 +6,14 @@ import {
   LeaderboardService,
   LeaderboardEntry
 } from '../services/leaderboard.service';
+import { InputService } from '../services/input.service';
 
-export type GameMode = 'classic' | 'practice';
+export type GameMode = 'classic' | 'practice' | 'spielanleitung';
 
 @Component({
   selector: 'app-start-page',
   standalone: true,
-  imports: [RouterLink, CommonModule],
+  imports: [CommonModule],
   templateUrl: './start-page.component.html',
   styleUrls: ['./start-page.component.css']
 })
@@ -20,12 +21,14 @@ export class StartPageComponent implements OnInit, OnDestroy {
   selectedMode: GameMode = 'classic';
   leaderboard: LeaderboardEntry[] = [];
   topScores: LeaderboardEntry[] = [];
+  private readonly menuModes: GameMode[] = ['spielanleitung', 'classic', 'practice'];
   private gamepadPollInterval: any;
   private lastKeyboardSelect = 0;
 
   constructor(
     private leaderboardService: LeaderboardService,
-    private router: Router
+    private router: Router,
+    private inputService: InputService
   ) {}
 
   ngOnInit(): void {
@@ -51,11 +54,18 @@ export class StartPageComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent) {
-    if (['ArrowLeft', 'ArrowUp'].includes(event.key)) {
-      this.selectedMode = 'classic';
+    const modes: GameMode[] = this.menuModes;
+    const currentIndex = modes.indexOf(this.selectedMode);
+
+    if (['ArrowUp', 'ArrowLeft'].includes(event.key)) {
+      // Navigate to previous mode (with wrap around)
+      const newIndex = currentIndex === 0 ? modes.length - 1 : currentIndex - 1;
+      this.selectedMode = modes[newIndex];
       event.preventDefault();
-    } else if (['ArrowRight', 'ArrowDown'].includes(event.key)) {
-      this.selectedMode = 'practice';
+    } else if (['ArrowDown', 'ArrowRight'].includes(event.key)) {
+      // Navigate to next mode (with wrap around)
+      const newIndex = (currentIndex + 1) % modes.length;
+      this.selectedMode = modes[newIndex];
       event.preventDefault();
     } else if (event.key === 'Enter') {
       const now = Date.now();
@@ -72,11 +82,16 @@ export class StartPageComponent implements OnInit, OnDestroy {
   }
 
   startGame(): void {
-    // Navigate to player-name page with selected game mode
+    if (this.selectedMode === 'spielanleitung') {
+      this.router.navigate(['/spielanleitung']);
+      return;
+    }
+
     this.router.navigate(['/player-name'], {
       queryParams: { mode: this.selectedMode }
     });
   }
+
 
   // Gamepad Polling for Mode Selection
   private startGamepadPolling(): void {
@@ -85,17 +100,11 @@ export class StartPageComponent implements OnInit, OnDestroy {
     let lastSelectTime = 0;
 
     this.gamepadPollInterval = setInterval(() => {
-      const gamepad = navigator.getGamepads()[0];
-      if (!gamepad) return;
-
-      // Detect direction from analog stick or D-pad
-      let currentDirection = '';
-      const threshold = 0.5;
-
-      if (gamepad.axes[1] < -threshold || gamepad.buttons[12]?.pressed) currentDirection = 'U';
-      else if (gamepad.axes[1] > threshold || gamepad.buttons[13]?.pressed) currentDirection = 'D';
-      else if (gamepad.axes[0] < -threshold || gamepad.buttons[14]?.pressed) currentDirection = 'L';
-      else if (gamepad.axes[0] > threshold || gamepad.buttons[15]?.pressed) currentDirection = 'R';
+      // Try arcade joystick first, fallback to standard gamepad
+      let currentDirection = this.inputService.getArcadeDirection(1);
+      if (!currentDirection) {
+        currentDirection = this.inputService.getDirection();
+      }
 
       // Handle direction input
       if (currentDirection && currentDirection === lastDirection) {
@@ -113,8 +122,8 @@ export class StartPageComponent implements OnInit, OnDestroy {
         directionHoldTime = 0;
       }
 
-      // A Button (0) - Select mode and start game
-      if (gamepad.buttons[0]?.pressed) {
+      // Arcade Select button (Button 10) or standard A button (0) - Select mode and start game
+      if (this.inputService.isArcadeSelectPressed() || this.inputService.isActionButtonPressed()) {
         const now = Date.now();
         if (now - lastSelectTime > 300) {
           this.startGame();
@@ -125,14 +134,13 @@ export class StartPageComponent implements OnInit, OnDestroy {
   }
 
   private handleModeNavigation(direction: string): void {
-    // Toggle between classic and practice with any direction key
-    switch (direction) {
-      case 'L':
-      case 'U':
-      case 'R':
-      case 'D':
-        this.selectedMode = this.selectedMode === 'classic' ? 'practice' : 'classic';
-        break;
-    }
+    const modes = this.menuModes;
+    let idx = modes.indexOf(this.selectedMode);
+    if (idx < 0) idx = 0;
+
+    const isPrev = direction === 'L' || direction === 'U';
+    idx = isPrev ? (idx === 0 ? modes.length - 1 : idx - 1) : (idx + 1) % modes.length;
+
+    this.selectedMode = modes[idx];
   }
 }
