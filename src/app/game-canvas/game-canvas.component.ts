@@ -47,6 +47,31 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private lastFrameTime = 0;
   private readonly FPS = 30;
   private onKeyDownBound = (e: KeyboardEvent) => this.onKeyDown(e);
+  // ===== BOOST / ENERGY =====
+  boostEnergy: number = 100;
+  readonly MAX_BOOST_ENERGY = 100;
+  readonly BOOST_DRAIN_RATE = 35;
+  readonly BOOST_RECHARGE_RATE = 20;
+
+  isBoostKeyPressed = false;
+  turboSpeed = false;
+
+  // ===== ANNOUNCEMENTS =====
+  lastAnnouncement: string = '';
+  announcementCooldown: number = 0;
+
+  // ===== LIGHTING / FLASHLIGHT =====
+  ambientDarkness: number = 0.65;
+  flashlightRadius: number = 140;
+
+  // ===== UI / DECOR =====
+  private warningSignsPositions: Array<{ x: number; y: number; type: 'achtung' }> = [];
+  private statusLEDPositions: Array<{ x: number; y: number; color: 'green' | 'orange' | 'red'; blinkSpeed: number }> = [];
+  private lightingEnabled: boolean = true;
+
+
+
+
   // Assets - Industrial Equipment
   private malfunctionBlueImage = new Image();
   private malfunctionOrangeImage = new Image();
@@ -242,9 +267,6 @@ private showAchievementToast(def: AchievementDef) {
   // Particle System for visual effects
   private particles: Particle[] = [];
 
-  // Decorative Industrial Elements
-  private warningSignsPositions: Array<{x: number, y: number, type: 'achtung' | 'verboten' | 'warnung'}> = [];
-  private statusLEDPositions: Array<{x: number, y: number, color: 'green' | 'red' | 'orange', blinkSpeed: number}> = [];
 
   // Malfunction Spawning Timer
   private malfunctionSpawnTimer = 0;
@@ -1602,7 +1624,8 @@ private showAchievementToast(def: AchievementDef) {
 
   private drawUI(ctx: CanvasRenderingContext2D) {
     // Draw industrial frame around game area
-    this.drawIndustrialFrame(ctx);
+    this.drawIndustrialDecorations(ctx);
+
 
     // IFM Logo on the score bar - very visible
     ctx.save();
@@ -2195,7 +2218,6 @@ private showAchievementToast(def: AchievementDef) {
   // Modi-spezifische Einstellungen
   isInvincible = false;      // Practice Mode: Unverwundbarkeit
   slowMotion = 1.0;          // Practice Mode: Zeitlupe (1.0 = normal)
-  turboSpeed = false;        // Turbo Mode: 2x Geschwindigkeit
 
   // Practice Mode: Zeit-Rückspulung
   private gameHistory: Array<{
@@ -2872,7 +2894,7 @@ private updatePerformanceAndCheckAchievements() {
 
     // Boost button (Button 12) - only in playing state
     if (this.gameState === 'playing' && this.gameMode !== 'practice') {
-      const boostPressed = this.inputService.isArcadeBoostPressed();
+      const boostPressed: boolean = this.inputService.isArcadeBoostPressed();
       if (boostPressed && !this.isBoostKeyPressed) {
         this.isBoostKeyPressed = true;
         console.log('🚀 Boost aktiviert (Arcade Button)');
@@ -4282,8 +4304,8 @@ this.stats.systemPerformance = Math.round(
           this.bufferedDirection = null; // Clear buffer on successful turn
         }
         // Otherwise keep buffered for next frame
-      }
-    }
+      
+
 
     // Handle robot2 (WASD keys) in 2-player mode
     if (this.isTwoPlayerMode && this.robot2) {
@@ -4317,8 +4339,6 @@ this.stats.systemPerformance = Math.round(
         }
         // Otherwise keep buffered for next frame
       }
-    }
-  }
 
   // KeyUp Handler für Practice Mode
   private onKeyUp(e: KeyboardEvent) {
@@ -4337,6 +4357,24 @@ this.stats.systemPerformance = Math.round(
       }
     }
   }
+  requestExitToMenu() {
+  this.showExitConfirm = true;
+  this.gameState = 'paused';
+  this.stopGameLoop();
+}
+
+cancelExitToMenu() {
+  this.showExitConfirm = false;
+  if (!this.gameOver) {
+    this.gameState = 'playing';
+    this.startGameLoop();
+  }
+}
+
+confirmExitToMenu() {
+  this.exitGame();
+}
+
 
   private openPause() {
     this.showPauseOverlay = true;
