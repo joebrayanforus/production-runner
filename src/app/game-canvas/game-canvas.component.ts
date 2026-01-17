@@ -8,7 +8,9 @@ import { Block } from '../models/Block';
 import { AudioService } from '../services/audio.service';
 import { InputService } from '../services/input.service';
 import { GameStats } from '../models/game-stats';
-import { AchievementService } from '../services/achievement.service';
+import { AchievementService, AchievementDef } from '../services/achievement.service';
+
+
 
 
 
@@ -143,6 +145,39 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   playerName = ''; // Player name for leaderboard
   playerName2 = ''; // Second player name for 2-player mode
   gameMode: GameMode = 'classic'; // Make gameMode accessible in template
+
+  // ===== Achievements / Stats =====
+stats: GameStats = {
+  sensorDataCollected: 0,
+  repairsSuccessful: 0,
+  errorsFixed: 0,
+  systemPerformance: 0,
+  achievementsUnlocked: {
+    ifm_meister: false,
+    wartungsexperte: false,
+    stoerungsjaeger: false,
+    effizienz_champion: false,
+  }
+};
+
+achievementToast: { title: string; description: string } | null = null;
+private achievementToastTimeoutId: any = null;
+
+// For level-based performance calc
+private sensorDataAtLevelStart = 0;
+private levelTotalSensors = 0;
+
+private showAchievementToast(def: AchievementDef) {
+  this.achievementToast = { title: def.title, description: def.description };
+
+  if (this.achievementToastTimeoutId) {
+    clearTimeout(this.achievementToastTimeoutId);
+  }
+  this.achievementToastTimeoutId = setTimeout(() => {
+    this.achievementToast = null;
+  }, 4000);
+}
+
 
   // 2-Player mode enhanced stats
   player1Score = 0;
@@ -338,7 +373,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Draw decorative industrial elements
-    this.drawIndustrialDecorations(ctx);
+   // this.drawIndustrialDecorations(ctx);
 
     // Draw production line walls (pipes, conveyors, machinery)
     this.walls.forEach(wall => {
@@ -2400,6 +2435,13 @@ private updatePerformanceAndCheckAchievements() {
     // Speichere Gesamtanzahl der Pellets für Cherry-Spawn
     this.totalPellets = this.foods.size + this.powerPellets.size;
 
+
+    // === Level performance baseline (for % calculation) ===
+    this.levelTotalSensors = this.foods.size;
+    this.sensorDataAtLevelStart = this.stats.sensorDataCollected;
+
+
+  
     // Create additional ghosts to reach 8 total
     this.createAdditionalGhosts();
 
@@ -4080,6 +4122,21 @@ this.stats.systemPerformance = Math.round(
     this.powerPellets.clear();
     this.ghosts.clear();
     this.cherry = null;
+    this.stats = {
+    sensorDataCollected: 0,
+    repairsSuccessful: 0,
+    errorsFixed: 0,
+    systemPerformance: 0,
+    achievementsUnlocked: {
+    ifm_meister: false,
+    wartungsexperte: false,
+    stoerungsjaeger: false,
+    effizienz_champion: false,
+  }
+};
+
+  this.achievementToast = null;
+
     this.loadMap();
     this.resetPositions();
     this.lives = 3;
