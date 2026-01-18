@@ -19,12 +19,6 @@
       </div>
       <canvas #gameCanvas></canvas>
       <div class="scanline-overlay"></div>
-      <!-- Achievement popup displayed when an achievement is unlocked -->
-      <div class="achievement-toast" *ngIf="achievementToast">
-      <div class="achievement-title">{{ achievementToast.title }}</div>
-      <div class="achievement-desc">{{ achievementToast.description }}</div>
-      </div>
-
 
       <!-- Game Over Overlay -->
       <div class="overlay" *ngIf="gameState === 'gameover'">
