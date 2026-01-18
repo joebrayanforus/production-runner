@@ -185,7 +185,8 @@ export class AudioService {
   private loadOriginalSounds() {
     // Load original sound files as fallback
     const soundFiles = {
-      'theme': 'assets/mp3/theme.mp3'  // Keep original theme
+      'theme': 'assets/mp3/theme.mp3',  // Keep original theme
+      'soundtrack': 'assets/mp3/soundtrack.mp3'  // Game soundtrack
     };
 
     for (const [key, path] of Object.entries(soundFiles)) {
@@ -194,11 +195,11 @@ export class AudioService {
       this.sounds.set(key, audio);
     }
 
-    // Setup background music
-    this.backgroundMusic = this.sounds.get('theme') || null;
+    // Setup background music (soundtrack)
+    this.backgroundMusic = this.sounds.get('soundtrack') || this.sounds.get('theme') || null;
     if (this.backgroundMusic) {
       this.backgroundMusic.loop = true;
-      this.backgroundMusic.volume = 0.3;
+      this.backgroundMusic.volume = 0.2;
     }
   }  play(soundName: string) {
     if (this.isMuted) return;
