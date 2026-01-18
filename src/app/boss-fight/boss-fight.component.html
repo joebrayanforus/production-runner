@@ -28,7 +28,8 @@
         </div>
         <div class="game-mode-badge">
           <span class="mode-label">MODE:</span>
-          <span class="mode-value">{{ gameMode.toUpperCase() === 'CLASSIC' ? 'CLASSIC' : 'PRACTICE' }}</span>
+          <span class="mode-value">{{ modeLabel }}</span>
+
         </div>
       </div>
       <canvas #gameCanvas></canvas>
@@ -52,7 +53,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let entry of leaderboard; let i = index">
+                <tr *ngFor="let entry of leaderboard; let i = index; trackBy: trackByLeaderboard">
                   <td>{{ entry.rank ?? i + 1 }}</td>
                   <td>{{ entry.username }}</td>
                   <td>{{ entry.points }}</td>
@@ -64,8 +65,8 @@
           </div>
 
           <div class="overlay-actions below">
-            <button class="btn primary" (click)="restartGame()">🔄 RESTART</button>
-            <button class="btn ghost" (click)="exitGame()">❌ EXIT</button>
+            <button type="button" class="btn primary" (click)="restartGame()">🔄 RESTART</button>
+            <button type="button" class="btn ghost" (click)="exitGame()">❌ EXIT</button>
           </div>
         </div>
       </div>
@@ -78,7 +79,7 @@
   <div class="overlay-panel spielanleitung-panel">
     <div class="spielanleitung-header">
       <h2>📋 SPIELANLEITUNG</h2>
-      <button class="close-btn" (click)="closeSpielanleitung()">✕</button>
+      <button type="button" class="close-btn" (click)="closeSpielanleitung()">✕</button>
     </div>
 
     <!-- Slide 1: STEUERUNG -->
@@ -152,7 +153,7 @@
     </div>
 
     <div class="slide-navigation">
-      <button class="nav-btn" [disabled]="spielanleitungSlide === 0" (click)="prevSpielanleitungSlide()">◄ ZURÜCK</button>
+      <button type="button" class="nav-btn" [disabled]="spielanleitungSlide === 0" (click)="prevSpielanleitungSlide()">◄ ZURÜCK</button>
       <div class="slide-indicator">
         <span class="dot" [class.active]="spielanleitungSlide === 0"></span>
         <span class="dot" [class.active]="spielanleitungSlide === 1"></span>
@@ -160,7 +161,7 @@
         <span class="dot" [class.active]="spielanleitungSlide === 3"></span>
         <span class="dot" [class.active]="spielanleitungSlide === 4"></span>
       </div>
-      <button class="nav-btn" [disabled]="spielanleitungSlide === 4" (click)="nextSpielanleitungSlide()">WEITER ►</button>
+      <button type="button"class="nav-btn" [disabled]="spielanleitungSlide === 4" (click)="nextSpielanleitungSlide()">WEITER ►</button>
     </div>
 
     <div class="gamepad-controls-footer">
@@ -177,15 +178,15 @@
     <h2>⏸️ PAUSED</h2>
     <p>GAME PAUSED</p>
     <div class="overlay-actions">
-      <button class="btn primary" (click)="resumeFromPause()">▶️ RESUME</button>
-      <button class="btn ghost" (click)="restartGame()">🔄 RESTART</button>
-      <button class="btn ghost" (click)="requestExitToMenu()">🏠 MENU</button>
+      <button type="button" class="btn primary" (click)="resumeFromPause()">▶️ RESUME</button>
+      <button type="button" class="btn ghost" (click)="restartGame()">🔄 RESTART</button>
+      <button type="button" class="btn ghost" (click)="requestExitToMenu()">🏠 MENU</button>
     </div>
     <div *ngIf="showExitConfirm" class="exit-confirm">
       <p>EXIT TO MENU?</p>
       <div class="overlay-actions">
-        <button class="btn ghost" (click)="cancelExitToMenu()">NO</button>
-        <button class="btn primary" (click)="confirmExitToMenu()">YES</button>
+        <button type="button" class="btn ghost" (click)="cancelExitToMenu()">NO</button>
+        <button type="button" class="btn primary" (click)="confirmExitToMenu()">YES</button>
       </div>
     </div>
   </div>

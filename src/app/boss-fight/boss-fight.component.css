@@ -1020,3 +1020,12 @@ canvas {
   border-radius: 5px;
   border: 1px solid rgba(255, 122, 1, 0.3);
 }
+
+/*
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+*/
