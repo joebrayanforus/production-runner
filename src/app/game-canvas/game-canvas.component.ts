@@ -3612,6 +3612,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private onKeyDown(e: KeyboardEvent) {
+
     // Prevent key repeat events
     if (e.repeat) return;
 

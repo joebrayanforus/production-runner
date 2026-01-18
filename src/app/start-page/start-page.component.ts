@@ -51,6 +51,9 @@ export class StartPageComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent) {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(event.key)) {
+      event.preventDefault();
+    }
     const modes: GameMode[] = ['spielanleitung', 'classic', 'practice', '2player'];
     const currentIndex = modes.indexOf(this.selectedMode);
 
