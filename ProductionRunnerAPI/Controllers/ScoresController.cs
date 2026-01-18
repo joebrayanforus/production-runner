@@ -27,6 +27,7 @@ public class ScoresController : ControllerBase
 
         var scores = await _context.Scores
             .Include(s => s.Player)
+            .Include(s => s.Player2)
             .OrderByDescending(s => s.Points)
             .Take(boundedTop)
             .ToListAsync();
@@ -36,15 +37,24 @@ public class ScoresController : ControllerBase
         for (var i = 0; i < scores.Count; i++)
         {
             var s = scores[i];
+            var username = s.Player.Username;
+
+            // If 2-player mode, combine both usernames
+            if (s.IsTwoPlayerMode && s.Player2 != null)
+            {
+                username = $"{s.Player.Username} & {s.Player2.Username}";
+            }
 
             result.Add(new LeaderboardEntryDto
             {
                 Rank = i + 1,
-                Username = s.Player.Username,
+                Username = username,
                 Points = s.Points,
                 Level = s.Level,
                 SensorsRepaired = s.SensorsRepaired,
-                AchievedAt = s.AchievedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                AchievedAt = s.AchievedAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                IsTwoPlayerMode = s.IsTwoPlayerMode,
+                Player2Username = s.Player2?.Username
             });
         }
 
@@ -93,8 +103,31 @@ public class ScoresController : ControllerBase
             ProductionOrdersCollected = dto.ProductionOrdersCollected,
             SensorsRepaired = dto.SensorsRepaired,
             PlaytimeSeconds = dto.PlaytimeSeconds,
-            AchievedAt = DateTime.UtcNow
+            AchievedAt = DateTime.UtcNow,
+            IsTwoPlayerMode = dto.IsTwoPlayerMode
         };
+
+        // Handle 2-player mode
+        if (dto.IsTwoPlayerMode && !string.IsNullOrWhiteSpace(dto.Player2Username))
+        {
+            var player2Username = dto.Player2Username.Trim();
+            var player2 = await _context.Players
+                .FirstOrDefaultAsync(p => p.Username == player2Username);
+
+            if (player2 == null)
+            {
+                player2 = new Player
+                {
+                    Username = player2Username,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.Players.Add(player2);
+                await _context.SaveChangesAsync();
+            }
+
+            score.Player2Id = player2.Id;
+        }
 
         _context.Scores.Add(score);
         await _context.SaveChangesAsync();
@@ -103,9 +136,18 @@ public class ScoresController : ControllerBase
 
         await _hubContext.Clients.All.SendAsync("LeaderboardUpdated", leaderboard);
 
-        await _hubContext.Clients.All.SendAsync("ReceiveNewScore", dto.Username, dto.Points);
+        // Notify for both players in 2-player mode
+        if (dto.IsTwoPlayerMode && !string.IsNullOrWhiteSpace(dto.Player2Username))
+        {
+            await _hubContext.Clients.All.SendAsync("ReceiveNewScore",
+                $"{dto.Username} & {dto.Player2Username}", dto.Points);
+        }
+        else
+        {
+            await _hubContext.Clients.All.SendAsync("ReceiveNewScore", dto.Username, dto.Points);
+        }
         //await _hubContext.Clients.All.SendAsync("ReceiveNewScore",player.Username,score.Points);
-        
+
         return CreatedAtAction(nameof(GetScore), new { id = score.Id }, score);
     }
 

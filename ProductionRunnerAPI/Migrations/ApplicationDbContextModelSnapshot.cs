@@ -89,9 +89,17 @@ namespace ProductionRunnerAPI.Migrations
                     b.Property<int>("SensorsRepaired")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsTwoPlayerMode")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Player2Id")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PlayerId");
+
+                    b.HasIndex("Player2Id");
 
                     b.HasIndex("Points");
 
@@ -108,7 +116,8 @@ namespace ProductionRunnerAPI.Migrations
                             PlaytimeSeconds = 420,
                             Points = 8450,
                             ProductionOrdersCollected = 280,
-                            SensorsRepaired = 12
+                            SensorsRepaired = 12,
+                            IsTwoPlayerMode = false
                         },
                         new
                         {
@@ -120,7 +129,8 @@ namespace ProductionRunnerAPI.Migrations
                             PlaytimeSeconds = 380,
                             Points = 7280,
                             ProductionOrdersCollected = 245,
-                            SensorsRepaired = 10
+                            SensorsRepaired = 10,
+                            IsTwoPlayerMode = false
                         },
                         new
                         {
@@ -132,7 +142,8 @@ namespace ProductionRunnerAPI.Migrations
                             PlaytimeSeconds = 350,
                             Points = 6910,
                             ProductionOrdersCollected = 230,
-                            SensorsRepaired = 8
+                            SensorsRepaired = 8,
+                            IsTwoPlayerMode = false
                         });
                 });
 
@@ -144,7 +155,13 @@ namespace ProductionRunnerAPI.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("ProductionRunnerAPI.Models.Player", "Player2")
+                        .WithMany()
+                        .HasForeignKey("Player2Id");
+
                     b.Navigation("Player");
+
+                    b.Navigation("Player2");
                 });
 
             modelBuilder.Entity("ProductionRunnerAPI.Models.Player", b =>

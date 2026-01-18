@@ -1,0 +1,192 @@
+
+<div class="game-container">
+  <!-- Animated Pixel Background -->
+  <div class="pixel-bg-animation">
+    <div class="moving-stars"></div>
+    <div class="pixel-grid"></div>
+    <div class="floating-icons">
+      <div class="icon icon-1">🏭</div>
+      <div class="icon icon-2">⚙️</div>
+      <div class="icon icon-3">🤖</div>
+      <div class="icon icon-4">📊</div>
+      <div class="icon icon-5">🔧</div>
+    </div>
+  </div>
+
+  <!-- IFM Logo Top Center -->
+  <div class="game-ifm-logo" *ngIf="showIfmLogo">
+    <img src="assets/ifm1.webp" alt="ifm" class="game-logo-img">
+    <div class="ifm-glow"></div>
+  </div>
+
+  <div class="arcade-cabinet">
+      <div class="arcade-screen-frame">
+      <div class="game-info-bar">
+        <div class="player-badge">
+          <span class="player-icon">⚙️</span>
+          <span class="player-name-display">{{ playerName || 'IFM OPERATOR' }}</span>
+        </div>
+        <div class="game-mode-badge">
+          <span class="mode-label">MODE:</span>
+          <span class="mode-value">{{ gameMode.toUpperCase() === 'CLASSIC' ? 'CLASSIC' : 'PRACTICE' }}</span>
+        </div>
+      </div>
+      <canvas #gameCanvas></canvas>
+      <div class="scanline-overlay"></div>
+
+      <!-- Game Over Overlay -->
+      <div class="overlay" *ngIf="gameState === 'gameover'">
+        <div class="overlay-panel wide">
+          <h2>⚡ GAME OVER</h2>
+          <p>PRODUCTION SCORE: <strong>{{ efficiency }} UNITS</strong></p>
+
+          <div class="leaderboard-block">
+            <h3>🏆 HIGH SCORES</h3>
+            <table class="overlay-table" *ngIf="leaderboard.length > 0">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>OPERATOR</th>
+                  <th>SCORE</th>
+                  <th>LEVEL</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let entry of leaderboard; let i = index">
+                  <td>{{ entry.rank ?? i + 1 }}</td>
+                  <td>{{ entry.username }}</td>
+                  <td>{{ entry.points }}</td>
+                  <td>{{ entry.level }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="overlay-hint" *ngIf="leaderboard.length === 0">NO RESULTS AVAILABLE</p>
+          </div>
+
+          <div class="overlay-actions below">
+            <button class="btn primary" (click)="restartGame()">🔄 RESTART</button>
+            <button class="btn ghost" (click)="exitGame()">❌ EXIT</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SPIELANLEITUNG Overlay -->
+<div class="overlay spielanleitung-overlay" *ngIf="showSpielanleitung">
+  <div class="overlay-panel spielanleitung-panel">
+    <div class="spielanleitung-header">
+      <h2>📋 SPIELANLEITUNG</h2>
+      <button class="close-btn" (click)="closeSpielanleitung()">✕</button>
+    </div>
+
+    <!-- Slide 1: STEUERUNG -->
+    <div class="slide-content" *ngIf="spielanleitungSlide === 0">
+      <h3>🎮 STEUERUNG</h3>
+      <div class="control-grid">
+        <div class="control-item">▲▼◄► PFEILTASTEN</div>
+        <div class="control-desc">Roboter bewegen</div>
+        <div class="control-item">🎮 D-PAD / STICK</div>
+        <div class="control-desc">Roboter bewegen (Gamepad)</div>
+        <div class="control-item">⚡ STRG / CTRL</div>
+        <div class="control-desc">Turbo aktivieren</div>
+        <div class="control-item">🎮 Y / △</div>
+        <div class="control-desc">Hilfe öffnen (Gamepad)</div>
+        <div class="control-item">H</div>
+        <div class="control-desc">Hilfe ein/aus (Tastatur)</div>
+      </div>
+      <p class="slide-desc">🎯 ZIEL: Sammle alle Sensordaten!</p>
+      <div class="gamepad-hint">
+        <strong>🎮 GAMEPAD:</strong> L1/R1 oder ◄► für Navigation | B für Schließen
+      </div>
+    </div>
+
+    <!-- Slide 2: STÖRUNGEN -->
+    <div class="slide-content" *ngIf="spielanleitungSlide === 1">
+      <h3>⚠️ STÖRUNGEN VERMEIDEN</h3>
+      <div class="danger-list">
+        <div class="danger-item">🌡️ TEMPERATUR - Überhitzung</div>
+        <div class="danger-item">💨 DRUCK - Druckausfall</div>
+        <div class="danger-item">📳 VIBRATION - Vibrationen</div>
+        <div class="danger-item">⚙️ VERSCHLEISS - Verschleiß</div>
+      </div>
+      <p class="slide-desc">❌ BERÜHRE SIE NICHT! Kontakt = 1 Leben verloren</p>
+    </div>
+
+    <!-- Slide 3: POWER-UPS -->
+    <div class="slide-content" *ngIf="spielanleitungSlide === 2">
+      <h3>⚡ POWER-UPS</h3>
+      <div class="powerup-list">
+        <div class="powerup-item">🛡️ SCHUTZSCHILD - 10 Sek. Unverwundbar</div>
+        <div class="powerup-item">🔧 WARTUNG - Störungen werden langsam</div>
+        <div class="powerup-item">📡 IOT BOOST - Bonus Punkte</div>
+        <div class="powerup-item">⚡ TURBO - Geschwindigkeit +</div>
+      </div>
+      <p class="slide-desc">⭐ COMBO = Mehrere Daten nacheinander sammeln</p>
+    </div>
+
+    <!-- Slide 4: FABRIK -->
+    <div class="slide-content" *ngIf="spielanleitungSlide === 3">
+      <h3>🏗️ DIE FABRIK</h3>
+      <div class="element-list">
+        <div class="element-item">🧱 WÄNDE - Nicht durchquerbar</div>
+        <div class="element-item">🚪 GEISTERTÜR - Feinde spawnen hier</div>
+        <div class="element-item">✨ PUNKTE - Sensordaten (+10)</div>
+        <div class="element-item">⚙️ STEUERUNG - Kontrollpanel</div>
+      </div>
+    </div>
+
+    <!-- Slide 5: START -->
+    <div class="slide-content" *ngIf="spielanleitungSlide === 4">
+      <h3>🚀 BEREIT?</h3>
+      <div class="ready-info">
+        <div class="info-big">❤️ 3 LEBEN</div>
+        <div class="info-big">🏆 HIGHSCORE</div>
+        <div class="info-big">⚡ TURBO MIT STRG</div>
+      </div>
+      <p class="slide-desc">Drücke H um zurück zum Spiel zu gehen!</p>
+      <div class="gamepad-hint">
+        <strong>🎮 GAMEPAD:</strong> Drücke B (○) um zu schließen
+      </div>
+    </div>
+
+    <div class="slide-navigation">
+      <button class="nav-btn" [disabled]="spielanleitungSlide === 0" (click)="prevSpielanleitungSlide()">◄ ZURÜCK</button>
+      <div class="slide-indicator">
+        <span class="dot" [class.active]="spielanleitungSlide === 0"></span>
+        <span class="dot" [class.active]="spielanleitungSlide === 1"></span>
+        <span class="dot" [class.active]="spielanleitungSlide === 2"></span>
+        <span class="dot" [class.active]="spielanleitungSlide === 3"></span>
+        <span class="dot" [class.active]="spielanleitungSlide === 4"></span>
+      </div>
+      <button class="nav-btn" [disabled]="spielanleitungSlide === 4" (click)="nextSpielanleitungSlide()">WEITER ►</button>
+    </div>
+
+    <div class="gamepad-controls-footer">
+      <span>🎮 L1/LB: Zurück</span>
+      <span>🎮 R1/RB: Weiter</span>
+      <span>🎮 B/○: Schließen</span>
+    </div>
+  </div>
+</div>
+
+<!-- Pause Overlay -->
+<div class="overlay" *ngIf="showPauseOverlay">
+  <div class="overlay-panel">
+    <h2>⏸️ PAUSED</h2>
+    <p>GAME PAUSED</p>
+    <div class="overlay-actions">
+      <button class="btn primary" (click)="resumeFromPause()">▶️ RESUME</button>
+      <button class="btn ghost" (click)="restartGame()">🔄 RESTART</button>
+      <button class="btn ghost" (click)="requestExitToMenu()">🏠 MENU</button>
+    </div>
+    <div *ngIf="showExitConfirm" class="exit-confirm">
+      <p>EXIT TO MENU?</p>
+      <div class="overlay-actions">
+        <button class="btn ghost" (click)="cancelExitToMenu()">NO</button>
+        <button class="btn primary" (click)="confirmExitToMenu()">YES</button>
+      </div>
+    </div>
+  </div>
+</div>

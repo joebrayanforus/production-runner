@@ -1,22 +1,8 @@
 
 <div class="game-container">
-  <!-- Animated Pixel Background -->
-  <div class="pixel-bg-animation">
-    <div class="moving-stars"></div>
-    <div class="pixel-grid"></div>
-    <div class="floating-icons">
-      <div class="icon icon-1">🏭</div>
-      <div class="icon icon-2">⚙️</div>
-      <div class="icon icon-3">🤖</div>
-      <div class="icon icon-4">📊</div>
-      <div class="icon icon-5">🔧</div>
-    </div>
-  </div>
-
-  <!-- IFM Logo Top Center -->
-  <div class="game-ifm-logo" *ngIf="showIfmLogo">
+  <!-- IFM Logo Top Right Corner -->
+  <div class="game-ifm-logo">
     <img src="assets/ifm1.webp" alt="ifm" class="game-logo-img">
-    <div class="ifm-glow"></div>
   </div>
 
   <div class="arcade-cabinet">
@@ -27,12 +13,18 @@
           <span class="player-name-display">{{ playerName || 'IFM OPERATOR' }}</span>
         </div>
         <div class="game-mode-badge">
-          <span class="mode-label">MODE:</span>
-          <span class="mode-value">{{ gameMode.toUpperCase() === 'CLASSIC' ? 'CLASSIC' : 'PRACTICE' }}</span>
+          <span class="mode-label">BETRIEB:</span>
+          <span class="mode-value">{{ gameMode.toUpperCase() === 'CLASSIC' ? 'STANDARD' : 'TRAINING' }}</span>
         </div>
       </div>
       <canvas #gameCanvas></canvas>
       <div class="scanline-overlay"></div>
+      <!-- Achievement popup displayed when an achievement is unlocked -->
+      <div class="achievement-toast" *ngIf="achievementToast">
+      <div class="achievement-title">{{ achievementToast.title }}</div>
+      <div class="achievement-desc">{{ achievementToast.description }}</div>
+      </div>
+
 
       <!-- Game Over Overlay -->
       <div class="overlay" *ngIf="gameState === 'gameover'">
@@ -46,9 +38,9 @@
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>OPERATOR</th>
-                  <th>SCORE</th>
-                  <th>LEVEL</th>
+                  <th>Operator</th>
+                  <th>Effizienz</th>
+                  <th>Level</th>
                 </tr>
               </thead>
               <tbody>
@@ -60,7 +52,7 @@
                 </tr>
               </tbody>
             </table>
-            <p class="overlay-hint" *ngIf="leaderboard.length === 0">NO RESULTS AVAILABLE</p>
+            <p class="overlay-hint" *ngIf="leaderboard.length === 0">Keine Ergebnisse verfügbar.</p>
           </div>
 
           <div class="overlay-actions below">

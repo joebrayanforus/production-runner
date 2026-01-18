@@ -25,4 +25,10 @@ public class CreateScoreDto
 
     [Range(0, int.MaxValue)]
     public int PlaytimeSeconds { get; set; }
+
+    // 2-Player mode support
+    public bool IsTwoPlayerMode { get; set; } = false;
+
+    [StringLength(100)]
+    public string? Player2Username { get; set; }
 }
