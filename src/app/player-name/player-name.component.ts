@@ -3,7 +3,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-export type GameMode = 'classic' | 'practice';
+export type GameMode = 'classic' | 'practice' | '2player';
 
 @Component({
   selector: 'app-player-name',
@@ -14,7 +14,10 @@ export type GameMode = 'classic' | 'practice';
 })
 export class PlayerNameComponent implements OnInit, OnDestroy {
   playerName = '';
+  player2Name = '';
+  currentPlayer: 1 | 2 = 1;
   gameMode: GameMode = 'classic';
+  is2PlayerMode = false;
 
   // Virtual Keyboard Variables
   keyboardVisible = true; // Always show keyboard on this page
@@ -40,6 +43,7 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
     // Get game mode from route params
     this.route.queryParams.subscribe(params => {
       this.gameMode = params['mode'] || 'classic';
+      this.is2PlayerMode = this.gameMode === '2player';
     });
 
     // Start gamepad polling for keyboard navigation
@@ -60,17 +64,36 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   }
 
   isPlayerNameValid(): boolean {
-    return this.playerName.trim().length > 0;
+    if (!this.is2PlayerMode) {
+      return this.playerName.trim().length > 0;
+    }
+    return this.currentPlayer === 1
+      ? this.playerName.trim().length > 0
+      : this.playerName.trim().length > 0 && this.player2Name.trim().length > 0;
+  }
+
+  getCurrentName(): string {
+    return this.currentPlayer === 1 ? this.playerName : this.player2Name;
+  }
+
+  setCurrentName(value: string): void {
+    if (this.currentPlayer === 1) {
+      this.playerName = value;
+    } else {
+      this.player2Name = value;
+    }
   }
 
   addCharacter(char: string): void {
-    if (this.playerName.length < 20) {
-      this.playerName += char;
+    const currentName = this.getCurrentName();
+    if (currentName.length < 20) {
+      this.setCurrentName(currentName + char);
     }
   }
 
   deleteCharacter(): void {
-    this.playerName = this.playerName.slice(0, -1);
+    const currentName = this.getCurrentName();
+    this.setCurrentName(currentName.slice(0, -1));
   }
 
   navigateKeyboard(direction: string): void {
@@ -116,18 +139,39 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   }
 
   startGame(): void {
-    if (this.isPlayerNameValid()) {
-      this.router.navigate(['/game'], {
-        queryParams: {
-          mode: this.gameMode,
-          playerName: this.playerName.trim()
-        }
-      });
+    if (!this.isPlayerNameValid()) return;
+
+    if (this.is2PlayerMode && this.currentPlayer === 1) {
+      // Passer au deuxième joueur
+      this.currentPlayer = 2;
+      return;
+    }
+
+    // Démarrer le jeu
+    const queryParams: any = {
+      mode: this.gameMode,
+      playerName: this.playerName.trim()
+    };
+
+    if (this.is2PlayerMode) {
+      queryParams.player2Name = this.player2Name.trim();
+    }
+
+    this.router.navigate(['/game'], { queryParams });
+  }
+
+  goBackToPlayer1(): void {
+    if (this.is2PlayerMode && this.currentPlayer === 2) {
+      this.currentPlayer = 1;
     }
   }
 
   goBack(): void {
-    this.router.navigate(['/']);
+    if (this.is2PlayerMode && this.currentPlayer === 2) {
+      this.goBackToPlayer1();
+    } else {
+      this.router.navigate(['/']);
+    }
   }
 
   // Gamepad Polling

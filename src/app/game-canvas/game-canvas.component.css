@@ -660,6 +660,16 @@ canvas {
   color: #FF8C33;
 }
 
+/* Gamepad selection indicator */
+.btn.selected {
+  outline: 3px solid #00FF88;
+  outline-offset: 3px;
+  transform: scale(1.05);
+  box-shadow:
+    0 6px 25px rgba(0, 0, 0, 0.7),
+    0 0 40px rgba(0, 255, 136, 1);
+}
+
 .leaderboard-block {
   margin-top: 12px;
 }

@@ -8,6 +8,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Angular](https://img.shields.io/badge/Angular-DD0031?logo=angular&logoColor=white)](https://angular.io/)
 [![.NET](https://img.shields.io/badge/.NET-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![Arcade](https://img.shields.io/badge/🕹️_ICONIC_ARCADE-Ready-FF6B00)](docs/ARCADE_QUICK_START.md)
 
 ---
 
@@ -20,6 +21,7 @@
 - **Gamification** für Wartezeiten bei Modell-Training und Produktionsplanung
 - **Nahtlose Integration** in ifm statmath Produkte
 - **Lauffähig** auf Arcade-Automaten für Messestände
+- **🕹️ ICONIC ARCADE Support** - Komplett optimiert für Raspberry Pi 4 Arcade-Systeme
 
 ---
 ## Kernmechanik:
@@ -65,6 +67,10 @@ Power-Up "KI-Optimierung" ermöglicht Sensor-Reparatur (200 Punkte) Scoring: Auf
 ## 🚀 Features
 
 - ✅ **Gamepad-Steuerung** (USB-Controller + Keyboard-Fallback)
+- ✅ **🕹️ 2-Spieler Modus** - Kooperatives Gameplay mit 2 Joysticks
+- ✅ **ICONIC ARCADE Ready** - Optimiert für Raspberry Pi 4 Arcade-Systeme
+- ✅ **16 Arcade-Buttons Support** - Vormontierte Mikroschalter-Steuerung
+- ✅ **Turbo-System** - Energie-basiertes Boost-System für beide Spieler
 - ✅ **Echtzeit-Leaderboard** (SignalR)
 - ✅ **Persistente Highscores** (PostgreSQL)
 - ✅ **Docker-Compose Setup** (debian/x86_64)
@@ -99,19 +105,58 @@ Power-Up "KI-Optimierung" ermöglicht Sensor-Reparatur (200 Punkte) Scoring: Auf
 git clone https://github.com/joebrayanforus/production-runner.git
 cd production-runner
 ```
-...(coming soon)
+
+### Schritt 2: Installation auswählen
+
+#### 🕹️ ICONIC ARCADE (Raspberry Pi 4)
+```bash
+# Automatische Installation für Arcade-Systeme
+chmod +x install-arcade.sh
+./install-arcade.sh
+
+# Oder manuell siehe:
+# docs/ARCADE_QUICK_START.md
+```
+
+#### 💻 Standard-Installation (Docker)
+```bash
+docker-compose up -d
+# Siehe DOCKER_SETUP.md für Details
+```
+
+---
 
 ## 🎮 Steuerung
 
-### Gamepad (bevorzugt):
-- **Linker Stick / D-Pad:** Bewegung (↑ ↓ ← →)
-- **A-Button:** Pause
-- **START-Button:** Neues Spiel
+### 🕹️ ICONIC ARCADE (2 Spieler)
 
-### Tastatur (Entwicklung):
-- **Pfeiltasten / WASD:** Bewegung
-- **SPACE:** Pause
-- **ENTER:** Neues Spiel
+#### Spieler 1 (Orange) - Linke Seite:
+- **Joystick 1:** Bewegung (8-Wege)
+- **Buttons 1-4:** Turbo aktivieren
+- **Button 6:** Hilfe (H)
+- **Pfeiltasten:** Alternative Steuerung
+- **STRG:** Turbo (Tastatur)
+
+#### Spieler 2 (Blau) - Rechte Seite:
+- **Joystick 2:** Bewegung (8-Wege)
+- **Buttons 9-12:** Turbo aktivieren
+- **Button 14:** Hilfe (H)
+- **WASD:** Alternative Steuerung
+- **SHIFT:** Turbo (Tastatur)
+
+### 🎮 Gamepad (Standard):
+- **Linker Stick / D-Pad:** Bewegung (↑ ↓ ← →)
+- **A / X Button:** Turbo
+- **Y / △ Button:** Hilfe
+- **START:** Pause
+
+### ⌨️ Tastatur:
+- **Pfeiltasten:** Spieler 1 Bewegung
+- **WASD:** Spieler 2 Bewegung (2-Spieler Modus)
+- **STRG / Control:** Spieler 1 Turbo
+- **SHIFT:** Spieler 2 Turbo
+- **H:** Hilfe ein/aus
+- **ESC:** Pause
 
 ---
 
@@ -137,8 +182,60 @@ production-runner/
 │   └── init.sql
 ├── docker-compose.yml     # Orchestrierung aller Services
 ├── Spielkonzept_Phase1.md # Konzept-Dokument
-└── Skizzen_Phase1.md      # Spielfeld-Skizzen
+├── Skizzen_Phase1.md      # Spielfeld-Skizzen
+├── install-arcade.sh      # 🕹️ ICONIC ARCADE Installer
+└── docs/                  # Dokumentation
+    ├── ARCADE_QUICK_START.md
+    ├── ARCADE_DEPLOYMENT.md
+    └── HARDWARE_TESTING_GUIDE.md
 ```
+
+---
+
+## 📖 Dokumentation
+
+### Spieler-Guides:
+- **[🕹️ ARCADE QUICK START](docs/ARCADE_QUICK_START.md)** - Schnellstart für ICONIC ARCADE
+- **[📋 ICONIC ARCADE ANLEITUNG](ICONIC_ARCADE_ANLEITUNG.md)** - Vollständige Arcade-Dokumentation
+- **[🎮 Spielanleitung](Spielkonzept_Phase1.md)** - Gameplay & Mechaniken
+- **[🎨 Level-Design](Skizzen_Phase1.md)** - Map-Layout & Gegner-Verhalten
+
+### Entwickler-Dokumentation:
+- **[🐳 Docker Setup](DOCKER_SETUP.md)** - Container-Deployment
+- **[🎯 Frontend Implementation](docs/FRONTEND_IMPLEMENTATION.md)** - Angular Architektur
+- **[🏗️ Arcade Deployment](docs/ARCADE_DEPLOYMENT.md)** - Arcade-System Setup
+- **[🔧 Hardware Testing](docs/HARDWARE_TESTING_GUIDE.md)** - Joystick & Button Kalibrierung
+
+### Medien & Assets:
+- **[🎵 Background Music](IFM_BACKGROUND_MUSIC.md)** - Sound Design
+- **[🔊 Industrial Sounds](INDUSTRIAL_SOUNDS.md)** - Audio-Effekte
+- **[🎬 Video Integration](VIDEO_INTEGRATION_GUIDE.md)** - Video-Backgrounds
+
+---
+
+## 🕹️ ICONIC ARCADE Spezifikationen
+
+### Hardware:
+- **Prozessor:** Raspberry Pi 4B (4GB RAM empfohlen)
+- **Display:** 21" Full-HD (1920x1080)
+- **Steuerung:** 2 Mikroschalter-Joysticks + 16 Arcade-Buttons
+- **Audio:** 2x 4" Stereo-Lautsprecher + Class-D Verstärker
+- **Anschlüsse:** WiFi, Bluetooth, Gigabit-Ethernet, HDMI, USB
+- **Stromversorgung:** DC-IN 90W 12V/7.5A
+- **Maße:** 56 x 50 x 158 cm
+
+### Unterstützte Betriebssysteme:
+- ✅ Batocera
+- ✅ Recalbox
+- ✅ RetroPie
+- ✅ Lakka
+
+### Features:
+- ✅ Plug & Play - Vormontiert
+- ✅ 2-Spieler vollständig unterstützt
+- ✅ Optimiert für Raspberry Pi 4
+- ✅ Automatische Installation verfügbar
+- ✅ Kiosk-Modus für Messestände
 
 ---
 

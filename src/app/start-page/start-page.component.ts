@@ -7,7 +7,7 @@ import {
   LeaderboardEntry
 } from '../services/leaderboard.service';
 
-export type GameMode = 'classic' | 'practice' | 'spielanleitung';
+export type GameMode = 'classic' | 'practice' | 'spielanleitung' | '2player';
 
 @Component({
   selector: 'app-start-page',
@@ -51,7 +51,7 @@ export class StartPageComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent) {
-    const modes: GameMode[] = ['spielanleitung', 'classic', 'practice'];
+    const modes: GameMode[] = ['spielanleitung', 'classic', 'practice', '2player'];
     const currentIndex = modes.indexOf(this.selectedMode);
 
     if (['ArrowUp', 'ArrowLeft'].includes(event.key)) {
