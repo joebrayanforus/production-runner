@@ -207,12 +207,12 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
   private malfunctionMode: 'random' | 'aggressive' | 'maintenance' = 'random';
   private modeTimer = 0;
   private modePhase = 0; // Aktuelle Phase im Scatter/Chase Zyklus
-  // Schwierigere Timings: Kürzere Scatter, längere Chase-Phasen
+  // Einfachere Timings: Längere Scatter, kürzere Chase-Phasen
   private readonly modeDurations = [
-    5000, 25000,  // Phase 0-1: 5s Scatter, 25s Chase
-    4000, 25000,  // Phase 2-3: 4s Scatter, 25s Chase
-    3000, 30000,  // Phase 4-5: 3s Scatter, 30s Chase
-    2000, Infinity // Phase 6-7: 2s Scatter, dann permanent Chase
+    8000, 20000,  // Phase 0-1: 8s Scatter, 20s Chase
+    7000, 20000,  // Phase 2-3: 7s Scatter, 20s Chase
+    6000, 22000,  // Phase 4-5: 6s Scatter, 22s Chase
+    5000, Infinity // Phase 6-7: 5s Scatter, dann permanent Chase
   ];
 
   // Pac-Man Animation
@@ -238,16 +238,16 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
   // Level-Progression: Geschwindigkeit und Frighten-Dauer pro Level
   private getGhostSpeed(): number {
     const baseSpeed = this.CELL_SIZE / 4;
-    // Höhere Grundgeschwindigkeit: +15% pro Level (statt 5%)
-    const speedMultiplier = 1.1 + (this.productionLevel - 1) * 0.15;
-    return Math.min(baseSpeed * speedMultiplier, baseSpeed * 2.0); // Max 200%
+    // Langsamere Geister: +8% pro Level (einfacher für Anfänger)
+    const speedMultiplier = 1.0 + (this.productionLevel - 1) * 0.08;
+    return Math.min(baseSpeed * speedMultiplier, baseSpeed * 1.6); // Max 160%
   }
 
   private getMaintenanceDuration(): number {
-    // Maintenance-Zeit: Start mit 8s, -1.5s pro Level
-    const baseDuration = 8000;
-    const reduction = (this.productionLevel - 1) * 1500;
-    return Math.max(baseDuration - reduction, 3000); // Minimum 3 Sekunden
+    // Längere Maintenance-Zeit: Start mit 10s, -1s pro Level (einfacher für Anfänger)
+    const baseDuration = 10000;
+    const reduction = (this.productionLevel - 1) * 1000;
+    return Math.max(baseDuration - reduction, 4000); // Minimum 4 Sekunden
   }
 
   // Legacy function for compatibility
@@ -1854,13 +1854,19 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
           ghost.type = 'patrol'; // Cyan/Blue - PATROL: Feste Route entlang Korridoren
           this.ghosts.add(ghost);
         } else if (tileMapChar === 'o') {
-          const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.orangeGhostImage);
-          ghost.type = 'random'; // Orange - RANDOM: Zufällige Bewegung
-          this.ghosts.add(ghost);
+          // In Level 1 spawnt der orangene Geist nicht (nur 2 Geister für Anfänger)
+          if (this.productionLevel > 1) {
+            const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.orangeGhostImage);
+            ghost.type = 'random'; // Orange - RANDOM: Zufällige Bewegung
+            this.ghosts.add(ghost);
+          }
         } else if (tileMapChar === 'p') {
-          const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.pinkGhostImage);
-          ghost.type = 'ambush'; // Pink - AMBUSH: Lauert voraus
-          this.ghosts.add(ghost);
+          // In Level 1 spawnt der pinke Geist nicht (nur 2 Geister für Anfänger)
+          if (this.productionLevel > 1) {
+            const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.pinkGhostImage);
+            ghost.type = 'ambush'; // Pink - AMBUSH: Lauert voraus
+            this.ghosts.add(ghost);
+          }
         } else if (tileMapChar === 'r') {
           const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.redGhostImage);
           ghost.type = 'aggressive'; // Red - AGGRESSIVE: Verfolgt direkt
