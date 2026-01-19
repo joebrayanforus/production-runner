@@ -398,7 +398,7 @@ canvas {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   padding: 50px 15px 15px 15px;
-  box-sizing: content-box;
+  box-sizing: border-box;
   box-shadow:
     inset 0 0 60px rgba(237, 107, 0, 0.15),
     inset 0 0 100px rgba(0, 0, 0, 0.8);
@@ -1020,3 +1020,18 @@ canvas {
   border-radius: 5px;
   border: 1px solid rgba(255, 122, 1, 0.3);
 }
+
+:host {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+/*
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+*/

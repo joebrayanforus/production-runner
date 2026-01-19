@@ -46,6 +46,7 @@
             (click)="startGameWithPlayers(2)">
       <span class="menu-arrow">▶</span>
       <span class="menu-text">2 SPIELER</span>
+      <span class="menu-text">1 PLAYER</span>
     </button>
     <button class="menu-item"
             [class.selected]="selectedMode === 'practice'"
@@ -53,7 +54,12 @@
       <span class="menu-arrow">▶</span>
       <span class="menu-text">SIMULATION</span>
     </button>
-
+    <button class="menu-item"
+            [class.selected]="selectedMode === '2player'"
+            (click)="selectMode('2player')">
+      <span class="menu-arrow">▶</span>
+      <span class="menu-text">2 PLAYER</span>
+    </button>
     <button class="menu-item menu-disabled">
       <span class="menu-arrow"></span>
       <span class="menu-text">EXIT</span>

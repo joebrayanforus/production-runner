@@ -6,7 +6,6 @@ import {
   LeaderboardService,
   LeaderboardEntry
 } from '../services/leaderboard.service';
-import { InputService } from '../services/input.service';
 
 export type GameMode = 'classic' | 'practice' | 'spielanleitung' | 'spielen1' | 'spielen2';
 
@@ -27,8 +26,7 @@ export class StartPageComponent implements OnInit, OnDestroy {
 
   constructor(
     private leaderboardService: LeaderboardService,
-    private router: Router,
-    private inputService: InputService
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -54,7 +52,10 @@ export class StartPageComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent) {
-    const modes: GameMode[] = this.menuModes;
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(event.key)) {
+      event.preventDefault();
+    }
+    const modes: GameMode[] = ['spielanleitung', 'classic', 'practice', '2player'];
     const currentIndex = modes.indexOf(this.selectedMode);
 
     if (['ArrowUp', 'ArrowLeft'].includes(event.key)) {
@@ -82,9 +83,14 @@ export class StartPageComponent implements OnInit, OnDestroy {
   }
 
   startGame(): void {
+    // Si mode spielanleitung, naviguer directement vers /spielanleitung
     if (this.selectedMode === 'spielanleitung') {
       this.router.navigate(['/spielanleitung']);
-      return;
+    } else {
+      // Navigate to player-name page with selected game mode
+      this.router.navigate(['/player-name'], {
+        queryParams: { mode: this.selectedMode }
+      });
     }
 
     // Handle SPIELEN 1 and SPIELEN 2 modes
@@ -115,6 +121,8 @@ export class StartPageComponent implements OnInit, OnDestroy {
   }
 
 
+  }
+
   // Gamepad Polling for Mode Selection
   private startGamepadPolling(): void {
     let lastDirection = '';
@@ -122,11 +130,17 @@ export class StartPageComponent implements OnInit, OnDestroy {
     let lastSelectTime = 0;
 
     this.gamepadPollInterval = setInterval(() => {
-      // Try arcade joystick first, fallback to standard gamepad
-      let currentDirection = this.inputService.getArcadeDirection(1);
-      if (!currentDirection) {
-        currentDirection = this.inputService.getDirection();
-      }
+      const gamepad = navigator.getGamepads()[0];
+      if (!gamepad) return;
+
+      // Detect direction from analog stick or D-pad
+      let currentDirection = '';
+      const threshold = 0.5;
+
+      if (gamepad.axes[1] < -threshold || gamepad.buttons[12]?.pressed) currentDirection = 'U';
+      else if (gamepad.axes[1] > threshold || gamepad.buttons[13]?.pressed) currentDirection = 'D';
+      else if (gamepad.axes[0] < -threshold || gamepad.buttons[14]?.pressed) currentDirection = 'L';
+      else if (gamepad.axes[0] > threshold || gamepad.buttons[15]?.pressed) currentDirection = 'R';
 
       // Handle direction input
       if (currentDirection && currentDirection === lastDirection) {
@@ -144,8 +158,8 @@ export class StartPageComponent implements OnInit, OnDestroy {
         directionHoldTime = 0;
       }
 
-      // Arcade Select button (Button 10) or standard A button (0) - Select mode and start game
-      if (this.inputService.isArcadeSelectPressed() || this.inputService.isActionButtonPressed()) {
+      // A Button (0) - Select mode and start game
+      if (gamepad.buttons[0]?.pressed) {
         const now = Date.now();
         if (now - lastSelectTime > 300) {
           this.startGame();
@@ -156,13 +170,14 @@ export class StartPageComponent implements OnInit, OnDestroy {
   }
 
   private handleModeNavigation(direction: string): void {
-    const modes = this.menuModes;
-    let idx = modes.indexOf(this.selectedMode);
-    if (idx < 0) idx = 0;
-
-    const isPrev = direction === 'L' || direction === 'U';
-    idx = isPrev ? (idx === 0 ? modes.length - 1 : idx - 1) : (idx + 1) % modes.length;
-
-    this.selectedMode = modes[idx];
+    // Toggle between classic and practice with any direction key
+    switch (direction) {
+      case 'L':
+      case 'U':
+      case 'R':
+      case 'D':
+        this.selectedMode = this.selectedMode === 'classic' ? 'practice' : 'classic';
+        break;
+    }
   }
 }

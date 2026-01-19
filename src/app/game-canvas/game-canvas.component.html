@@ -19,12 +19,6 @@
       </div>
       <canvas #gameCanvas></canvas>
       <div class="scanline-overlay"></div>
-      <!-- Achievement popup displayed when an achievement is unlocked -->
-      <div class="achievement-toast" *ngIf="achievementToast">
-      <div class="achievement-title">{{ achievementToast.title }}</div>
-      <div class="achievement-desc">{{ achievementToast.description }}</div>
-      </div>
-
 
       <!-- Game Over Overlay -->
       <div class="overlay" *ngIf="gameState === 'gameover'">
@@ -56,8 +50,8 @@
           </div>
 
           <div class="overlay-actions below">
-            <button class="btn primary" (click)="restartGame()">🔄 RESTART</button>
-            <button class="btn ghost" (click)="exitGame()">❌ EXIT</button>
+            <button class="btn primary" [class.selected]="gameOverMenuIndex === 0" (click)="restartGame()">🔄 RESTART</button>
+            <button class="btn ghost" [class.selected]="gameOverMenuIndex === 1" (click)="exitGame()">❌ EXIT</button>
           </div>
         </div>
       </div>
@@ -77,20 +71,45 @@
     <div class="slide-content" *ngIf="spielanleitungSlide === 0">
       <h3>🎮 STEUERUNG</h3>
       <div class="control-grid">
-        <div class="control-item">▲▼◄► PFEILTASTEN</div>
-        <div class="control-desc">Roboter bewegen</div>
-        <div class="control-item">🎮 D-PAD / STICK</div>
-        <div class="control-desc">Roboter bewegen (Gamepad)</div>
-        <div class="control-item">⚡ STRG / CTRL</div>
-        <div class="control-desc">Turbo aktivieren</div>
+        <div class="control-section" *ngIf="gameMode !== '2player'">
+          <div class="control-item">▲▼◄► PFEILTASTEN</div>
+          <div class="control-desc">Roboter bewegen</div>
+          <div class="control-item">🎮 D-PAD / STICK</div>
+          <div class="control-desc">Roboter bewegen (Gamepad)</div>
+          <div class="control-item">⚡ STRG / CTRL</div>
+          <div class="control-desc">Turbo aktivieren</div>
+          <div class="control-item">🎮 A / ✕</div>
+          <div class="control-desc">Turbo (Gamepad)</div>
+        </div>
+        <div class="control-section" *ngIf="gameMode === '2player'">
+          <h4 style="color: #ED6B00;">🎮 SPIELER 1 (ORANGE)</h4>
+          <div class="control-item">🕹️ JOYSTICK 1</div>
+          <div class="control-desc">Bewegung (Links)</div>
+          <div class="control-item">🔘 BUTTON 1-4</div>
+          <div class="control-desc">Turbo aktivieren</div>
+          <div class="control-item">⌨️ PFEILTASTEN</div>
+          <div class="control-desc">Alternative Steuerung</div>
+          <div class="control-item">⚡ STRG</div>
+          <div class="control-desc">Turbo (Tastatur)</div>
+
+          <h4 style="color: #4D9FFF; margin-top: 10px;">🎮 SPIELER 2 (BLAU)</h4>
+          <div class="control-item">🕹️ JOYSTICK 2</div>
+          <div class="control-desc">Bewegung (Rechts)</div>
+          <div class="control-item">🔘 BUTTON 9-12</div>
+          <div class="control-desc">Turbo aktivieren</div>
+          <div class="control-item">⌨️ WASD</div>
+          <div class="control-desc">Alternative Steuerung</div>
+          <div class="control-item">⚡ SHIFT</div>
+          <div class="control-desc">Turbo (Tastatur)</div>
+        </div>
         <div class="control-item">🎮 Y / △</div>
-        <div class="control-desc">Hilfe öffnen (Gamepad)</div>
+        <div class="control-desc">Hilfe öffnen</div>
         <div class="control-item">H</div>
-        <div class="control-desc">Hilfe ein/aus (Tastatur)</div>
+        <div class="control-desc">Hilfe (Tastatur)</div>
       </div>
       <p class="slide-desc">🎯 ZIEL: Sammle alle Sensordaten!</p>
       <div class="gamepad-hint">
-        <strong>🎮 GAMEPAD:</strong> L1/R1 oder ◄► für Navigation | B für Schließen
+        <strong>🎮 ICONIC ARCADE:</strong> 2 Joysticks + 16 Buttons | Raspberry Pi 4
       </div>
     </div>
 
@@ -133,13 +152,24 @@
     <div class="slide-content" *ngIf="spielanleitungSlide === 4">
       <h3>🚀 BEREIT?</h3>
       <div class="ready-info">
-        <div class="info-big">❤️ 3 LEBEN</div>
+        <div class="info-big">❤️ {{ gameMode === '2player' ? '3 LEBEN PRO SPIELER' : '3 LEBEN' }}</div>
         <div class="info-big">🏆 HIGHSCORE</div>
-        <div class="info-big">⚡ TURBO MIT STRG</div>
+        <div class="info-big" *ngIf="gameMode !== '2player'">⚡ TURBO MIT STRG</div>
+        <div class="info-big" *ngIf="gameMode === '2player'">⚡ 2 SPIELER MODUS</div>
       </div>
-      <p class="slide-desc">Drücke H um zurück zum Spiel zu gehen!</p>
+      <div class="arcade-info" *ngIf="gameMode === '2player'">
+        <h4>🕹️ ICONIC ARCADE SETUP</h4>
+        <p>✅ Raspberry Pi 4 (4GB RAM empfohlen)</p>
+        <p>✅ 2 Mikroschalter-Joysticks vormontiert</p>
+        <p>✅ 16 Arcade-Buttons (8 pro Spieler)</p>
+        <p>✅ 21" Full-HD Display (1920x1080)</p>
+        <p>✅ 2x 4" Stereo-Lautsprecher</p>
+        <p>🎮 Gamepad 1 (Links) + Gamepad 2 (Rechts)</p>
+        <p>⚡ Buttons 1-4 (P1) & 9-12 (P2) für Turbo</p>
+      </div>
+      <p class="slide-desc">Drücke H oder Y/△ um zurück zum Spiel zu gehen!</p>
       <div class="gamepad-hint">
-        <strong>🎮 GAMEPAD:</strong> Drücke B (○) um zu schließen
+        <strong>🎮 ICONIC ARCADE:</strong> Button 2 (B/○) um zu schließen
       </div>
     </div>
 
@@ -169,9 +199,9 @@
     <h2>⏸️ PAUSED</h2>
     <p>GAME PAUSED</p>
     <div class="overlay-actions">
-      <button class="btn primary" (click)="resumeFromPause()">▶️ RESUME</button>
-      <button class="btn ghost" (click)="restartGame()">🔄 RESTART</button>
-      <button class="btn ghost" (click)="requestExitToMenu()">🏠 MENU</button>
+      <button class="btn primary" [class.selected]="pauseMenuIndex === 0" (click)="resumeFromPause()">▶️ RESUME</button>
+      <button class="btn ghost" [class.selected]="pauseMenuIndex === 1" (click)="restartGame()">🔄 RESTART</button>
+      <button class="btn ghost" [class.selected]="pauseMenuIndex === 2" (click)="requestExitToMenu()">🏠 MENU</button>
     </div>
     <div *ngIf="showExitConfirm" class="exit-confirm">
       <p>EXIT TO MENU?</p>

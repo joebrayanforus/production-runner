@@ -7,12 +7,8 @@ import { GameManager } from '../models/game-manager';
 import { Block } from '../models/Block';
 import { AudioService } from '../services/audio.service';
 import { InputService } from '../services/input.service';
-import { GameStats } from '../models/game-stats';
-import { AchievementService } from '../services/achievement.service';
 
-
-
-export type GameMode = 'classic' | 'practice';
+export type GameMode = 'classic' | 'practice' | '2player';
 
 interface Particle {
   x: number;
@@ -23,9 +19,7 @@ interface Particle {
   maxLife: number;
   color: string;
   size: number;
-
 }
-
 
 @Component({
   selector: 'app-game-canvas',
@@ -43,7 +37,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private ctx!: CanvasRenderingContext2D;
   private animationFrameId = 0;
   private lastFrameTime = 0;
-  private readonly FPS = 30;
+  private readonly FPS = 60;
   private onKeyDownBound = (e: KeyboardEvent) => this.onKeyDown(e);
   // Assets - Industrial Equipment
   private malfunctionBlueImage = new Image();
@@ -79,9 +73,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   maintenanceStations: Set<Block> = new Set<Block>();
   malfunctions: Set<Block> = new Set<Block>();
   robot: Block | null = null;
-  robot2: Block | null = null; // Second robot for 2-player mode
+  robot2: Block | null = null; // Player 2 in 2-player mode
   cherry: Block | null = null;
-  isTwoPlayerMode = false; // Flag for 2-player mode
 
   // Legacy aliases for compatibility during migration
   get pacman() { return this.robot; }
@@ -134,29 +127,18 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Buffered input for smoother corner turning
   private bufferedDirection: string | null = null;
-  private bufferedDirection2: string | null = null; // For robot2 (WASD)
+  private bufferedDirection2: string | null = null; // Buffer for Player 2
 
   // Basic system state
   systemHealth = 3;
+  systemHealth2 = 3; // Lives for Player 2
   efficiency = 0;
+  efficiency2 = 0; // Score for Player 2
   gameOver = false;
+  gameOver2 = false; // Game over state for Player 2
   playerName = ''; // Player name for leaderboard
-  playerName2 = ''; // Second player name for 2-player mode
+  player2Name = ''; // Player 2 name
   gameMode: GameMode = 'classic'; // Make gameMode accessible in template
-
-  // 2-Player mode enhanced stats
-  player1Score = 0;
-  player2Score = 0;
-  player1Lives = 3;
-  player2Lives = 3;
-  player1PowerUp: 'none' | 'shield' | 'speed' | 'magnet' = 'none';
-  player2PowerUp: 'none' | 'shield' | 'speed' | 'magnet' = 'none';
-  player1PowerUpTimer = 0;
-  player2PowerUpTimer = 0;
-  teamComboMultiplier = 1;
-  teamComboTimer = 0;
-  lastPelletCollector: 1 | 2 | null = null;
-  winner: 1 | 2 | null = null; // Track winner in 2-player mode
   maintenanceTimer = 0;
   maintenanceDuration = 10000; // 10 seconds in ms
   dataStreak = 0;
@@ -170,7 +152,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private shieldActive = false;
   private qualityCheckpoints: Set<Block> = new Set<Block>();
   private controlPanels: Set<Block> = new Set<Block>();
-  private readonly BONUS_ROTATION_INTERVAL = 15000; // Change bonus type every 15s
+  private readonly BONUS_ROTATION_INTERVAL = 8000; // Change bonus type every 8s
   private bonusRotationTimer = 0;
   private totalSensorData = 0; // Wird beim Laden der Map gesetzt
 
@@ -189,15 +171,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private successBurst = 0;
   private shieldRipples: Array<{radius: number, alpha: number}> = [];
   private comboDisplayTimer = 0;
-
-  // 2-Player mode visual effects
-  private player1Trail: Array<{x: number, y: number, alpha: number}> = [];
-  private player2Trail: Array<{x: number, y: number, alpha: number}> = [];
-  private connectionBeam: {active: boolean, pulse: number} = {active: false, pulse: 0};
-  private teamBonusParticles: Array<{x: number, y: number, vx: number, vy: number, alpha: number, color: string}> = [];
-  private player1Aura = 0;
-  private player2Aura = 0;
-  private victoryDance = 0;
 
   // Death animation - maze destruction
   private mazeDestruction: Map<Block, {offsetY: number, rotation: number, speed: number}> = new Map();
@@ -464,7 +437,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
             ctx.stroke();
           }
         }
-
         ctx.globalAlpha = 1;
 
         // Rivets/Bolts on pipes (every 40px)
@@ -794,29 +766,16 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       ctx.restore();
-    }    // 2-Player Mode: Draw trails behind robots
-    if (this.isTwoPlayerMode) {
-      this.drawPlayer1Trail(ctx);
-      this.drawPlayer2Trail(ctx);
-    }
-
-    // Robot mit Animation zeichnen
+    }    // Robot mit Animation zeichnen
     if (this.robot && this.gameState !== 'dying') {
       this.drawRobot(ctx);
     } else if (this.robot && this.gameState === 'dying') {
       this.drawDyingRobot(ctx);
     }
 
-    // Draw robot2 in 2-player mode
-    if (this.isTwoPlayerMode && this.robot2 && this.gameState !== 'dying') {
+    // Draw Robot 2 (Player 2) in 2-player mode
+    if (this.robot2 && this.gameMode === '2player' && this.gameState !== 'dying') {
       this.drawRobot2(ctx);
-    }
-
-    // 2-Player Mode: Draw auras and connection beam
-    if (this.isTwoPlayerMode) {
-      this.drawPlayerAuras(ctx);
-      this.drawConnectionBeam(ctx);
-      this.drawTeamBonusParticles(ctx);
     }
 
     // Störungen zeichnen
@@ -829,11 +788,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // UI Overlay
     this.drawUI(ctx);
-
-    // 2-Player Mode HUD
-    if (this.isTwoPlayerMode) {
-      this.drawTwoPlayerHUD(ctx);
-    }
 
     // Industrial scanline effect (subtle)
     this.drawIndustrialScanlines(ctx);
@@ -990,6 +944,69 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  private drawRobot2(ctx: CanvasRenderingContext2D) {
+    if (!this.robot2) return;
+
+    const centerX = this.robot2.x + this.robot2.width / 2;
+    const centerY = this.robot2.y + this.robot2.height / 2;
+    const size = this.robot2.width - 2;
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+
+    // Smooth rotation based on direction
+    const targetRotation = this.getTargetRotation(this.robot2.direction);
+    ctx.rotate(targetRotation);
+
+    // Boost trail effect for Player 2
+    if (this.turboSpeed2 && this.boostEnergy2 > 0) {
+      const trailLength = 3;
+      for (let i = 1; i <= trailLength; i++) {
+        const alpha = 0.3 - (i * 0.1);
+        const offset = -i * 4;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#4D9FFF';
+        ctx.fillRect(offset - size/2, -size/2, size, size);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Main body with blue gradient for Player 2
+    const bodyGradient = ctx.createLinearGradient(-size/2, -size/2, size/2, size/2);
+    bodyGradient.addColorStop(0, '#4D9FFF');
+    bodyGradient.addColorStop(0.5, '#0080FF');
+    bodyGradient.addColorStop(1, '#0066CC');
+    ctx.fillStyle = bodyGradient;
+    ctx.fillRect(-size/2, -size/2, size, size);
+
+    // Chassis border
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-size/2, -size/2, size, size);
+
+    // Corner rivets
+    const rivetPositions = [
+      [-size/2 + 2, -size/2 + 2],
+      [size/2 - 2, -size/2 + 2],
+      [-size/2 + 2, size/2 - 2],
+      [size/2 - 2, size/2 - 2]
+    ];
+    ctx.fillStyle = '#404040';
+    rivetPositions.forEach(([rx, ry]) => {
+      ctx.beginPath();
+      ctx.arc(rx, ry, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Player 2 indicator
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 6px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('P2', 0, 2);
+
+    ctx.restore();
+  }
+
   private getTargetRotation(direction: string): number {
     switch (direction) {
       case 'U': return -Math.PI / 2;
@@ -1032,497 +1049,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     ctx.restore();
   }
-
-  private drawRobot2(ctx: CanvasRenderingContext2D) {
-    if (!this.robot2) return;
-
-    const centerX = this.robot2.x + this.robot2.width / 2;
-    const centerY = this.robot2.y + this.robot2.height / 2;
-    const size = this.robot2.width - 2;
-
-    ctx.save();
-    ctx.translate(centerX, centerY);
-
-    // Smooth rotation based on direction
-    const targetRotation = this.getTargetRotation(this.robot2.direction);
-    let robot2Rotation = 0;
-    // Use a separate rotation variable for robot2 (we'll need to store this)
-    // For now, use immediate rotation
-    ctx.rotate(targetRotation);
-
-    // Draw ifm robot - Industrial AGV style (slightly different color to distinguish)
-    // Main body with metallic gradient (slightly different shade)
-    const bodyGradient = ctx.createLinearGradient(-size/2, -size/2, size/2, size/2);
-    bodyGradient.addColorStop(0, '#FFA500'); // Slightly lighter orange
-    bodyGradient.addColorStop(0.5, '#FF8C00');
-    bodyGradient.addColorStop(1, '#ED6B00');
-    ctx.fillStyle = bodyGradient;
-    ctx.fillRect(-size/2, -size/2, size, size);
-
-    // Chassis border
-    ctx.strokeStyle = '#1a1a1a';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-size/2, -size/2, size, size);
-
-    // Corner rivets
-    const rivetPositions = [
-      [-size/2 + 2, -size/2 + 2],
-      [size/2 - 2, -size/2 + 2],
-      [-size/2 + 2, size/2 - 2],
-      [size/2 - 2, size/2 - 2]
-    ];
-    ctx.fillStyle = '#404040';
-    rivetPositions.forEach(([rx, ry]) => {
-      ctx.beginPath();
-      ctx.arc(rx, ry, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Direction indicator (front sensor array)
-    const headSize = size * 0.4;
-    let headX = 0, headY = 0;
-
-    if (this.robot2.direction === 'U') { headX = 0; headY = -size * 0.35; }
-    else if (this.robot2.direction === 'D') { headX = 0; headY = size * 0.35; }
-    else if (this.robot2.direction === 'L') { headX = -size * 0.35; headY = 0; }
-    else if (this.robot2.direction === 'R') { headX = size * 0.35; headY = 0; }
-
-    // Front sensor housing
-    ctx.fillStyle = '#2a2a2a';
-    ctx.fillRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
-    ctx.strokeStyle = '#00FF88';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(headX - headSize/2, headY - headSize/2, headSize, headSize);
-
-    // Active sensor LEDs
-    const ledPulse = 0.5 + Math.sin(Date.now() / 100) * 0.5;
-    ctx.fillStyle = `rgba(0, 255, 136, ${ledPulse})`;
-    if (this.robot2.direction === 'U' || this.robot2.direction === 'D') {
-      ctx.fillRect(headX - 3, headY - 1, 2, 2);
-      ctx.fillRect(headX + 1, headY - 1, 2, 2);
-    } else {
-      ctx.fillRect(headX - 1, headY - 3, 2, 2);
-      ctx.fillRect(headX - 1, headY + 1, 2, 2);
-    }
-
-    ctx.restore();
-  }
-
-  // ==================== 2-PLAYER MODE VISUAL EFFECTS ====================
-
-  private drawPlayer1Trail(ctx: CanvasRenderingContext2D) {
-    if (!this.isTwoPlayerMode || this.player1Trail.length === 0) return;
-
-    ctx.save();
-    for (let i = 0; i < this.player1Trail.length; i++) {
-      const trail = this.player1Trail[i];
-      const size = 8 * trail.alpha;
-
-      // Orange energy trail with glow
-      const gradient = ctx.createRadialGradient(trail.x, trail.y, 0, trail.x, trail.y, size);
-      gradient.addColorStop(0, `rgba(237, 107, 0, ${trail.alpha * 0.8})`);
-      gradient.addColorStop(0.5, `rgba(255, 165, 0, ${trail.alpha * 0.4})`);
-      gradient.addColorStop(1, `rgba(237, 107, 0, 0)`);
-
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(trail.x, trail.y, size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  private drawPlayer2Trail(ctx: CanvasRenderingContext2D) {
-    if (!this.isTwoPlayerMode || this.player2Trail.length === 0) return;
-
-    ctx.save();
-    for (let i = 0; i < this.player2Trail.length; i++) {
-      const trail = this.player2Trail[i];
-      const size = 8 * trail.alpha;
-
-      // Lighter orange/gold energy trail
-      const gradient = ctx.createRadialGradient(trail.x, trail.y, 0, trail.x, trail.y, size);
-      gradient.addColorStop(0, `rgba(255, 180, 50, ${trail.alpha * 0.8})`);
-      gradient.addColorStop(0.5, `rgba(255, 200, 100, ${trail.alpha * 0.4})`);
-      gradient.addColorStop(1, `rgba(255, 180, 50, 0)`);
-
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(trail.x, trail.y, size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  private drawConnectionBeam(ctx: CanvasRenderingContext2D) {
-    if (!this.isTwoPlayerMode || !this.connectionBeam.active || !this.robot || !this.robot2) return;
-
-    const x1 = this.robot.x + this.robot.width / 2;
-    const y1 = this.robot.y + this.robot.height / 2;
-    const x2 = this.robot2.x + this.robot2.width / 2;
-    const y2 = this.robot2.y + this.robot2.height / 2;
-
-    ctx.save();
-
-    // Pulsating energy beam
-    const pulseIntensity = 0.5 + Math.sin(this.connectionBeam.pulse) * 0.3;
-
-    // Outer glow
-    ctx.strokeStyle = `rgba(0, 200, 255, ${pulseIntensity * 0.3})`;
-    ctx.lineWidth = 12;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-
-    // Middle beam
-    ctx.strokeStyle = `rgba(100, 220, 255, ${pulseIntensity * 0.6})`;
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-
-    // Inner core
-    ctx.strokeStyle = `rgba(255, 255, 255, ${pulseIntensity})`;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-
-    // Connection nodes at each robot
-    [{ x: x1, y: y1 }, { x: x2, y: y2 }].forEach(pos => {
-      const nodeGradient = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 15);
-      nodeGradient.addColorStop(0, `rgba(255, 255, 255, ${pulseIntensity})`);
-      nodeGradient.addColorStop(0.5, `rgba(100, 220, 255, ${pulseIntensity * 0.6})`);
-      nodeGradient.addColorStop(1, 'rgba(0, 200, 255, 0)');
-
-      ctx.fillStyle = nodeGradient;
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, 15, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Team bonus text in the middle
-    if (this.teamComboMultiplier > 1) {
-      const midX = (x1 + x2) / 2;
-      const midY = (y1 + y2) / 2;
-
-      ctx.font = 'bold 14px "Press Start 2P", monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      // Text shadow
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-      ctx.fillText(`×${this.teamComboMultiplier}`, midX + 2, midY + 2);
-
-      // Main text
-      ctx.fillStyle = `rgba(255, 255, 255, ${pulseIntensity})`;
-      ctx.fillText(`×${this.teamComboMultiplier}`, midX, midY);
-    }
-
-    ctx.restore();
-  }
-
-  private drawTeamBonusParticles(ctx: CanvasRenderingContext2D) {
-    if (!this.isTwoPlayerMode || this.teamBonusParticles.length === 0) return;
-
-    ctx.save();
-    for (const particle of this.teamBonusParticles) {
-      const size = 4 * particle.alpha;
-
-      // Colorful celebration particles
-      const gradient = ctx.createRadialGradient(particle.x, particle.y, 0, particle.x, particle.y, size);
-      gradient.addColorStop(0, particle.color.replace('rgb', 'rgba').replace(')', `, ${particle.alpha})`));
-      gradient.addColorStop(1, particle.color.replace('rgb', 'rgba').replace(')', ', 0)'));
-
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(particle.x, particle.y, size, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Sparkle effect
-      if (particle.alpha > 0.7) {
-        ctx.strokeStyle = `rgba(255, 255, 255, ${particle.alpha})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(particle.x - size * 1.5, particle.y);
-        ctx.lineTo(particle.x + size * 1.5, particle.y);
-        ctx.moveTo(particle.x, particle.y - size * 1.5);
-        ctx.lineTo(particle.x, particle.y + size * 1.5);
-        ctx.stroke();
-      }
-    }
-    ctx.restore();
-  }
-
-  private drawPlayerAuras(ctx: CanvasRenderingContext2D) {
-    if (!this.isTwoPlayerMode || !this.robot || !this.robot2) return;
-
-    const drawAura = (robot: Block, powerUp: string, baseColor: string) => {
-      if (powerUp === 'none') return;
-
-      const x = robot.x + robot.width / 2;
-      const y = robot.y + robot.height / 2;
-      const time = Date.now() * 0.003;
-
-      let auraColor = baseColor;
-      let auraSize = 30;
-
-      switch (powerUp) {
-        case 'shield':
-          auraColor = '65, 105, 225'; // Royal blue
-          auraSize = 35;
-          break;
-        case 'speed':
-          auraColor = '255, 215, 0'; // Gold
-          auraSize = 32;
-          break;
-        case 'magnet':
-          auraColor = '138, 43, 226'; // Purple
-          auraSize = 34;
-          break;
-      }
-
-      ctx.save();
-
-      // Rotating aura rings
-      for (let i = 0; i < 3; i++) {
-        const radius = auraSize + i * 8 + Math.sin(time + i) * 3;
-        const alpha = (0.4 - i * 0.1) * Math.abs(Math.sin(time * 0.5));
-
-        const gradient = ctx.createRadialGradient(x, y, radius - 5, x, y, radius + 5);
-        gradient.addColorStop(0, `rgba(${auraColor}, 0)`);
-        gradient.addColorStop(0.5, `rgba(${auraColor}, ${alpha})`);
-        gradient.addColorStop(1, `rgba(${auraColor}, 0)`);
-
-        ctx.strokeStyle = gradient;
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(x, y, radius, time + i, time + i + Math.PI * 1.5);
-        ctx.stroke();
-      }
-
-      // Power-up icon above robot
-      ctx.font = '16px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-
-      const iconY = robot.y - 8 + Math.sin(time * 2) * 2;
-      let icon = '';
-
-      switch (powerUp) {
-        case 'shield': icon = '🛡️'; break;
-        case 'speed': icon = '⚡'; break;
-        case 'magnet': icon = '🧲'; break;
-      }
-
-      // Icon shadow
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      ctx.fillText(icon, x + 1, iconY + 1);
-
-      // Icon
-      ctx.fillStyle = 'white';
-      ctx.fillText(icon, x, iconY);
-
-      ctx.restore();
-    };
-
-    // Draw auras for both players
-    drawAura(this.robot, this.player1PowerUp, '237, 107, 0');
-    drawAura(this.robot2, this.player2PowerUp, '255, 180, 50');
-  }
-
-  private updatePlayerTrails() {
-    if (!this.isTwoPlayerMode || !this.robot || !this.robot2) return;
-
-    const maxTrailLength = 20;
-
-    // Add new trail positions
-    if (this.robot.velocityX !== 0 || this.robot.velocityY !== 0) {
-      this.player1Trail.push({
-        x: this.robot.x + this.robot.width / 2,
-        y: this.robot.y + this.robot.height / 2,
-        alpha: 1.0
-      });
-    }
-
-    if (this.robot2.velocityX !== 0 || this.robot2.velocityY !== 0) {
-      this.player2Trail.push({
-        x: this.robot2.x + this.robot2.width / 2,
-        y: this.robot2.y + this.robot2.height / 2,
-        alpha: 1.0
-      });
-    }    // Fade and remove old trail particles
-    this.player1Trail = this.player1Trail.filter(trail => {
-      trail.alpha -= 0.05;
-      return trail.alpha > 0;
-    }).slice(-maxTrailLength);
-
-    this.player2Trail = this.player2Trail.filter(trail => {
-      trail.alpha -= 0.05;
-      return trail.alpha > 0;
-    }).slice(-maxTrailLength);
-  }
-
-  private updateConnectionBeam() {
-    if (!this.isTwoPlayerMode || !this.robot || !this.robot2) return;
-
-    const dx = this.robot.x - this.robot2.x;
-    const dy = this.robot.y - this.robot2.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    // Activate beam when players are within 100 pixels
-    const beamDistance = 100;
-    this.connectionBeam.active = distance < beamDistance;
-
-    if (this.connectionBeam.active) {
-      this.connectionBeam.pulse += 0.1;
-
-      // Team combo bonus when connected
-      if (this.teamComboMultiplier < 3) {
-        this.teamComboMultiplier = Math.min(3, this.teamComboMultiplier + 0.01);
-      }
-    } else {
-      // Slowly decay multiplier when disconnected
-      if (this.teamComboMultiplier > 1) {
-        this.teamComboMultiplier = Math.max(1, this.teamComboMultiplier - 0.02);
-      }
-    }
-  }
-
-  private createTeamBonusParticles(x: number, y: number) {
-    const colors = [
-      'rgb(237, 107, 0)',   // IFM Orange
-      'rgb(255, 215, 0)',   // Gold
-      'rgb(0, 200, 255)',   // Cyan
-      'rgb(255, 100, 255)', // Magenta
-      'rgb(100, 255, 100)'  // Green
-    ];
-
-    for (let i = 0; i < 15; i++) {
-      const angle = (Math.PI * 2 * i) / 15;
-      const speed = 2 + Math.random() * 3;
-
-      this.teamBonusParticles.push({
-        x,
-        y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        alpha: 1.0,
-        color: colors[Math.floor(Math.random() * colors.length)]
-      });
-    }
-  }
-
-  private updateTeamBonusParticles() {
-    this.teamBonusParticles = this.teamBonusParticles.filter(particle => {
-      particle.x += particle.vx;
-      particle.y += particle.vy;
-      particle.vy += 0.1; // Gravity
-      particle.alpha -= 0.02;
-      return particle.alpha > 0;
-    });
-  }
-
-  private drawTwoPlayerHUD(ctx: CanvasRenderingContext2D) {
-    if (!this.isTwoPlayerMode) return;
-
-    ctx.save();
-    ctx.font = 'bold 14px "Press Start 2P", monospace';
-
-    // Player 1 HUD (Top Left)
-    const p1X = 20;
-    const p1Y = 30;
-
-    // Player 1 name and score
-    ctx.fillStyle = '#ED6B00';
-    ctx.textAlign = 'left';
-    ctx.fillText(`P1: ${this.playerName}`, p1X, p1Y);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(`${this.player1Score}`, p1X, p1Y + 20);
-
-    // Player 1 lives
-    for (let i = 0; i < this.player1Lives; i++) {
-      ctx.fillStyle = '#ED6B00';
-      ctx.fillRect(p1X + i * 15, p1Y + 28, 12, 12);
-      ctx.strokeStyle = '#000';
-      ctx.strokeRect(p1X + i * 15, p1Y + 28, 12, 12);
-    }
-
-    // Player 2 HUD (Top Right)
-    const p2X = this.CANVAS_WIDTH - 20;
-    const p2Y = 30;
-
-    // Player 2 name and score
-    ctx.fillStyle = '#FFB432';
-    ctx.textAlign = 'right';
-    ctx.fillText(`P2: ${this.playerName2}`, p2X, p2Y);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(`${this.player2Score}`, p2X, p2Y + 20);
-
-    // Player 2 lives
-    for (let i = 0; i < this.player2Lives; i++) {
-      ctx.fillStyle = '#FFB432';
-      ctx.fillRect(p2X - (i + 1) * 15, p2Y + 28, 12, 12);
-      ctx.strokeStyle = '#000';
-      ctx.strokeRect(p2X - (i + 1) * 15, p2Y + 28, 12, 12);
-    }
-
-    // Team Combo Multiplier (Center Top)
-    if (this.teamComboMultiplier > 1) {
-      const centerX = this.CANVAS_WIDTH / 2;
-      const centerY = 25;
-
-      const glowIntensity = 0.5 + Math.sin(Date.now() * 0.005) * 0.3;
-
-      // Glow background
-      const glowGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 60);
-      glowGradient.addColorStop(0, `rgba(0, 200, 255, ${glowIntensity * 0.4})`);
-      glowGradient.addColorStop(1, 'rgba(0, 200, 255, 0)');
-
-      ctx.fillStyle = glowGradient;
-      ctx.fillRect(centerX - 60, centerY - 20, 120, 40);
-
-      // Text
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      // Shadow
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-      ctx.fillText(`TEAM ×${this.teamComboMultiplier.toFixed(1)}`, centerX + 2, centerY + 2);
-
-      // Main text with gradient
-      const textGradient = ctx.createLinearGradient(centerX - 50, centerY, centerX + 50, centerY);
-      textGradient.addColorStop(0, '#00C8FF');
-      textGradient.addColorStop(0.5, '#FFFFFF');
-      textGradient.addColorStop(1, '#00C8FF');
-
-      ctx.fillStyle = textGradient;
-      ctx.fillText(`TEAM ×${this.teamComboMultiplier.toFixed(1)}`, centerX, centerY);
-    }
-
-    // Connection status indicator
-    if (this.connectionBeam.active) {
-      const indicatorX = this.CANVAS_WIDTH / 2;
-      const indicatorY = 50;
-
-      ctx.textAlign = 'center';
-      ctx.font = '10px "Press Start 2P", monospace';
-
-      const pulseAlpha = 0.6 + Math.sin(this.connectionBeam.pulse) * 0.4;
-      ctx.fillStyle = `rgba(0, 200, 255, ${pulseAlpha})`;
-      ctx.fillText('⚡ CONNECTED ⚡', indicatorX, indicatorY);
-    }
-
-    ctx.restore();
-  }
-
-  // ==================== END 2-PLAYER VISUAL EFFECTS ====================
 
   private drawMalfunction(ctx: CanvasRenderingContext2D, ghost: Block) {
     const x = ghost.x;
@@ -1699,17 +1225,86 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.shadowBlur = 0;
     ctx.restore();
 
-    // Score as industrial KPIs - Start at y=45 to be below logo
-    ctx.font = 'bold 10px "Press Start 2P", monospace';
+    // Score as industrial KPIs - In top bar (y=10-25)
+    ctx.font = 'bold 8px "Press Start 2P", monospace';
     ctx.fillStyle = '#1a1a1a';
     ctx.textAlign = 'left';
 
-    // Production Efficiency KPI
-    const efficiencyPercent = Math.min(100, Math.floor((this.efficiency / 1000) * 100));
-    ctx.fillText(`EFFICIENCY: ${efficiencyPercent}%`, 70, 45);
+    // In 2-player mode, show both scores and lives
+    if (this.gameMode === '2player') {
+      // Player 1 Score - Top left
+      ctx.fillStyle = '#ED6B00';
+      ctx.font = 'bold 8px "Press Start 2P", monospace';
+      ctx.fillText(`${this.efficiency}`, 5, 14);
 
-    // Production Level
-    ctx.fillText(`LEVEL: ${this.productionLevel}`, this.CANVAS_WIDTH / 2 - 60, 45);
+      // Draw P1 lives as squares
+      for (let i = 0; i < this.systemHealth; i++) {
+        ctx.fillStyle = '#ED6B00';
+        ctx.fillRect(5 + i * 12, 18, 10, 10);
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(5 + i * 12, 18, 10, 10);
+      }
+
+      // Player 2 Score - Top right
+      ctx.fillStyle = '#4D9FFF';
+      ctx.textAlign = 'right';
+      ctx.font = 'bold 8px "Press Start 2P", monospace';
+      ctx.fillText(`${this.efficiency2}`, this.CANVAS_WIDTH - 5, 14);
+
+      // Draw P2 lives as squares
+      for (let i = 0; i < this.systemHealth2; i++) {
+        ctx.fillStyle = '#4D9FFF';
+        ctx.fillRect(this.CANVAS_WIDTH - 15 - i * 12, 18, 10, 10);
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(this.CANVAS_WIDTH - 15 - i * 12, 18, 10, 10);
+      }
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#1a1a1a';
+    } else {
+      // Single player mode - show score and lives as squares
+      ctx.fillStyle = '#ED6B00';
+      ctx.fillText(`SCORE: ${this.efficiency}`, 5, 14);
+
+      // Draw lives as squares for single player too
+      for (let i = 0; i < this.systemHealth; i++) {
+        ctx.fillStyle = '#ED6B00';
+        ctx.fillRect(5 + i * 12, 18, 10, 10);
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(5 + i * 12, 18, 10, 10);
+      }
+    }
+
+    // Production Level - Center in top bar
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 8px "Press Start 2P", monospace';
+    ctx.fillStyle = '#1a1a1a';
+
+    if (this.gameMode === '2player') {
+      // Show player names on same line as level - larger and more visible
+      ctx.fillStyle = '#1a1a1a';
+      const levelText = `LVL ${this.productionLevel}`;
+      ctx.fillText(levelText, this.CANVAS_WIDTH / 2, 20);
+
+      // Player 1 name (Orange) - Left of center, larger font
+      ctx.fillStyle = '#ED6B00';
+      ctx.textAlign = 'right';
+      ctx.font = 'bold 9px "Press Start 2P", monospace';
+      ctx.fillText(this.playerName || 'PLAYER1', this.CANVAS_WIDTH / 2 - 50, 20);
+
+      // Player 2 name (Blue) - Right of center, larger font
+      ctx.fillStyle = '#4D9FFF';
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 9px "Press Start 2P", monospace';
+      ctx.fillText(this.player2Name || 'PLAYER2', this.CANVAS_WIDTH / 2 + 50, 20);
+    } else {
+      ctx.fillText(`LVL: ${this.productionLevel}`, this.CANVAS_WIDTH / 2, 20);
+    }
+
+    ctx.textAlign = 'left';
 
     // High Score as "Best Performance"
     ctx.textAlign = 'right';
@@ -1728,8 +1323,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         statusY += 12;
       }
       if (this.turboSpeed && this.boostEnergy > 0) {
-        ctx.fillStyle = '#FFD700';
-        ctx.fillText('⚡ TURBO', this.CANVAS_WIDTH - 10, statusY);
+        ctx.fillStyle = '#ED6B00';
+        ctx.fillText('BOOST ACTIVE', this.CANVAS_WIDTH - 10, statusY);
         statusY += 12;
       }
       if (this.slowMotion < 1.0) {
@@ -1739,34 +1334,35 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     ctx.textAlign = 'left';
 
-    // Combo counter display - adjusted position
+    // Combo counter display - center of maze
     if (this.pelletStreak >= 10 && this.comboDisplayTimer > 0) {
       ctx.save();
       ctx.font = 'bold 16px "Press Start 2P", monospace';
       ctx.textAlign = 'center';
       const comboAlpha = this.comboDisplayTimer / 1000;
       ctx.fillStyle = `rgba(237, 107, 0, ${comboAlpha})`; // IFM Orange
-      ctx.fillText(`${this.pelletStreak}x COMBO!`, this.CANVAS_WIDTH / 2, 60);
+      ctx.fillText(`${this.pelletStreak}x COMBO!`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
       ctx.restore();
     }
 
     // Draw particles
     this.drawParticles(ctx);
 
+    // Draw Advanced Maze Features
+    this.drawAdvancedMazeFeatures(ctx);
+
     // Apply dynamic lighting effect
     if (this.lightingEnabled && this.gameState === 'playing') {
       this.drawDynamicLighting(ctx);
     }
 
-    // Draw Energy Gauge for Boost (only in single player mode)
-    if (!this.isTwoPlayerMode) {
-      this.drawEnergyGauge(ctx);
+    // Draw Energy Gauge for Boost
+    this.drawEnergyGauge(ctx);
+    if (this.gameMode === '2player') {
+      this.drawEnergyGauge2(ctx);
     }
 
-    // System Health - bottom left
-    for (let i = 0; i < this.systemHealth; i++) {
-      this.drawRobotIcon(ctx, 20 + i * 25, this.CANVAS_HEIGHT - 20);
-    }
+    // Lives now shown as colored squares in top bar for all modes
 
     // Active bonus effects display with circular progress
     ctx.font = '12px monospace';
@@ -1972,11 +1568,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      // 2-Player Mode: Show winner instead of GAME OVER
-      const mainText = this.isTwoPlayerMode && this.winner
-        ? `PLAYER ${this.winner} WINS!`
-        : 'GAME OVER';
-
       // Multiple chromatic aberration layers
       const aberrationLayers = [
         {color: 'rgba(255, 0, 0, 0.7)', x: -6, y: -6},
@@ -1987,21 +1578,21 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
       for (const layer of aberrationLayers) {
         ctx.fillStyle = layer.color;
-        ctx.fillText(mainText, centerX + layer.x + Math.sin(time * 10) * 2, centerY - 30 + layer.y);
+        ctx.fillText('GAME OVER', centerX + layer.x + Math.sin(time * 10) * 2, centerY - 30 + layer.y);
       }
 
       // Main text with massive glow
-      ctx.shadowColor = this.isTwoPlayerMode && this.winner ? '#00FF00' : '#FF0000';
+      ctx.shadowColor = '#FF0000';
       ctx.shadowBlur = 60 + Math.sin(time * 8) * 20;
       ctx.fillStyle = `rgba(255, 255, 255, ${explosionProgress})`;
-      ctx.fillText(mainText, centerX, centerY - 30);
+      ctx.fillText('GAME OVER', centerX, centerY - 30);
 
       // Super intense flickering
       if (Math.floor(time * 20) % 2 === 0) {
         ctx.shadowBlur = 80;
-        ctx.shadowColor = this.isTwoPlayerMode && this.winner ? '#FFD700' : '#FFFF00';
+        ctx.shadowColor = '#FFFF00';
         ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-        ctx.fillText(mainText, centerX, centerY - 30);
+        ctx.fillText('GAME OVER', centerX, centerY - 30);
       }
 
       // Distortion effect on text
@@ -2010,7 +1601,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         ctx.translate(centerX, centerY - 30);
         ctx.scale(1 + (Math.random() - 0.5) * 0.1, 1 + (Math.random() - 0.5) * 0.1);
         ctx.fillStyle = 'rgba(255, 122, 1, 0.5)';
-        ctx.fillText(mainText, 0, 0);
+        ctx.fillText('GAME OVER', 0, 0);
         ctx.restore();
       }
 
@@ -2018,20 +1609,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.shadowBlur = 20;
       ctx.shadowColor = '#FF7A01';
       ctx.font = 'bold 20px "Press Start 2P", monospace';
-
-      // 2-Player Mode: Show loser's name
-      let subtitle = 'PRODUCTION HALTED';
-      if (this.isTwoPlayerMode && this.winner) {
-        const winnerName = this.winner === 1 ? this.playerName : this.playerName2;
-        const loserName = this.winner === 1 ? this.playerName2 : this.playerName;
-        subtitle = `${winnerName} DEFEATS ${loserName}!`;
-      }
       const subtitleAlpha = Math.max(0, explosionProgress - 0.15) / 0.85;
       ctx.fillStyle = `rgba(255, 122, 1, ${subtitleAlpha})`;
       const subtitleY = centerY + 25 + Math.sin(time * 4) * 3;
-
-      // Display custom subtitle
-      ctx.fillText(this.isTwoPlayerMode && this.winner ? subtitle : '>>> CRITICAL SYSTEM FAILURE <<<', centerX, subtitleY);
+      ctx.fillText('>>> CRITICAL SYSTEM FAILURE <<<', centerX, subtitleY);
 
       // Error code for dramatic effect
       if (subtitleAlpha > 0.5) {
@@ -2258,6 +1839,25 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   isInvincible = false;      // Practice Mode: Unverwundbarkeit
   slowMotion = 1.0;          // Practice Mode: Zeitlupe (1.0 = normal)
   turboSpeed = false;        // Turbo Mode: 2x Geschwindigkeit
+  turboSpeed2 = false;       // Player 2 Turbo Mode
+
+  // Energy Gauge System for Turbo
+  private boostEnergy = 100;           // Current energy (0-100)
+  private boostEnergy2 = 100;          // Player 2 energy (0-100)
+  private readonly MAX_BOOST_ENERGY = 100;
+  private readonly BOOST_DRAIN_RATE = 40;  // Energy consumed per second (was 25)
+  private readonly BOOST_RECHARGE_RATE = 8; // Energy recharged per second when not boosting (was 15)
+  private isBoostKeyPressed = false;
+  private isBoostKeyPressed2 = false;  // Player 2 boost state
+
+  // Dynamic Lighting System
+  private lightingEnabled = false;
+  private flashlightRadius = 120;
+  private ambientDarkness = 0.85; // 0 = fully dark, 1 = fully lit
+
+  // Voice Announcements
+  private lastAnnouncement = '';
+  private announcementCooldown = 0;
 
   // Practice Mode: Zeit-Rückspulung
   private gameHistory: Array<{
@@ -2276,12 +1876,14 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   showExitConfirm = false;
   private pausedForExitConfirm = false;
   showPauseOverlay = false;
-  pauseMenuIndex = 0; // 0 = Resume, 1 = Restart, 2 = Main Menu
-  gameOverMenuIndex = 0; // 0 = Restart, 1 = Main Menu
+  pauseMenuIndex = 0; // 0 = Resume, 1 = Restart, 2 = Exit
+  gameOverMenuIndex = 0; // 0 = Restart, 1 = Menu
   showSpielanleitung = false;
   spielanleitungSlide = 0;
   private gamepadPollInterval: any;
   private lastGamepadSpielanleitungAction = 0;
+  private lastGamepadMenuAction = 0;
+  private readonly GAMEPAD_MENU_COOLDOWN = 200; // ms between menu actions
 
   // Get high score from leaderboard
   private getHighScore(): number {
@@ -2289,46 +1891,15 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     return Math.max(...this.leaderboard.map(entry => entry.points));
   }
 
-constructor(
-  private audioService: AudioService,
-  private route: ActivatedRoute,
-  private http: HttpClient,
-  private inputService: InputService,
-  private router: Router,
-  private achievements: AchievementService
-) {
-  this.initAssets();
-}
-
-
-// Updates system performance for the current level and checks achievements
-private updatePerformanceAndCheckAchievements() {
-  // Sensors collected in this level only
-  const collectedThisLevel =
-    this.stats.sensorDataCollected - this.sensorDataAtLevelStart;
-
-  // Avoid division by zero
-  if (this.levelTotalSensors <= 0) {
-    this.stats.systemPerformance = 0;
-    return;
+  constructor(
+    private audioService: AudioService,
+    private route: ActivatedRoute,
+    private http: HttpClient,
+    private inputService: InputService,
+    private router: Router
+  ) {
+    this.initAssets();
   }
-
-  // Performance = percentage of collected sensors in this level
-  const percent = Math.round(
-    (collectedThisLevel / this.levelTotalSensors) * 100
-  );
-
-  // Clamp value between 0 and 100
-  this.stats.systemPerformance = Math.max(0, Math.min(100, percent));
-
-  // Check whether a new achievement has been unlocked
-  const newlyUnlocked = this.achievements.checkAndUnlock(this.stats);
-  if (newlyUnlocked.length > 0) {
-    this.showAchievementToast(newlyUnlocked[0]);
-  }
-}
-
-
 
   // Wendet Spielmodus-spezifische Einstellungen an
   private applyGameMode(): void {
@@ -2455,6 +2026,11 @@ private updatePerformanceAndCheckAchievements() {
           this.ghosts.add(ghost);
         } else if (tileMapChar === 'P') {
           this.robot = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.robotRightImage);
+          // Create Player 2 robot in 2-player mode
+          if (this.gameMode === '2player') {
+            // Player 2 starts 3 cells to the right
+            this.robot2 = new Block(x + 3 * this.CELL_SIZE, y, this.CELL_SIZE, this.CELL_SIZE, this.robotRightImage);
+          }
         } else if (tileMapChar === 'Q') {
           // Quality Checkpoint - special bonus location
           const checkpoint = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.qualityCheckpointImage);
@@ -2497,111 +2073,31 @@ private updatePerformanceAndCheckAchievements() {
     // Speichere Gesamtanzahl der Pellets für Cherry-Spawn
     this.totalPellets = this.foods.size + this.powerPellets.size;
 
-    // Create additional ghosts to reach 8 total
-    this.createAdditionalGhosts();
-
-    // Create second robot for 2-player mode
-    if (this.isTwoPlayerMode && this.robot) {
-      // Position robot2 slightly offset from robot1 (to the left)
-      const robot2X = this.robot.startX - this.CELL_SIZE;
-      const robot2Y = this.robot.startY;
-      this.robot2 = new Block(robot2X, robot2Y, this.CELL_SIZE, this.CELL_SIZE, this.robotRightImage);
-      this.robot2.direction = 'R';
-      this.robot2.updateVelocity(this.CELL_SIZE);
-      console.log('🤖 Robot2 created for 2-player mode');
-    }
-
-    // Assign ghost targets in 2-player mode
-    if (this.isTwoPlayerMode) {
-      this.assignGhostTargets();
-    }
+    // Initialize advanced maze features
+    this.initializeAdvancedMazeFeatures();
   }
-
-  private createAdditionalGhosts() {
-    const currentGhostCount = this.ghosts.size;
-    const targetGhostCount = 8;
-    const ghostsToAdd = targetGhostCount - currentGhostCount;
-
-    if (ghostsToAdd <= 0) return;
-
-    // Ghost spawn positions (around the ghost house)
-    const spawnPositions = [
-      { x: 12 * this.CELL_SIZE, y: 14 * this.CELL_SIZE },
-      { x: 15 * this.CELL_SIZE, y: 14 * this.CELL_SIZE },
-      { x: 13 * this.CELL_SIZE, y: 15 * this.CELL_SIZE },
-      { x: 14 * this.CELL_SIZE, y: 15 * this.CELL_SIZE }
-    ];
-
-    const ghostTypes: Array<'aggressive' | 'ambush' | 'patrol' | 'random'> = ['aggressive', 'ambush', 'patrol', 'random'];
-    const ghostImages = [this.redGhostImage, this.pinkGhostImage, this.blueGhostImage, this.orangeGhostImage];
-
-    for (let i = 0; i < ghostsToAdd; i++) {
-      const pos = spawnPositions[i % spawnPositions.length];
-      const typeIndex = i % ghostTypes.length;
-      const ghost = new Block(pos.x, pos.y, this.CELL_SIZE, this.CELL_SIZE, ghostImages[typeIndex]);
-      ghost.type = ghostTypes[typeIndex];
-      this.ghosts.add(ghost);
-    }
-
-    console.log(`👻 Created ${ghostsToAdd} additional ghosts. Total: ${this.ghosts.size}`);
-  }
-
-  private assignGhostTargets() {
-    const ghostArray = Array.from(this.ghosts);
-
-    // First 4 ghosts target Player 1, next 4 target Player 2
-    ghostArray.forEach((ghost, index) => {
-      if (index < 4) {
-        ghost.targetPlayer = 1;
-      } else {
-        ghost.targetPlayer = 2;
-      }
-    });
-
-    console.log('🎯 Assigned ghost targets: 4 → Player 1, 4 → Player 2');
-  }
-
   ngOnInit(): void{
     console.log('🎮 GameCanvasComponent initialized');
 
     // Lese Spielmodus und Spielername aus Query-Parametern
     this.route.queryParams.subscribe(params => {
-
       const mode = params['mode'] as GameMode;
-      if (mode && ['classic', 'practice'].includes(mode)) {
+      if (mode && ['classic', 'practice', '2player'].includes(mode)) {
         this.gameMode = mode;
         this.applyGameMode();
       }
 
-      // Check for 2-player mode
-      const players = params['players'] as string;
-      if (players === '2') {
-        this.isTwoPlayerMode = true;
-        console.log('🎮 2-Player mode activated');
-
-        // Initialize 2-player variables
-        this.player1Lives = 3;
-        this.player2Lives = 3;
-        this.player1Score = 0;
-        this.player2Score = 0;
-        this.teamComboMultiplier = 1;
-        this.lastPelletCollector = null;
-        this.player1Trail = [];
-        this.player2Trail = [];
-        this.teamBonusParticles = [];
-        this.connectionBeam = { active: false, pulse: 0 };
-        this.winner = null;
-      }      // Lese Spielername(n)
+      // Lese Spielername
       const playerName = params['playerName'] as string;
       if (playerName) {
         this.playerName = playerName;
         console.log(`👤 Player 1: ${this.playerName}`);
       }
 
-      const playerName2 = params['playerName2'] as string;
-      if (playerName2 && this.isTwoPlayerMode) {
-        this.playerName2 = playerName2;
-        console.log(`👤 Player 2: ${this.playerName2}`);
+      const player2Name = params['player2Name'] as string;
+      if (player2Name) {
+        this.player2Name = player2Name;
+        console.log(`👤 Player 2: ${this.player2Name}`);
       }
     });
 
@@ -2629,6 +2125,11 @@ private updatePerformanceAndCheckAchievements() {
     this.gameState = 'ready';
     this.stateTimer = 0;
     this.scaredDuration = this.getFrightenedDuration();
+
+    // Announce game start
+    setTimeout(() => {
+      this.announce('PRODUCTION SEQUENCE INITIATED');
+    }, 500);
   }
 
   private onKeyUpBound = (e: KeyboardEvent) => this.onKeyUp(e);
@@ -2672,7 +2173,10 @@ private updatePerformanceAndCheckAchievements() {
   private updateEnergyGauge(deltaTime: number) {
     const deltaSeconds = deltaTime / 1000;
 
-    if (this.isBoostKeyPressed && this.boostEnergy > 0 && this.gameState === 'playing') {
+    // Check if boost is active (keyboard or gamepad) for Player 1
+    const isBoostActive = this.isBoostKeyPressed || this.inputService.isBoostButtonHeld();
+
+    if (isBoostActive && this.boostEnergy > 0 && this.gameState === 'playing') {
       // Drain energy when boosting
       this.boostEnergy -= this.BOOST_DRAIN_RATE * deltaSeconds;
 
@@ -2683,11 +2187,30 @@ private updatePerformanceAndCheckAchievements() {
       if (this.boostEnergy < 0) {
         this.boostEnergy = 0;
       }
-    } else if (!this.isBoostKeyPressed && this.boostEnergy < this.MAX_BOOST_ENERGY) {
+    } else if (!isBoostActive && this.boostEnergy < this.MAX_BOOST_ENERGY) {
       // Recharge energy when not boosting
       this.boostEnergy += this.BOOST_RECHARGE_RATE * deltaSeconds;
       if (this.boostEnergy > this.MAX_BOOST_ENERGY) {
         this.boostEnergy = this.MAX_BOOST_ENERGY;
+      }
+    }
+
+    // Player 2 boost energy in 2-player mode
+    if (this.gameMode === '2player') {
+      const isBoostActive2 = this.isBoostKeyPressed2;
+
+      if (isBoostActive2 && this.boostEnergy2 > 0 && this.gameState === 'playing') {
+        // Drain energy when boosting
+        this.boostEnergy2 -= this.BOOST_DRAIN_RATE * deltaSeconds;
+        if (this.boostEnergy2 < 0) {
+          this.boostEnergy2 = 0;
+        }
+      } else if (!isBoostActive2 && this.boostEnergy2 < this.MAX_BOOST_ENERGY) {
+        // Recharge energy when not boosting
+        this.boostEnergy2 += this.BOOST_RECHARGE_RATE * deltaSeconds;
+        if (this.boostEnergy2 > this.MAX_BOOST_ENERGY) {
+          this.boostEnergy2 = this.MAX_BOOST_ENERGY;
+        }
       }
     }
   }
@@ -2738,18 +2261,105 @@ private updatePerformanceAndCheckAchievements() {
     ctx.restore();
   }
 
+  // Draw Industrial Frame around game area with s.FOX and moneo info
+  private drawIndustrialFrame(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+
+    // Top bar - s.FOX optimization running
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 30);
+
+    // Top bar gradient with metallic effect
+    const topGradient = ctx.createLinearGradient(0, 0, 0, 28);
+    topGradient.addColorStop(0, '#333333');
+    topGradient.addColorStop(0.5, '#1a1a1a');
+    topGradient.addColorStop(1, '#2a2a2a');
+    ctx.fillStyle = topGradient;
+    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 28);
+
+    // IFM orange accent line with glow
+    ctx.shadowBlur = 5;
+    ctx.shadowColor = '#ED6B00';
+    ctx.fillStyle = '#ED6B00';
+    ctx.fillRect(0, 28, this.CANVAS_WIDTH, 2);
+    ctx.shadowBlur = 0;
+
+    // s.FOX system status
+    ctx.font = '8px "Press Start 2P", monospace';
+    ctx.fillStyle = '#00FF88';
+    ctx.textAlign = 'left';
+
+    if (this.gameState === 'ready') {
+      ctx.fillText('s.FOX INITIALIZING...', 10, 20);
+      // Loading bar
+      const loadProgress = (this.stateTimer / this.READY_DURATION) * 100;
+      ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
+      ctx.fillRect(10, 22, 100, 3);
+      ctx.fillStyle = '#00FF88';
+      ctx.fillRect(10, 22, loadProgress, 3);
+    } else if (this.gameState === 'playing') {
+      // Blinking cursor effect
+      const blink = Math.floor(Date.now() / 500) % 2 === 0 ? '_' : '';
+      ctx.fillText(`s.FOX RUNNING${blink}`, 10, 20);
+      // Activity indicator dots
+      const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
+      ctx.fillStyle = '#ED6B00';
+      ctx.fillText(dots, 110, 20);
+    } else if (this.gameState === 'gameover') {
+      ctx.fillStyle = '#FF6B6B';
+      ctx.fillText('SYSTEM HALTED', 10, 20);
+      // Error indicator
+      ctx.fillRect(5, 16, 3, 8);
+    }
+
+    // moneo AI Assistant indicator - top right
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#00FF88';
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.fillText('moneo IAIA', this.CANVAS_WIDTH - 10, 12);
+
+    // AI status indicator with LED
+    const aiStatus = this.gameState === 'playing' ? 'ANALYZING' : 'STANDBY';
+    ctx.fillStyle = this.gameState === 'playing' ? '#ED6B00' : '#808080';
+    ctx.fillText(aiStatus, this.CANVAS_WIDTH - 10, 22);
+
+    // Animated LED indicator
+    const ledPulse = this.gameState === 'playing'
+      ? 0.5 + Math.sin(Date.now() / 200) * 0.5
+      : 0.3;
+    const ledColor = this.gameState === 'playing' ? '#ED6B00' : '#808080';
+    ctx.fillStyle = `rgba(237, 107, 0, ${ledPulse})`;
+    ctx.beginPath();
+    ctx.arc(this.CANVAS_WIDTH - 80, 19, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // LED glow
+    if (this.gameState === 'playing') {
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = ledColor;
+      ctx.beginPath();
+      ctx.arc(this.CANVAS_WIDTH - 80, 19, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    // No bottom bar - clean game area
+
+    ctx.restore();
+  }
+
   // Draw Energy Gauge
   private drawEnergyGauge(ctx: CanvasRenderingContext2D) {
-    const barWidth = 150;
-    const barHeight = 20;
-    const barX = this.CANVAS_WIDTH - barWidth - 15;
-    const barY = 15;
+    const barWidth = this.gameMode === '2player' ? 120 : 150;
+    const barHeight = 10;
+    // Position at bottom, below maze (maze ends around y=620, leave space)
+    const barX = this.gameMode === '2player' ? this.CANVAS_WIDTH - barWidth - 5 : this.CANVAS_WIDTH - barWidth - 15;
+    const barY = this.CANVAS_HEIGHT - 15; // Bottom of canvas
 
     // Background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillStyle = 'rgba(26, 26, 26, 0.8)';
     ctx.fillRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
 
-    // Border
+    // Border (Orange for Player 1)
     ctx.strokeStyle = '#ED6B00';
     ctx.lineWidth = 2;
     ctx.strokeRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
@@ -2773,14 +2383,60 @@ private updatePerformanceAndCheckAchievements() {
     ctx.fillRect(barX, barY, energyWidth, barHeight);
 
     // Text
-    ctx.font = 'bold 10px "Press Start 2P", monospace';
+    ctx.font = 'bold 7px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#fff';
     ctx.strokeStyle = '#000';
-    ctx.lineWidth = 3;
-    const text = `BOOST: ${Math.floor(this.boostEnergy)}%`;
-    ctx.strokeText(text, barX + barWidth / 2, barY + 14);
-    ctx.fillText(text, barX + barWidth / 2, barY + 14);
+    ctx.lineWidth = 2;
+    const text = `P1 BOOST: ${Math.floor(this.boostEnergy)}%`;
+    ctx.strokeText(text, barX + barWidth / 2, barY + 8);
+    ctx.fillText(text, barX + barWidth / 2, barY + 11);
+    ctx.textAlign = 'left';
+  }
+
+  // Draw Player 2 Energy Gauge (left side, blue)
+  private drawEnergyGauge2(ctx: CanvasRenderingContext2D) {
+    const barWidth = 120;
+    const barHeight = 10;
+    const barX = 5; // Left side for Player 2
+    const barY = this.CANVAS_HEIGHT - 15; // Bottom of canvas, same as P1
+
+    // Background
+    ctx.fillStyle = 'rgba(26, 26, 26, 0.8)';
+    ctx.fillRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
+
+    // Border (Blue for Player 2)
+    ctx.strokeStyle = '#4D9FFF';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
+
+    // Energy bar
+    const energyWidth = (this.boostEnergy2 / this.MAX_BOOST_ENERGY) * barWidth;
+    const gradient = ctx.createLinearGradient(barX, barY, barX + energyWidth, barY);
+
+    if (this.boostEnergy2 > 60) {
+      gradient.addColorStop(0, '#00FF88');
+      gradient.addColorStop(1, '#00CC6A');
+    } else if (this.boostEnergy2 > 30) {
+      gradient.addColorStop(0, '#FFD700');
+      gradient.addColorStop(1, '#FFA500');
+    } else {
+      gradient.addColorStop(0, '#FF6B6B');
+      gradient.addColorStop(1, '#FF0000');
+    }
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(barX, barY, energyWidth, barHeight);
+
+    // Text
+    ctx.font = 'bold 7px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    const text = `P2 BOOST: ${Math.floor(this.boostEnergy2)}%`;
+    ctx.strokeText(text, barX + barWidth / 2, barY + 8);
+    ctx.fillText(text, barX + barWidth / 2, barY + 11);
     ctx.textAlign = 'left';
   }
 
@@ -2794,6 +2450,11 @@ private updatePerformanceAndCheckAchievements() {
       return;
     }
     this.ctx = context;
+
+    // Hide IFM logo after 5 seconds
+    setTimeout(() => {
+      this.showIfmLogo = false;
+    }, 5000);
 
     // Register keyboard input
     window.addEventListener('keydown', this.onKeyDownBound);
@@ -2838,12 +2499,41 @@ private updatePerformanceAndCheckAchievements() {
       this.announcementCooldown -= deltaTime;
     }
 
-    // Update Boost Mode based on key state and energy
+    // Update Advanced Maze Features
+    this.updateAdvancedMazeFeatures(deltaTime);
+
+    // Update Boost Mode based on key state and energy (keyboard or gamepad)
     if (this.gameMode !== 'practice') {
-      if (this.isBoostKeyPressed && this.boostEnergy > 0) {
+      const isBoostActive = this.isBoostKeyPressed || this.inputService.isBoostButtonHeld();
+      if (isBoostActive && this.boostEnergy > 0) {
         this.turboSpeed = true;
       } else {
         this.turboSpeed = false;
+      }
+
+      // Player 2 boost activation (keyboard + gamepad)
+      if (this.gameMode === '2player') {
+        // Check gamepad 1 for Player 2 boost (buttons 0-3 for arcade compatibility)
+        const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+        let gamepadBoostP2 = false;
+
+        // Try gamepad index 1 first, fallback to gamepad 0 buttons 8-11 for arcade
+        const gp2 = gamepads[1] || gamepads[0];
+        if (gp2) {
+          // Standard gamepad: buttons 0-3
+          // Arcade setup: buttons 8-11 for Player 2
+          gamepadBoostP2 = gp2.buttons[0]?.pressed || gp2.buttons[1]?.pressed ||
+                          gp2.buttons[2]?.pressed || gp2.buttons[3]?.pressed ||
+                          gp2.buttons[8]?.pressed || gp2.buttons[9]?.pressed ||
+                          gp2.buttons[10]?.pressed || gp2.buttons[11]?.pressed;
+        }
+
+        const isBoostActive2 = this.isBoostKeyPressed2 || gamepadBoostP2;
+        if (isBoostActive2 && this.boostEnergy2 > 0) {
+          this.turboSpeed2 = true;
+        } else {
+          this.turboSpeed2 = false;
+        }
       }
     }
 
@@ -2852,13 +2542,52 @@ private updatePerformanceAndCheckAchievements() {
       this.handleSpielanleitungGamepad();
     }
 
-    // Arcade Input - Try arcade joystick first, fallback to standard gamepad
-    let gpDir: string | null = null;
-    gpDir = this.inputService.getArcadeDirection(1); // Player 1 joystick
-    if (!gpDir) {
-      gpDir = this.inputService.getDirection(); // Fallback to standard gamepad
+    // Gamepad Pause Button (Button 9)
+    if (this.inputService.isPauseButtonPressed()) {
+      if (this.gameState === 'paused') {
+        this.resumeFromPause();
+      } else if (this.gameState === 'playing') {
+        this.openPause();
+        this.pauseMenuIndex = 0; // Reset to Resume
+      }
     }
 
+    // Gamepad Input for Pause Menu
+    if (this.showPauseOverlay && !this.showExitConfirm) {
+      const now = Date.now();
+      if (now - this.lastGamepadMenuAction > this.GAMEPAD_MENU_COOLDOWN) {
+        const menuDir = this.inputService.getDirectionChange();
+        if (menuDir === 'U' || menuDir === 'D') {
+          this.navigatePauseMenu(menuDir === 'U' ? 'up' : 'down');
+          this.lastGamepadMenuAction = now;
+        }
+        if (this.inputService.isActionButtonPressed()) {
+          this.selectPauseMenuItem();
+          this.lastGamepadMenuAction = now;
+        }
+      }
+      return; // Skip gameplay input when paused
+    }
+
+    // Gamepad Input for Game Over Menu
+    if (this.gameState === 'gameover') {
+      const now = Date.now();
+      if (now - this.lastGamepadMenuAction > this.GAMEPAD_MENU_COOLDOWN) {
+        const menuDir = this.inputService.getDirectionChange();
+        if (menuDir === 'U' || menuDir === 'D') {
+          this.navigateGameOverMenu(menuDir === 'U' ? 'up' : 'down');
+          this.lastGamepadMenuAction = now;
+        }
+        if (this.inputService.isActionButtonPressed()) {
+          this.selectGameOverMenuItem();
+          this.lastGamepadMenuAction = now;
+        }
+      }
+      return; // Skip gameplay input when game over
+    }
+
+    // Gamepad Input for Gameplay
+    const gpDir = this.inputService.getDirection();
     if (gpDir && this.pacman && this.gameState === 'playing') {
       this.bufferedDirection = gpDir; // Buffer the direction
     }
@@ -2871,6 +2600,39 @@ private updatePerformanceAndCheckAchievements() {
       gpDir2 = this.inputService.getArcadeDirection(2); // Player 2 joystick
       if (gpDir2) {
         this.bufferedDirection2 = gpDir2; // Buffer the direction for player 2
+    // Player 2 gamepad input (try second gamepad first, fallback to first if alone) in 2-player mode
+    if (this.gameMode === '2player' && this.robot2 && this.gameState === 'playing') {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      // Try gamepad index 1 first (second controller)
+      let gp2 = gamepads[1];
+      // If no second gamepad, allow using first gamepad for Player 2
+      if (!gp2 && gamepads[0]) {
+        gp2 = gamepads[0];
+      }
+
+      if (gp2) {
+        let gpDir2: string | null = null;
+        const axisX = gp2.axes[0];
+        const axisY = gp2.axes[1];
+
+        // D-Pad support
+        const dpadUp = gp2.buttons[12]?.pressed;
+        const dpadDown = gp2.buttons[13]?.pressed;
+        const dpadLeft = gp2.buttons[14]?.pressed;
+        const dpadRight = gp2.buttons[15]?.pressed;
+
+        if (dpadUp || (Math.abs(axisY) > 0.5 && axisY < 0)) gpDir2 = 'U';
+        else if (dpadDown || (Math.abs(axisY) > 0.5 && axisY > 0)) gpDir2 = 'D';
+        else if (dpadLeft || (Math.abs(axisX) > 0.5 && axisX < 0)) gpDir2 = 'L';
+        else if (dpadRight || (Math.abs(axisX) > 0.5 && axisX > 0)) gpDir2 = 'R';
+
+        if (gpDir2) {
+          this.bufferedDirection2 = gpDir2;
+        }
+
+        // Player 2 boost button (Button 0 - A/Cross or Button 1 - B/Circle)
+        const boostButton2 = gp2.buttons[0]?.pressed || gp2.buttons[1]?.pressed;
+        this.isBoostKeyPressed2 = boostButton2;
       }
     }
 
@@ -2973,33 +2735,30 @@ private updatePerformanceAndCheckAchievements() {
         this.isBoostKeyPressed = false;
         this.turboSpeed = false;
         console.log('🛑 Boost deaktiviert (Arcade Button)');
+    // Apply buffered direction for Player 2
+    if (this.bufferedDirection2 && this.robot2 && this.gameState === 'playing' && this.gameMode === '2player') {
+      const canTurn2 = this.canChangeTo2(this.bufferedDirection2);
+      if (canTurn2) {
+        this.robot2.updateDirection(this.bufferedDirection2, this.CELL_SIZE, this.walls);
+        // Update image for Player 2
+        if (this.bufferedDirection2 === 'U') this.robot2.image = this.robotUpImage;
+        else if (this.bufferedDirection2 === 'D') this.robot2.image = this.robotDownImage;
+        else if (this.bufferedDirection2 === 'L') this.robot2.image = this.robotLeftImage;
+        else if (this.bufferedDirection2 === 'R') this.robot2.image = this.robotRightImage;
+        this.bufferedDirection2 = null;
       }
     }
 
-    // Help/Spielanleitung button (Button 13)
-    if (this.gameState === 'playing') {
+    // Gamepad - Open SPIELANLEITUNG with Y button (button 3) during gameplay
+    if (this.gameState === 'playing' && !this.showSpielanleitung) {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
       const now = Date.now();
-      if (this.inputService.isArcadeHelpPressed() && now - this.lastGamepadSpielanleitungAction > 300) {
-        this.toggleSpielanleitung();
-        this.lastGamepadSpielanleitungAction = now;
-      }
-    }
-
-    // Game Over Menu Navigation
-    if ((this.gameState as string) === 'gameover') {
-      // Try arcade joystick first, fallback to standard gamepad
-      let currentDirection = this.inputService.getArcadeDirection(1);
-      if (!currentDirection) {
-        currentDirection = this.inputService.getDirection();
-      }
-
-      if (currentDirection === 'L' || currentDirection === 'R') {
-        this.navigateGameOverMenu(currentDirection);
-      }
-
-      // Select button (Button 10) or standard A Button (0) - Select
-      if (this.inputService.isArcadeSelectPressed() || this.inputService.isActionButtonPressed()) {
-        this.selectGameOverMenuItem();
+      for (const gp of gamepads) {
+        if (gp && gp.buttons[3]?.pressed && now - this.lastGamepadSpielanleitungAction > 300) {
+          this.toggleSpielanleitung();
+          this.lastGamepadSpielanleitungAction = now;
+          break;
+        }
       }
     }
 
@@ -3028,23 +2787,58 @@ private updatePerformanceAndCheckAchievements() {
 
         this.stateTimer += deltaTime;
         if (this.stateTimer >= this.DEATH_DURATION) {
-          if (this.lives <= 0) {
-            // Trigger final explosion before game over
-            this.gameState = 'finalexplosion';
-            this.stateTimer = 0;
-            // Initialize more dramatic destruction
-            this.mazeDestruction.clear();
-            this.walls.forEach(wall => {
-              this.mazeDestruction.set(wall, {
-                offsetY: 0,
-                rotation: (Math.random() - 0.5) * 1.0,
-                speed: 3 + Math.random() * 5
+          // In 2-player mode, check if any player is out
+          if (this.gameMode === '2player') {
+            if (this.lives <= 0 || this.systemHealth2 <= 0) {
+              // At least one player is out - trigger game over
+              this.gameState = 'finalexplosion';
+              this.stateTimer = 0;
+              this.announce('CRITICAL SYSTEM FAILURE');
+              this.mazeDestruction.clear();
+              this.walls.forEach(wall => {
+                this.mazeDestruction.set(wall, {
+                  offsetY: 0,
+                  rotation: (Math.random() - 0.5) * 1.0,
+                  speed: 3 + Math.random() * 5
+                });
               });
-            });
+            } else {
+              this.resetPositions();
+              this.gameState = 'ready';
+              this.stateTimer = 0;
+              setTimeout(() => {
+                this.announce('SYSTEM MALFUNCTION DETECTED');
+              }, 500);
+            }
           } else {
-            this.resetPositions();
-            this.gameState = 'ready';
-            this.stateTimer = 0;
+            // Single player mode
+            if (this.lives <= 0) {
+              // Trigger final explosion before game over
+              this.gameState = 'finalexplosion';
+              this.stateTimer = 0;
+
+              // Announce critical failure
+              this.announce('CRITICAL SYSTEM FAILURE');
+
+              // Initialize more dramatic destruction
+              this.mazeDestruction.clear();
+              this.walls.forEach(wall => {
+                this.mazeDestruction.set(wall, {
+                  offsetY: 0,
+                  rotation: (Math.random() - 0.5) * 1.0,
+                  speed: 3 + Math.random() * 5
+                });
+              });
+            } else {
+              this.resetPositions();
+              this.gameState = 'ready';
+              this.stateTimer = 0;
+
+              // Announce malfunction
+              setTimeout(() => {
+                this.announce('SYSTEM MALFUNCTION DETECTED');
+              }, 500);
+            }
           }
         }
         return;
@@ -3054,7 +2848,6 @@ private updatePerformanceAndCheckAchievements() {
         if (this.stateTimer >= this.FINAL_EXPLOSION_DURATION) {
           this.gameState = 'gameover';
           this.gameOver = true;
-          this.gameOverMenuIndex = 0; // Reset to Restart
           // Load leaderboard immediately
           this.loadLeaderboard();
           // Submit final score to backend
@@ -3070,8 +2863,6 @@ private updatePerformanceAndCheckAchievements() {
         }
         return;
 
-      case 'gameover':
-        return; // Warte auf Tastendruck
       case 'paused':
         return; // pausiert
 
@@ -3132,13 +2923,6 @@ private updatePerformanceAndCheckAchievements() {
       this.powerPelletBlinkTimer = 0;
     }
 
-    // 2-Player Mode Updates
-    if (this.isTwoPlayerMode) {
-      this.updatePlayerTrails();
-      this.updateConnectionBeam();
-      this.updateTeamBonusParticles();
-    }
-
     // Scatter/Chase Mode Timer (nur wenn nicht frightened)
     if (this.scaredTimer <= 0) {
       this.modeTimer += deltaTime;
@@ -3173,25 +2957,6 @@ private updatePerformanceAndCheckAchievements() {
       this.bonusRotationTimer = 0;
       const bonusTypes: ('iot-sensor' | 'shield' | 'diagnostic')[] = ['iot-sensor', 'shield', 'diagnostic'];
       this.currentBonusType = bonusTypes[Math.floor(Math.random() * bonusTypes.length)];
-    }
-
-    // 2-Player: Update power-up timers
-    if (this.isTwoPlayerMode) {
-      if (this.player1PowerUpTimer > 0) {
-        this.player1PowerUpTimer -= deltaTime;
-        if (this.player1PowerUpTimer <= 0) {
-          this.player1PowerUp = 'none';
-          this.player1PowerUpTimer = 0;
-        }
-      }
-
-      if (this.player2PowerUpTimer > 0) {
-        this.player2PowerUpTimer -= deltaTime;
-        if (this.player2PowerUpTimer <= 0) {
-          this.player2PowerUp = 'none';
-          this.player2PowerUpTimer = 0;
-        }
-      }
     }
 
     // Bonus effect timers
@@ -3267,7 +3032,6 @@ private updatePerformanceAndCheckAchievements() {
     return true;
   }
 
-  // Check if robot2 can turn to a new direction (for buffered input)
   private canChangeTo2(newDirection: string): boolean {
     if (!this.robot2) return false;
 
@@ -3432,12 +3196,6 @@ private updatePerformanceAndCheckAchievements() {
   private updateGhostAI(ghost: Block) {
     if (!this.pacman) return;
 
-    // 2-Player Mode: Select target based on ghost's assigned player
-    let targetRobot = this.pacman;
-    if (this.isTwoPlayerMode && ghost.targetPlayer === 2 && this.robot2) {
-      targetRobot = this.robot2;
-    }
-
     // Check if ghost is inside the ghost house (Box)
     // House area approx: X [10..17]*CELL_SIZE, Y [12..16]*CELL_SIZE
     const gridX = Math.floor(ghost.x / this.CELL_SIZE);
@@ -3460,8 +3218,8 @@ private updatePerformanceAndCheckAchievements() {
     const timeInHouse = this.ghostHouseTimer.get(ghost) || 0;
     const forceExit = timeInHouse > this.MAX_HOUSE_TIME;
 
-    let targetX = targetRobot.x;
-    let targetY = targetRobot.y;
+    let targetX = this.pacman.x;
+    let targetY = this.pacman.y;
 
     if (inGhostHouse || forceExit) {
       // Force target to be outside the door (Row 11, Col 13.5) to exit the box
@@ -3492,23 +3250,23 @@ private updatePerformanceAndCheckAchievements() {
         // Chase Mode: Individuelle Jagdstrategien gemäß Skizze
         switch (ghost.type) {
           case 'aggressive': // ROT - Verfolgt direkt den AGV
-            targetX = targetRobot.x;
-            targetY = targetRobot.y;
+            targetX = this.pacman.x;
+            targetY = this.pacman.y;
             break;
 
           case 'ambush': // ROSA - Lauert voraus (4 Tiles vor Pac-Man)
-            if (targetRobot.direction === 'U') {
-              targetX = targetRobot.x;
-              targetY = targetRobot.y - 4 * this.CELL_SIZE;
-            } else if (targetRobot.direction === 'D') {
-              targetX = targetRobot.x;
-              targetY = targetRobot.y + 4 * this.CELL_SIZE;
-            } else if (targetRobot.direction === 'L') {
-              targetX = targetRobot.x - 4 * this.CELL_SIZE;
-              targetY = targetRobot.y;
+            if (this.pacman.direction === 'U') {
+              targetX = this.pacman.x;
+              targetY = this.pacman.y - 4 * this.CELL_SIZE;
+            } else if (this.pacman.direction === 'D') {
+              targetX = this.pacman.x;
+              targetY = this.pacman.y + 4 * this.CELL_SIZE;
+            } else if (this.pacman.direction === 'L') {
+              targetX = this.pacman.x - 4 * this.CELL_SIZE;
+              targetY = this.pacman.y;
             } else {
-              targetX = targetRobot.x + 4 * this.CELL_SIZE;
-              targetY = targetRobot.y;
+              targetX = this.pacman.x + 4 * this.CELL_SIZE;
+              targetY = this.pacman.y;
             }
             break;
 
@@ -3558,13 +3316,14 @@ private updatePerformanceAndCheckAchievements() {
       this.pacman.x += this.pacman.velocityX;
       this.pacman.y += this.pacman.velocityY;
 
-    // Tunnel-Wraparound für Pac-Man
-    this.handleTunnelWraparound(this.pacman);
+      // Tunnel-Wraparound für Pac-Man
+      this.handleTunnelWraparound(this.pacman);
 
       // Check wall collisions (außer Ghost Door)
       let collided = false;
       for (const wall of this.walls) {
         if (wall.type === 'ghost-door') continue; // Pac-Man kann NICHT durch die Tür
+
         if (this.collision(this.pacman, wall)) {
           // Revert movement
           this.pacman.x = oldX;
@@ -3578,47 +3337,35 @@ private updatePerformanceAndCheckAchievements() {
       if (collided) break;
     }
 
-    // Move robot2 in 2-player mode
-    if (this.isTwoPlayerMode && this.robot2) {
-      let boostMultiplier2 = this.turboSpeed ? 2 : 1;
+    // Move Player 2 in 2-player mode
+    if (this.gameMode === '2player' && this.robot2 && !this.gameOver2) {
+      // Player 2 has its own boost multiplier
+      const boostMultiplier2 = this.turboSpeed2 ? 2 : 1;
+      const steps2 = boostMultiplier2;
+      for (let i = 0; i < steps2; i++) {
+        const oldX2 = this.robot2.x;
+        const oldY2 = this.robot2.y;
 
-      // Apply speed power-up for player 2
-      if (this.player2PowerUp === 'speed') {
-        boostMultiplier2 = Math.max(boostMultiplier2, 1.5);
-      }
-
-      const steps = Math.ceil(boostMultiplier2);
-      for (let i = 0; i < steps; i++) {
-        const oldX = this.robot2.x;
-        const oldY = this.robot2.y;
-
-        // Move one step
         this.robot2.x += this.robot2.velocityX;
         this.robot2.y += this.robot2.velocityY;
 
-        // Tunnel-Wraparound für robot2
         this.handleTunnelWraparound(this.robot2);
 
-        // Check wall collision
-        let collided = false;
+        let collided2 = false;
         for (const wall of this.walls) {
           if (wall.type === 'ghost-door') continue;
-
           if (this.collision(this.robot2, wall)) {
-            // Revert movement
-            this.robot2.x = oldX;
-            this.robot2.y = oldY;
-            collided = true;
+            this.robot2.x = oldX2;
+            this.robot2.y = oldY2;
+            collided2 = true;
             break;
           }
         }
-
-        // Stop moving if we hit a wall
-        if (collided) break;
+        if (collided2) break;
       }
     }
 
-    // Check ghost collisions with robot1
+    // Check ghost collisions
     for (const ghost of this.ghosts) {
       if (this.collision(ghost, this.pacman)) {
         // Shield protects from collision
@@ -3638,19 +3385,6 @@ private updatePerformanceAndCheckAchievements() {
           // Reparatur: Störung "reparieren" (+200 Effizienz)
           this.audioService.play('eatghost');
           this.efficiency += 200;
-          // Successful repair: increment repair counter
-          this.stats.repairsSuccessful += 1;
-          // Fixed error (counts as resolved malfunction)
-          this.stats.errorsFixed += 1;
-
-          // Check whether a new achievement has been unlocked
-          const newlyUnlocked = this.achievements.checkAndUnlock(this.stats);
-
-          // Show achievement popup if one was unlocked
-          if (newlyUnlocked.length > 0) {
-            this.showAchievementToast(newlyUnlocked[0]);
-          }
-
           // Respawn ghost at starting position
           ghost.reset();
           ghost.scared = false;
@@ -3659,21 +3393,7 @@ private updatePerformanceAndCheckAchievements() {
         } else {
           // Systemfehler: Health verlieren
           this.audioService.play('die');
-
-          // 2-Player Mode: Separate lives
-          if (this.isTwoPlayerMode) {
-            this.player1Lives -= 1;
-
-            // Check if Player 1 lost all lives
-            if (this.player1Lives <= 0) {
-              this.winner = 2; // Player 2 wins
-              this.systemHealth = 0; // Trigger game over
-              this.announce(`PLAYER 2 ${this.playerName2} WINS!`);
-            }
-          } else {
-            this.systemHealth -= 1;
-          }
-
+          this.systemHealth -= 1;
           this.damageFlash = 0.5; // Trigger damage flash
           this.gameState = 'dying';
           this.stateTimer = 0;
@@ -3681,52 +3401,61 @@ private updatePerformanceAndCheckAchievements() {
         }
       }
 
-      // Check ghost collisions with robot2 in 2-player mode
-      if (this.isTwoPlayerMode && this.robot2 && this.collision(ghost, this.robot2)) {
-        // Shield protects from collision
-        if (this.shieldActive && !ghost.scared) {
-          // Ghost bounces back with shield
-          ghost.velocityX = -ghost.velocityX;
-          ghost.velocityY = -ghost.velocityY;
-          this.efficiency += 50;
-          this.audioService.play('eatghost');
-
-          // Add ripple effect
-          this.shieldRipples.push({radius: 20, alpha: 1.0});
-          continue;
-        }
-
-        if (ghost.scared) {
-          // Reparatur: Störung "reparieren" (+200 Effizienz)
-          this.audioService.play('eatghost');
-          this.efficiency += 200;
-          // Respawn ghost at starting position
-          ghost.reset();
-          ghost.scared = false;
-          ghost.updateVelocity(this.CELL_SIZE); // Reset to normal speed
-          continue;
-        } else {
-          // Systemfehler: Health verlieren
-          this.audioService.play('die');
-
-          // 2-Player Mode: Separate lives
-          if (this.isTwoPlayerMode) {
-            this.player2Lives -= 1;
-
-            // Check if Player 2 lost all lives
-            if (this.player2Lives <= 0) {
-              this.winner = 1; // Player 1 wins
-              this.systemHealth = 0; // Trigger game over
-              this.announce(`PLAYER 1 ${this.playerName} WINS!`);
-            }
+      // Check collision with Player 2 in 2-player mode
+      if (this.gameMode === '2player' && this.robot2 && !this.gameOver2) {
+        if (this.collision(ghost, this.robot2)) {
+          if (ghost.scared) {
+            // Player 2 eats ghost
+            this.audioService.play('eatghost');
+            this.efficiency2 += 200;
+            ghost.reset();
+            ghost.scared = false;
+            ghost.updateVelocity(this.CELL_SIZE);
+            continue;
           } else {
-            this.systemHealth -= 1;
-          }
+            // Player 2 loses a life
+            this.audioService.play('die');
+            this.systemHealth2 -= 1;
+            this.damageFlash = 0.5; // Trigger damage flash for P2 too
 
-          this.damageFlash = 0.5; // Trigger damage flash
-          this.gameState = 'dying';
-          this.stateTimer = 0;
-          return; // Stoppe weitere Bewegung
+            if (this.systemHealth2 <= 0) {
+              this.gameOver2 = true;
+              // Game over when first player loses all lives
+              this.gameState = 'finalexplosion';
+              this.stateTimer = 0;
+              this.announce('CRITICAL SYSTEM FAILURE');
+              this.mazeDestruction.clear();
+              this.walls.forEach(wall => {
+                this.mazeDestruction.set(wall, {
+                  offsetY: 0,
+                  rotation: (Math.random() - 0.5) * 1.0,
+                  speed: 3 + Math.random() * 5
+                });
+              });
+              return;
+            }
+
+            // Trigger dying state for Player 2 with visual effects
+            this.gameState = 'dying';
+            this.stateTimer = 0;
+
+            // Create explosion particles for Player 2 at death position
+            for (let i = 0; i < 20; i++) {
+              const angle = Math.random() * Math.PI * 2;
+              const speed = 2 + Math.random() * 4;
+              this.particles.push({
+                x: this.robot2.x + this.robot2.width / 2,
+                y: this.robot2.y + this.robot2.height / 2,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 1.0,
+                maxLife: 1.0,
+                color: '#4D9FFF', // Blue particles for Player 2
+                size: 3 + Math.random() * 3
+              });
+            }
+            return; // Stop further movement
+          }
         }
       }
 
@@ -3756,7 +3485,7 @@ private updatePerformanceAndCheckAchievements() {
       }
     }
 
-    // Check food collision (Produktionsauftrag) with robot1
+    // Check food collision (Produktionsauftrag)
     let foodEaten: Block | null = null;
     for (const food of this.foods) {
       if (this.collision(this.pacman, food)) {
@@ -3783,87 +3512,24 @@ private updatePerformanceAndCheckAchievements() {
           } else if (this.pelletStreak >= 10) {
             this.streakMultiplier = 1.5;
           }
-
-          // 2-Player Mode: Separate scoring with team bonus
-          if (this.isTwoPlayerMode) {
-            const basePoints = Math.floor(10 * this.streakMultiplier);
-            const teamPoints = Math.floor(basePoints * this.teamComboMultiplier);
-            this.player1Score += teamPoints;
-
-            // Track last collector for team combo
-            if (this.lastPelletCollector === 2) {
-              // Consecutive collection by different players = team combo!
-              this.createTeamBonusParticles(food.x + 2, food.y + 2);
-            }
-            this.lastPelletCollector = 1;
-          } else {
-            this.score += Math.floor(10 * this.streakMultiplier);
-          }
+          this.score += Math.floor(10 * this.streakMultiplier);
         }
       }
     }
     if (foodEaten) {
-  // Remove collected sensor data from the map
-  this.foods.delete(foodEaten);
+      this.foods.delete(foodEaten);
+    }
 
-  // Increase the collected sensor data counter
-  this.stats.sensorDataCollected += 1;
-  // Update system performance based on collected pellets
-const collected =
-  this.totalPellets - (this.foods.size + this.powerPellets.size);
-
-this.stats.systemPerformance = Math.round(
-  (collected / this.totalPellets) * 100
-);
-  // Check whether a new achievement has been unlocked
-  const newlyUnlocked = this.achievements.checkAndUnlock(this.stats);
-
-  // Show achievement popup if one was unlocked
-  if (newlyUnlocked.length > 0) {
-    this.showAchievementToast(newlyUnlocked[0]);
-  }
-}
-
-    // Check food collision with robot2 in 2-player mode
-    if (this.isTwoPlayerMode && this.robot2) {
+    // Check food collision for Player 2 in 2-player mode
+    if (this.gameMode === '2player' && this.robot2 && !this.gameOver2) {
       let foodEaten2: Block | null = null;
       for (const food of this.foods) {
         if (this.collision(this.robot2, food)) {
           this.audioService.play('waka');
           foodEaten2 = food;
-          // Create green particles for sensor data
-          this.createParticles(food.x + 2, food.y + 2, '#00FF88', 6);
-
-          // Only count pellets after touching a checkpoint
-          if (this.pelletCountingEnabled) {
-            this.pelletStreak++;
-            this.comboResetTimer = this.COMBO_RESET_DELAY;
-
-            // Show combo display for high streaks
-            if (this.pelletStreak >= 10) {
-              this.comboDisplayTimer = 1000;
-            }
-
-            // Update streak multiplier
-            if (this.pelletStreak >= 30) {
-              this.streakMultiplier = 3.0;
-            } else if (this.pelletStreak >= 20) {
-              this.streakMultiplier = 2.0;
-            } else if (this.pelletStreak >= 10) {
-              this.streakMultiplier = 1.5;
-            }
-
-            const basePoints = Math.floor(10 * this.streakMultiplier);
-            const teamPoints = Math.floor(basePoints * this.teamComboMultiplier);
-            this.player2Score += teamPoints;
-
-            // Track last collector for team combo
-            if (this.lastPelletCollector === 1) {
-              // Consecutive collection by different players = team combo!
-              this.createTeamBonusParticles(food.x + 2, food.y + 2);
-            }
-            this.lastPelletCollector = 2;
-          }
+          // Create blue particles for Player 2
+          this.createParticles(food.x + 2, food.y + 2, '#4D9FFF', 6);
+          this.efficiency2 += 10;
         }
       }
       if (foodEaten2) {
@@ -3871,7 +3537,7 @@ this.stats.systemPerformance = Math.round(
       }
     }
 
-    // Check power pellet collision (KI-Optimierung) with robot1
+    // Check power pellet collision (KI-Optimierung)
     let powerEaten: Block | null = null;
     for (const pellet of this.powerPellets) {
       if (this.collision(this.pacman, pellet)) {
@@ -3886,31 +3552,29 @@ this.stats.systemPerformance = Math.round(
           g.scared = true;
           g.updateVelocity(this.CELL_SIZE); // update speed to 80%
         });
+
+        // Announce power mode
+        this.announce('POWER MODE ACTIVATED');
       }
     }
     if (powerEaten) {
       this.powerPellets.delete(powerEaten);
     }
 
-    // Check power pellet collision with robot2 in 2-player mode
-    if (this.isTwoPlayerMode && this.robot2) {
+    // Check power pellet collision for Player 2
+    if (this.gameMode === '2player' && this.robot2 && !this.gameOver2) {
       let powerEaten2: Block | null = null;
       for (const pellet of this.powerPellets) {
         if (this.collision(this.robot2, pellet)) {
           this.audioService.play('powerpill');
           powerEaten2 = pellet;
-          // Create orange particles for power pellet
-          this.createParticles(pellet.x + 4, pellet.y + 4, '#ED6B00', 12);
-          this.score += 50;
-          // Activate scared mode for 10 seconds
+          this.createParticles(pellet.x + 4, pellet.y + 4, '#4D9FFF', 12);
+          this.efficiency2 += 50;
           this.scaredTimer = this.scaredDuration;
           this.ghosts.forEach(g => {
             g.scared = true;
-            g.updateVelocity(this.CELL_SIZE); // update speed to 80%
+            g.updateVelocity(this.CELL_SIZE);
           });
-
-          // Announce power mode
-          this.announce('POWER MODE ACTIVATED');
         }
       }
       if (powerEaten2) {
@@ -3918,7 +3582,7 @@ this.stats.systemPerformance = Math.round(
       }
     }
 
-    // Quality Checkpoint collision with robot1
+    // Quality Checkpoint collision for Player 1
     if (this.robot) {
       this.qualityCheckpoints.forEach(checkpoint => {
         if (this.collision(this.robot!, checkpoint)) {
@@ -3944,33 +3608,23 @@ this.stats.systemPerformance = Math.round(
       });
     }
 
-    // Quality Checkpoint collision with robot2 in 2-player mode
-    if (this.isTwoPlayerMode && this.robot2) {
+    // Quality Checkpoint collision for Player 2
+    if (this.gameMode === '2player' && this.robot2 && !this.gameOver2) {
       this.qualityCheckpoints.forEach(checkpoint => {
         if (this.collision(this.robot2!, checkpoint)) {
-          this.score += 500;
-          this.efficiency += 500;
-          // Create blue particles for checkpoint
-          this.createParticles(checkpoint.x + 16, checkpoint.y + 16, '#4169E1', 16);
+          this.efficiency2 += 500;
+          this.createParticles(checkpoint.x + 16, checkpoint.y + 16, '#4D9FFF', 16);
           this.qualityCheckpoints.delete(checkpoint);
           this.audioService.play('eatghost');
-
-          // Enable pellet counting after first checkpoint
-          this.pelletCountingEnabled = true;
-          this.checkpointsCollected++;
-
-          // Trigger success burst effect
-          this.successBurst = 1.0;
-
-          // Extra life every 2 checkpoints (max 3 lives)
-          if (this.checkpointsCollected % 2 === 0 && this.systemHealth < 3) {
-            this.systemHealth++;
+          // Extra life every 2 checkpoints for Player 2
+          if (this.systemHealth2 < 3) {
+            this.systemHealth2++;
           }
         }
       });
     }
 
-    // Cherry/Bonus collision with effects - robot1
+    // Cherry/Bonus collision with effects (Player 1)
     if (this.cherry && this.collision(this.pacman, this.cherry)) {
       let bonusScore = 500;
       let particleColor = '#FFD700';
@@ -3982,12 +3636,6 @@ this.stats.systemPerformance = Math.round(
           particleColor = '#00FFFF';
           this.dataStreak += 10; // Massive boost to data streak
           this.audioService.play('eatghost');
-
-          // 2-Player: Assign magnet power-up
-          if (this.isTwoPlayerMode) {
-            this.player1PowerUp = 'magnet';
-            this.player1PowerUpTimer = 10000;
-          }
           break;
         case 'shield':
           bonusScore = 500;
@@ -4003,87 +3651,30 @@ this.stats.systemPerformance = Math.round(
           bonusScore = 500;
           particleColor = '#FF69B4';
           this.audioService.play('eatghost');
-
-          // 2-Player: Assign speed power-up
-          if (this.isTwoPlayerMode) {
-            this.player1PowerUp = 'speed';
-            this.player1PowerUpTimer = 10000;
-          }
           break;
       }
 
       // Create colored particles based on bonus type
       this.createParticles(this.cherry.x + 16, this.cherry.y + 16, particleColor, 20);
-
-      // 2-Player: Add to individual score
-      if (this.isTwoPlayerMode) {
-        this.player1Score += bonusScore;
-      } else {
-        this.efficiency += bonusScore;
-      }
+      this.efficiency += bonusScore;
 
       // System Health bonus (capped at 3)
       if (this.systemHealth < 3) {
         this.systemHealth += 1;
       }
 
-      // 2-Player: Extra life for player 1
-      if (this.isTwoPlayerMode && this.player1Lives < 3) {
-        this.player1Lives += 1;
-      }
-
       this.cherry = null;
       this.cherrySpawnCooldown = 300;
     }
 
-    // Cherry/Bonus collision with effects - robot2
-    if (this.isTwoPlayerMode && this.robot2 && this.cherry && this.collision(this.robot2, this.cherry)) {
-      let bonusScore = 500;
-      let particleColor = '#FFD700';
-
-      // Apply bonus effect based on type
-      switch (this.currentBonusType) {
-        case 'iot-sensor':
-          bonusScore = 700;
-          particleColor = '#00FFFF';
-          this.dataStreak += 10;
-          this.audioService.play('eatghost');
-          this.player2PowerUp = 'magnet';
-          this.player2PowerUpTimer = 10000;
-          break;
-        case 'shield':
-          bonusScore = 500;
-          particleColor = '#4169E1';
-          this.shieldActive = true;
-          this.bonusEffectTimer = 10000;
-          this.audioService.play('eatghost');
-          this.announce('DEFENSE SHIELD ACTIVATED');
-          this.player2PowerUp = 'shield';
-          this.player2PowerUpTimer = 10000;
-          break;
-        case 'diagnostic':
-          bonusScore = 500;
-          particleColor = '#FF69B4';
-          this.audioService.play('eatghost');
-          this.player2PowerUp = 'speed';
-          this.player2PowerUpTimer = 10000;
-          break;
+    // Cherry/Bonus collision for Player 2
+    if (this.gameMode === '2player' && this.robot2 && !this.gameOver2 && this.cherry && this.collision(this.robot2, this.cherry)) {
+      this.audioService.play('eatghost');
+      this.createParticles(this.cherry.x + 16, this.cherry.y + 16, '#4D9FFF', 20);
+      this.efficiency2 += 500;
+      if (this.systemHealth2 < 3) {
+        this.systemHealth2 += 1;
       }
-
-      // Create colored particles
-      this.createParticles(this.cherry.x + 16, this.cherry.y + 16, particleColor, 20);
-      this.player2Score += bonusScore;
-
-      // System Health bonus
-      if (this.systemHealth < 3) {
-        this.systemHealth += 1;
-      }
-
-      // Extra life for player 2
-      if (this.player2Lives < 3) {
-        this.player2Lives += 1;
-      }
-
       this.cherry = null;
       this.cherrySpawnCooldown = 300;
     }
@@ -4093,11 +3684,9 @@ this.stats.systemPerformance = Math.round(
       this.cherrySpawnCooldown--;
     }
 
-    // Spawn Cherry: Nach 70 et 170 Pellets gegessen (wie im Original)
-    // In 2-player mode: spawn more frequently (every 40 and 100 pellets)
+    // Spawn Cherry: Nach 70 und 170 Pellets gegessen (wie im Original)
     const pelletsEaten = this.totalPellets - this.foods.size - this.powerPellets.size;
-    const spawnThresholds = this.isTwoPlayerMode ? [40, 100, 160, 220] : [70, 170];
-    const shouldSpawnCherry = spawnThresholds.includes(pelletsEaten) && !this.cherry && this.cherrySpawnCooldown === 0;
+    const shouldSpawnCherry = (pelletsEaten === 70 || pelletsEaten === 170) && !this.cherry && this.cherrySpawnCooldown === 0;
 
     if (shouldSpawnCherry || (!this.cherry && this.cherrySpawnCooldown === 0 && Math.random() < 0.003)) {
       // Spawn an fester Position unter der Ghost Box (wie im Original)
@@ -4115,6 +3704,9 @@ this.stats.systemPerformance = Math.round(
       this.streakMultiplier = 1.0;
       this.gameState = 'levelcomplete';
       this.stateTimer = 0;
+
+      // Announce level complete
+      this.announce('LEVEL COMPLETE. INITIATING NEXT SEQUENCE');
     }
   }
 
@@ -4146,7 +3738,8 @@ this.stats.systemPerformance = Math.round(
       this.pacman.velocityX = 0;
       this.pacman.velocityY = 0;
     }
-    if (this.isTwoPlayerMode && this.robot2) {
+    // Reset Player 2 in 2-player mode
+    if (this.gameMode === '2player' && this.robot2) {
       this.robot2.reset();
       this.robot2.velocityX = 0;
       this.robot2.velocityY = 0;
@@ -4168,34 +3761,15 @@ this.stats.systemPerformance = Math.round(
   private submitScore(): void {
     try {
       const collected = Math.max(0, this.totalPellets - (this.foods.size + this.powerPellets.size));
-
-      // 2-Player Mode: Use combined score
-      const finalScore = this.isTwoPlayerMode
-        ? (this.player1Score + this.player2Score)
-        : this.score;
-
-      // 2-Player Mode: Combined lives remaining
-      const livesRemaining = this.isTwoPlayerMode
-        ? (this.player1Lives + this.player2Lives)
-        : this.lives;
-
-      const dto: any = {
+      const dto = {
         Username: this.playerName?.trim() || 'Anonymous',
-        Points: finalScore,
+        Points: this.score,
         Level: this.currentLevel,
-        LivesRemaining: livesRemaining,
+        LivesRemaining: this.lives,
         ProductionOrdersCollected: collected,
         SensorsRepaired: 0,
-        PlaytimeSeconds: 0,
-        IsTwoPlayerMode: this.isTwoPlayerMode
+        PlaytimeSeconds: 0
       };
-
-      // Add second player if in 2-player mode
-      if (this.isTwoPlayerMode && this.playerName2?.trim()) {
-        dto.Player2Username = this.playerName2.trim();
-      }
-
-      console.log(`🏆 Submitting ${this.isTwoPlayerMode ? '2-player combined' : 'single player'} score:`, finalScore);
 
       this.http.post('/api/scores', dto).subscribe({
         next: (res) => {
@@ -4234,21 +3808,7 @@ this.stats.systemPerformance = Math.round(
     this.resetPositions();
     this.lives = 3;
     this.score = 0;
-
-    // Initialize 2-player mode variables
-    if (this.isTwoPlayerMode) {
-      this.player1Lives = 3;
-      this.player2Lives = 3;
-      this.player1Score = 0;
-      this.player2Score = 0;
-      this.teamComboMultiplier = 1;
-      this.lastPelletCollector = null;
-      this.player1Trail = [];
-      this.player2Trail = [];
-      this.teamBonusParticles = [];
-      this.connectionBeam = { active: false, pulse: 0 };
-      this.winner = null; // Reset winner
-    }    this.pelletStreak = 0;
+    this.pelletStreak = 0;
     this.streakMultiplier = 1.0;
     this.checkpointsCollected = 0;
     this.pelletCountingEnabled = false;
@@ -4262,10 +3822,15 @@ this.stats.systemPerformance = Math.round(
     this.gameState = 'ready';
     this.stateTimer = 0;
     this.gameHistory = [];
+    this.boostEnergy = this.MAX_BOOST_ENERGY;
+    this.isBoostKeyPressed = false;
+    this.gameOverMenuIndex = 0; // Reset menu index
+    this.inputService.resetButtonStates();
     this.startGameLoop();
   }
 
   private onKeyDown(e: KeyboardEvent) {
+
     // Prevent key repeat events
     if (e.repeat) return;
 
@@ -4274,29 +3839,17 @@ this.stats.systemPerformance = Math.round(
         this.resumeFromPause();
       } else if (this.gameState === 'playing') {
         this.openPause();
-      } else if ((this.gameState as string) === 'gameover') {
+      } else if (this.gameState === 'gameover') {
         // allow exit confirm from gameover via pause overlay
         this.openPause();
       }
       return;
     }
 
-    // Game Over Menu Navigation
-    if ((this.gameState as string) === 'gameover') {
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        this.navigateGameOverMenu('L');
-        return;
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        this.navigateGameOverMenu('R');
-        return;
-      } else if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        this.selectGameOverMenuItem();
-        return;
-      }
-      return; // Don't process other keys when game over menu is active
+    // Restart bei Game Over
+    if (this.gameState === 'gameover') {
+      this.restartGame();
+      return;
     }
 
     // === PRACTICE MODE STEUERUNG ===
@@ -4341,9 +3894,23 @@ this.stats.systemPerformance = Math.round(
       }
     }
 
-    // Shift for boost in all modes
-    if (e.key === 'Shift' && this.gameMode !== 'practice') {
+    // Control for boost in all modes
+    // H pour SPIELANLEITUNG (Help/Hilfe)
+    if (e.key === 'h' || e.key === 'H') {
+      this.toggleSpielanleitung();
+      return;
+    }
+
+    if (e.key === 'Control' && this.gameMode !== 'practice') {
       this.isBoostKeyPressed = true;
+      console.log('🚀 Boost aktiviert (Control gedrückt)');
+      return;
+    }
+
+    // Player 2 boost with Shift key in 2-player mode
+    if (e.key === 'Shift' && this.gameMode === '2player') {
+      this.isBoostKeyPressed2 = true;
+      console.log('🚀 P2 Boost aktiviert (Shift gedrückt)');
       return;
     }
 
@@ -4357,16 +3924,30 @@ this.stats.systemPerformance = Math.round(
     if (this.isTwoPlayerMode && this.robot2) {
       const key = e.key.toLowerCase();
       if (key === 'w') {
+    // Buffer the direction for Player 1 (Arrow keys)
+    if (e.key === 'ArrowUp') {
+      this.bufferedDirection = 'U';
+    } else if (e.key === 'ArrowDown') {
+      this.bufferedDirection = 'D';
+    } else if (e.key === 'ArrowLeft') {
+      this.bufferedDirection = 'L';
+    } else if (e.key === 'ArrowRight') {
+      this.bufferedDirection = 'R';
+    }
+
+    // Player 2 keyboard controls (WASD keys) in 2-player mode
+    if (this.gameMode === '2player' && this.robot2) {
+      if (e.key === 'w' || e.key === 'W') {
         this.bufferedDirection2 = 'U';
-      } else if (key === 's') {
+      } else if (e.key === 's' || e.key === 'S') {
         this.bufferedDirection2 = 'D';
-      } else if (key === 'a') {
+      } else if (e.key === 'a' || e.key === 'A') {
         this.bufferedDirection2 = 'L';
-      } else if (key === 'd') {
+      } else if (e.key === 'd' || e.key === 'D') {
         this.bufferedDirection2 = 'R';
       }
 
-      // Try to apply immediately if possible
+      // Try to apply Player 2 direction immediately
       if (this.bufferedDirection2) {
         // Only update direction if it's different from current direction
         // This prevents double movement when pressing the same direction key
@@ -4389,9 +3970,36 @@ this.stats.systemPerformance = Math.round(
         } else {
           // Already moving in this direction, just clear the buffer
           this.bufferedDirection2 = null;
+        const canTurn2 = this.canChangeTo2(this.bufferedDirection2);
+        if (canTurn2) {
+          this.robot2.updateDirection(this.bufferedDirection2, this.CELL_SIZE, this.walls);
+          if (this.bufferedDirection2 === 'U') this.robot2.image = this.robotUpImage;
+          else if (this.bufferedDirection2 === 'D') this.robot2.image = this.robotDownImage;
+          else if (this.bufferedDirection2 === 'L') this.robot2.image = this.robotLeftImage;
+          else if (this.bufferedDirection2 === 'R') this.robot2.image = this.robotRightImage;
+          this.bufferedDirection2 = null;
         }
-        // Otherwise keep buffered for next frame
       }
+    }
+
+    // Try to apply Player 1 direction immediately if possible
+    if (this.bufferedDirection) {
+      const canTurn = this.canChangeTo(this.bufferedDirection);
+      if (canTurn) {
+        this.pacman.updateDirection(this.bufferedDirection, this.CELL_SIZE, this.walls);
+        // Update pacman image
+        if (this.bufferedDirection === 'U') {
+          this.pacman.image = this.pacmanUpImage;
+        } else if (this.bufferedDirection === 'D') {
+          this.pacman.image = this.pacmanDownImage;
+        } else if (this.bufferedDirection === 'L') {
+          this.pacman.image = this.pacmanLeftImage;
+        } else if (this.bufferedDirection === 'R') {
+          this.pacman.image = this.pacmanRightImage;
+        }
+        this.bufferedDirection = null; // Clear buffer on successful turn
+      }
+      // Otherwise keep buffered for next frame
     }
 
     // Buffer the direction for smoother cornering
@@ -4444,9 +4052,15 @@ this.stats.systemPerformance = Math.round(
       }
     } else {
       // Release boost in normal modes
-      if (e.key === 'Shift') {
+      if (e.key === 'Control') {
         this.isBoostKeyPressed = false;
         this.turboSpeed = false;
+        console.log('🛑 Boost deaktiviert (Control losgelassen)');
+      }
+      // Release Player 2 boost
+      if (e.key === 'Shift' && this.gameMode === '2player') {
+        this.isBoostKeyPressed2 = false;
+        console.log('🛑 P2 Boost deaktiviert (Shift losgelassen)');
       }
     }
   }
@@ -4461,66 +4075,55 @@ this.stats.systemPerformance = Math.round(
   resumeFromPause() {
     this.showPauseOverlay = false;
     this.showExitConfirm = false;
-    this.pauseMenuIndex = 0;
     if (!this.gameOver) {
       this.gameState = 'playing';
       this.startGameLoop();
     }
+    this.inputService.resetButtonStates();
   }
 
-  navigatePauseMenu(direction: string): void {
-    if (!this.showPauseOverlay) return;
-
-    switch (direction) {
-      case 'L':
-        this.pauseMenuIndex = Math.max(0, this.pauseMenuIndex - 1);
-        break;
-      case 'R':
-        this.pauseMenuIndex = Math.min(2, this.pauseMenuIndex + 1);
-        break;
+  navigatePauseMenu(direction: string) {
+    if (direction === 'up') {
+      this.pauseMenuIndex = (this.pauseMenuIndex - 1 + 3) % 3;
+    } else if (direction === 'down') {
+      this.pauseMenuIndex = (this.pauseMenuIndex + 1) % 3;
     }
   }
 
-  selectPauseMenuItem(): void {
-    if (!this.showPauseOverlay) return;
-
-    switch (this.pauseMenuIndex) {
-      case 0:
-        this.resumeFromPause();
-        break;
-      case 1:
-        this.restartGame();
-        break;
-      case 2:
-        this.exitGame();
-        break;
+  selectPauseMenuItem() {
+    if (this.pauseMenuIndex === 0) {
+      // Resume
+      this.resumeFromPause();
+    } else if (this.pauseMenuIndex === 1) {
+      // Restart
+      this.showPauseOverlay = false;
+      this.restartGame();
+    } else if (this.pauseMenuIndex === 2) {
+      // Exit to Menu
+      this.requestExitToMenu();
     }
   }
 
-  navigateGameOverMenu(direction: string): void {
-    if (this.gameState !== 'gameover') return;
-
-    switch (direction) {
-      case 'L':
-        this.gameOverMenuIndex = Math.max(0, this.gameOverMenuIndex - 1);
-        break;
-      case 'R':
-        this.gameOverMenuIndex = Math.min(1, this.gameOverMenuIndex + 1);
-        break;
+  navigateGameOverMenu(direction: string) {
+    if (direction === 'up') {
+      this.gameOverMenuIndex = (this.gameOverMenuIndex - 1 + 2) % 2;
+    } else if (direction === 'down') {
+      this.gameOverMenuIndex = (this.gameOverMenuIndex + 1) % 2;
     }
   }
 
-  selectGameOverMenuItem(): void {
-    if (this.gameState !== 'gameover') return;
-
-    switch (this.gameOverMenuIndex) {
-      case 0:
-        this.restartGame();
-        break;
-      case 1:
-        this.exitGame();
-        break;
+  selectGameOverMenuItem() {
+    if (this.gameOverMenuIndex === 0) {
+      // Restart
+      this.restartGame();
+    } else if (this.gameOverMenuIndex === 1) {
+      // Return to Menu
+      this.router.navigate(['/']);
     }
+  }
+
+  requestExitToMenu() {
+    this.showExitConfirm = true;
   }
 
   // ============================================================================
@@ -4633,6 +4236,15 @@ this.stats.systemPerformance = Math.round(
     });
   }
 
+  confirmExitToMenu() {
+    this.showExitConfirm = false;
+    this.stopGameLoop();
+    this.router.navigate(['/']);
+  }
+
+  cancelExitToMenu() {
+    this.showExitConfirm = false;
+  }
 
   toggleSpielanleitung() {
     this.showSpielanleitung = !this.showSpielanleitung;
@@ -4722,4 +4334,3 @@ this.stats.systemPerformance = Math.round(
     }
   }
 }
-

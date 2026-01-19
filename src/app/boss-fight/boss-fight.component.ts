@@ -9,6 +9,14 @@ import { AudioService } from '../services/audio.service';
 import { InputService } from '../services/input.service';
 
 export type GameMode = 'classic' | 'practice';
+type GameState = 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' | 'paused' | 'finalexplosion'
+
+interface LeaderboardEntry {
+  rank?: number;
+  username: string;
+  points: number;
+  level: number;
+}
 
 interface Particle {
   x: number;
@@ -220,7 +228,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
   showIfmLogo = true;
 
   // Ready/Game Over Screen
-  gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' | 'paused' | 'finalexplosion' = 'ready';
+  gameState: GameState = 'ready';
   private stateTimer = 0;
   private readonly READY_DURATION = 500; // 0.5 seconde "READY!"
   private readonly DEATH_DURATION = 300; // 0.3 seconde animation mort
@@ -1222,7 +1230,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Ready Screen
-    if ((this.gameState as string) === 'ready') {
+    if (this.gameState === 'ready') {
       ctx.font = 'bold 24px "Press Start 2P", monospace';
       ctx.fillStyle = '#ED6B00';
       ctx.textAlign = 'center';
@@ -1668,6 +1676,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly CANVAS_HEIGHT = this.GRID_HEIGHT * this.CELL_SIZE; // 620px
   // Game Manager
   private game: BossGameManager | null = null;
+  readonly modeLabel = 'BOSS FIGHT';
 
   // Modi-spezifische Einstellungen
   isInvincible = false;      // Practice Mode: Unverwundbarkeit
@@ -1680,6 +1689,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly BOOST_DRAIN_RATE = 40;  // Energy consumed per second (was 25)
   private readonly BOOST_RECHARGE_RATE = 8; // Energy recharged per second when not boosting (was 15)
   private isBoostKeyPressed = false;
+  
 
   // Dynamic Lighting System
   private lightingEnabled = false;
@@ -1701,7 +1711,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly MAX_HISTORY = 300; // ~10 Sekunden bei 30 FPS
 
   // Leaderboard
-  leaderboard: any[] = [];
+  leaderboard: LeaderboardEntry[] = [];
 
   // Exit confirmation modal
   showExitConfirm = false;
@@ -1709,13 +1719,17 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
   showPauseOverlay = false;
   showSpielanleitung = false;
   spielanleitungSlide = 0;
-  private gamepadPollInterval: any;
+  private gamepadPollInterval: ReturnType<typeof window.setInterval> | null = null;
   private lastGamepadSpielanleitungAction = 0;
 
   // Get high score from leaderboard
   private getHighScore(): number {
     if (this.leaderboard.length === 0) return 0;
     return Math.max(...this.leaderboard.map(entry => entry.points));
+  }
+
+  trackByLeaderboard(index: number, entry: LeaderboardEntry): number | string {
+    return entry.rank ?? entry.username ?? index;
   }
 
   constructor(
@@ -2090,7 +2104,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.fillRect(10, 22, 100, 3);
       ctx.fillStyle = '#00FF88';
       ctx.fillRect(10, 22, loadProgress, 3);
-    } else if ((this.gameState as string) === 'playing') {
+    } else if (this.gameState === 'playing') {
       // Blinking cursor effect
       const blink = Math.floor(Date.now() / 500) % 2 === 0 ? '_' : '';
       ctx.fillText(`s.FOX RUNNING${blink}`, 10, 20);
@@ -2098,7 +2112,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
       const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
       ctx.fillStyle = '#ED6B00';
       ctx.fillText(dots, 110, 20);
-    } else if ((this.gameState as string) === 'gameover') {
+    } else if (this.gameState === 'gameover') {
       ctx.fillStyle = '#FF6B6B';
       ctx.fillText('SYSTEM HALTED', 10, 20);
       // Error indicator
@@ -2283,7 +2297,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Gamepad Restart / Exit in Game Over
-    if ((this.gameState as string) === 'gameover') {
+    if (this.gameState === 'gameover') {
       if (this.inputService.isActionButtonPressed()) {
         this.restartGame();
       }
@@ -3162,7 +3176,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private loadLeaderboard() {
     console.log('🏆 Loading leaderboard...');
-    this.http.get<any[]>('/api/scores/leaderboard?top=5').subscribe({
+    this.http.get<LeaderboardEntry[]>('/api/scores/leaderboard?top=5').subscribe({
       next: (data) => {
         this.leaderboard = data;
         console.log(`✅ Leaderboard loaded: ${data.length} entries`, data);
@@ -3213,7 +3227,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
         this.resumeFromPause();
       } else if (this.gameState === 'playing') {
         this.openPause();
-      } else if ((this.gameState as string) === 'gameover') {
+      } else if (this.gameState === 'gameover') {
         // allow exit confirm from gameover via pause overlay
         this.openPause();
       }
@@ -3221,7 +3235,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // Restart bei Game Over
-    if ((this.gameState as string) === 'gameover') {
+    if (this.gameState === 'gameover') {
       this.restartGame();
       return;
     }

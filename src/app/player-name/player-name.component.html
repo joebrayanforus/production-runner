@@ -28,42 +28,33 @@
   <!-- Pixel Art Header -->
   <header class="pixel-header">
     <div class="pixel-title-box">
-      <h1 class="pixel-game-title">ENTER NAME</h1>
-      <p class="pixel-subtitle">{{ gameMode === 'classic' ? '★ CLASSIC MODE ★' : '⚡ PRACTICE MODE ⚡' }}</p>
+      <h1 class="pixel-game-title">{{ is2PlayerMode ? (currentPlayer === 1 ? 'PLAYER 1 NAME' : 'PLAYER 2 NAME') : 'ENTER NAME' }}</h1>
+      <p class="pixel-subtitle">{{ gameMode === 'classic' ? '★ CLASSIC MODE ★' : gameMode === 'practice' ? '⚡ PRACTICE MODE ⚡' : '🎮 2 PLAYER MODE 🎮' }}</p>
     </div>
   </header>
 
   <!-- Arcade Screen with Pixel Art Style -->
-  <div class="arcade-screen" *ngIf="currentStep === 'name'">
+  <div class="arcade-screen">
     <div class="screen-scanlines"></div>
 
     <label class="player-label">
-      <span class="label-text" *ngIf="numberOfPlayers === 1">▼ OPERATOR ID ▼</span>
-      <span class="label-text" *ngIf="numberOfPlayers === 2 && currentPlayerInput === 1">▼ SPIELER 1 NAME ▼</span>
-      <span class="label-text" *ngIf="numberOfPlayers === 2 && currentPlayerInput === 2">▼ SPIELER 2 NAME ▼</span>
+      <span class="label-text">▼ {{ is2PlayerMode ? (currentPlayer === 1 ? 'PLAYER 1 ID' : 'PLAYER 2 ID') : 'OPERATOR ID' }} ▼</span>
     </label>
 
     <!-- Player Name Display with Pixel Style -->
     <div class="input-wrapper">
       <div class="arcade-input">
-        {{ getCurrentPlayerName().toUpperCase() || '_ _ _ _ _ _ _ _ _ _' }}
+        {{ getCurrentName().toUpperCase() || '_ _ _ _ _ _ _ _ _ _' }}
       </div>
       <div class="input-cursor active"></div>
     </div>
 
     <!-- Current Input Display -->
-    <p class="name-preview" *ngIf="isCurrentPlayerNameValid()">
-      ► {{ numberOfPlayers === 2 && currentPlayerInput === 1 ? 'SPIELER 1' : (numberOfPlayers === 2 && currentPlayerInput === 2 ? 'SPIELER 2' : 'OPERATOR') }}: <span class="preview-name">{{ getCurrentPlayerName().toUpperCase() }}</span>
+    <p class="name-preview" *ngIf="isPlayerNameValid()">
+      ► {{ is2PlayerMode ? (currentPlayer === 1 ? 'PLAYER 1' : 'PLAYER 2') : 'OPERATOR' }}: <span class="preview-name">{{ getCurrentName().toUpperCase() }}</span>
     </p>
-    <p class="hint-text" *ngIf="!isCurrentPlayerNameValid()">
-      ⚠ {{ numberOfPlayers === 2 && currentPlayerInput === 1 ? 'SPIELER 1 NAME EINGEBEN' : (numberOfPlayers === 2 && currentPlayerInput === 2 ? 'SPIELER 2 NAME EINGEBEN' : 'ENTER YOUR NAME TO START') }} ⚠
-    </p>
-
-    <!-- Progress indicator for 2 players -->
-    <p class="player-progress" *ngIf="numberOfPlayers === 2">
-      <span [class.active]="currentPlayerInput === 1">🤖 P1</span>
-      <span class="separator">|</span>
-      <span [class.active]="currentPlayerInput === 2">🤖 P2</span>
+    <p class="hint-text" *ngIf="!isPlayerNameValid()">
+      ⚠ ENTER YOUR NAME TO {{ is2PlayerMode && currentPlayer === 1 ? 'CONTINUE' : 'START' }} ⚠
     </p>
 
     <!-- Virtual Keyboard Pixel Style -->
@@ -99,15 +90,15 @@
           class="control-button play-btn"
           [class.selected]="focusArea === 'buttons' && buttonIndex === 1"
           (click)="startGame()"
-          [disabled]="!isCurrentPlayerNameValid()"
+          [disabled]="!isPlayerNameValid()"
           type="button"
         >
-          ▶ {{ numberOfPlayers === 2 && currentPlayerInput === 1 ? 'WEITER' : 'START' }}
+          ▶ {{ is2PlayerMode && currentPlayer === 1 ? 'NEXT PLAYER' : 'START GAME' }}
         </button>
         <button class="control-button back-btn"
                 [class.selected]="focusArea === 'buttons' && buttonIndex === 2"
                 (click)="goBack()" type="button">
-          ✕ BACK
+          ✕ {{ is2PlayerMode && currentPlayer === 2 ? 'BACK TO P1' : 'BACK' }}
         </button>
       </div>
 
@@ -115,52 +106,6 @@
         ↑↓←→ MOVE | ENTER/A SELECT | ESC/B BACK
       </p>
     </div>
-  </div>
-
-  <!-- Player Selection Screen -->
-  <div class="arcade-screen player-selection-screen" *ngIf="currentStep === 'players'">
-    <div class="screen-scanlines"></div>
-
-    <!-- IFM Robots Battle Image -->
-    <div class="robots-battle-image">
-      <img src="assets/ifm-robots-battle.jpg" alt="IFM Robots Battle" class="battle-img">
-      <div class="image-glow"></div>
-    </div>
-
-    <div class="selection-header">
-      <h2 class="selection-title">WÄHLE SPIELERANZAHL</h2>
-      <p class="selection-subtitle">SELECT NUMBER OF PLAYERS</p>
-    </div>
-
-    <div class="player-options">
-      <button class="player-option"
-              [class.selected]="buttonIndex === 0"
-              (click)="selectNumberOfPlayers(1); startGame();"
-              type="button">
-        <div class="option-icon">🤖</div>
-        <div class="option-label">1 SPIELER</div>
-        <div class="option-hint">SINGLE PLAYER</div>
-      </button>
-
-      <button class="player-option"
-              [class.selected]="buttonIndex === 1"
-              (click)="selectNumberOfPlayers(2); startGame();"
-              type="button">
-        <div class="option-icon">🤖🤖</div>
-        <div class="option-label">2 SPIELER</div>
-        <div class="option-hint">CO-OP MODE</div>
-      </button>
-    </div>
-
-    <div class="selection-controls">
-      <button class="control-button back-btn" (click)="goBack()" type="button">
-        ◄ ZURÜCK
-      </button>
-    </div>
-
-    <p class="keyboard-hint">
-      ←→ SELECT | ENTER/A CONFIRM | ESC/B BACK
-    </p>
   </div>
 
   <!-- Pixel Ground -->

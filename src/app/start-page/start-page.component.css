@@ -521,3 +521,9 @@
     font-size: 6px;
   }
 }
+
+:host {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
