@@ -18,44 +18,124 @@
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
+  background: linear-gradient(135deg, #0a0e1a 0%, #1E2A3A 50%, #2D3E50 100%);
 }
 
-/* === VIDEO BACKGROUND === */
-.video-background {
-  position: fixed;
-  top: 0;
-  left: 0;
+/* === ANIMATED BACKGROUND PARTICLES === */
+.particles {
+  position: absolute;
   width: 100%;
   height: 100%;
-  z-index: 0;
-  overflow: hidden;
-}
-
-.bg-video {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  min-width: 100%;
-  min-height: 100%;
-  width: auto;
-  height: auto;
-  transform: translate(-50%, -50%);
-  object-fit: cover;
-  filter: blur(3px) brightness(0.5);
-}
-
-.video-overlay {
-  position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    180deg,
-    rgba(100, 80, 150, 0.7) 0%,
-    rgba(60, 40, 100, 0.85) 100%
-  );
   pointer-events: none;
+  z-index: 0;
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #FF7A01;
+  border-radius: 50%;
+  top: -10px;
+  box-shadow: 0 0 10px #FF7A01;
+  animation: particleFall 8s linear infinite;
+}
+
+@keyframes particleFall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* === GRID LINES ANIMATION === */
+.background-animation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.grid-line.vertical {
+  position: absolute;
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent, #FF7A01, transparent);
+  animation: scanlineVertical 4s ease-in-out infinite;
+}
+
+.grid-line.horizontal {
+  position: absolute;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(to right, transparent, #FF7A01, transparent);
+  animation: scanlineHorizontal 5s ease-in-out infinite;
+}
+
+@keyframes scanlineVertical {
+  0%, 100% { opacity: 0.1; transform: scaleY(1); }
+  50% { opacity: 0.4; transform: scaleY(1.5); }
+}
+
+@keyframes scanlineHorizontal {
+  0%, 100% { opacity: 0.1; transform: scaleX(1); }
+  50% { opacity: 0.4; transform: scaleX(1.5); }
+}
+
+/* === CORNER ACCENTS === */
+.corner-accent {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  border: 3px solid #FF7A01;
+  z-index: 2;
+}
+
+.corner-accent.top-left {
+  top: 20px;
+  left: 20px;
+  border-right: none;
+  border-bottom: none;
+  animation: cornerPulse 2s ease-in-out infinite;
+}
+
+.corner-accent.top-right {
+  top: 20px;
+  right: 20px;
+  border-left: none;
+  border-bottom: none;
+  animation: cornerPulse 2s ease-in-out infinite 0.5s;
+}
+
+.corner-accent.bottom-left {
+  bottom: 20px;
+  left: 20px;
+  border-right: none;
+  border-top: none;
+  animation: cornerPulse 2s ease-in-out infinite 1s;
+}
+
+.corner-accent.bottom-right {
+  bottom: 20px;
+  right: 20px;
+  border-left: none;
+  border-top: none;
+  animation: cornerPulse 2s ease-in-out infinite 1.5s;
+}
+
+@keyframes cornerPulse {
+  0%, 100% { box-shadow: 0 0 5px #FF7A01; }
+  50% { box-shadow: 0 0 20px #FF7A01; }
 }
 
 /* === PIXEL CLOUDS === */

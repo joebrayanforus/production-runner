@@ -2474,8 +2474,15 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.animationFrameId) {
       return;
     }
+<<<<<<< Updated upstream
     // Play soundtrack in loop during gameplay
     this.audioService.playBackgroundMusic();
+=======
+    // Start soundtrack when game loop starts (only if game is playing)
+    if (this.gameState === 'playing') {
+      this.audioService.playBackgroundMusic();
+    }
+>>>>>>> Stashed changes
     const loop = (timestamp: number) => {
       const delta = timestamp - this.lastFrameTime;
       if (delta > 1000 / this.FPS) { // target FPS
@@ -2769,6 +2776,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         if (this.stateTimer >= this.READY_DURATION) {
           this.gameState = 'playing';
           this.stateTimer = 0;
+          // Start soundtrack when game begins playing
+          this.audioService.playBackgroundMusic();
         }
         return; // Keine Bewegung während Ready
 
@@ -3105,7 +3114,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.animationFrameId = 0;
       this.lastFrameTime = 0;
     }
-    this.audioService.stopBackgroundMusic();
+    // Only stop music completely on game over, otherwise pause it
+    if (this.gameState === 'gameover' || this.gameState === 'finalexplosion') {
+      this.audioService.stopBackgroundMusic();
+    } else {
+      this.audioService.pauseBackgroundMusic();
+    }
   }
 
   private collision(a: Block, b: Block): boolean {
@@ -3826,6 +3840,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isBoostKeyPressed = false;
     this.gameOverMenuIndex = 0; // Reset menu index
     this.inputService.resetButtonStates();
+    // Stop any existing music before restarting
+    this.audioService.stopBackgroundMusic();
     this.startGameLoop();
   }
 
@@ -4077,6 +4093,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.showExitConfirm = false;
     if (!this.gameOver) {
       this.gameState = 'playing';
+      // Resume soundtrack when resuming from pause
+      this.audioService.resumeBackgroundMusic();
       this.startGameLoop();
     }
     this.inputService.resetButtonStates();
