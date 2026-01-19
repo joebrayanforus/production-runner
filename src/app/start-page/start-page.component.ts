@@ -7,7 +7,7 @@ import {
   LeaderboardEntry
 } from '../services/leaderboard.service';
 
-export type GameMode = 'classic' | 'practice' | 'spielanleitung' | '2player';
+export type GameMode = 'classic' | 'practice' | 'spielanleitung' | 'spielen1' | 'spielen2';
 
 @Component({
   selector: 'app-start-page',
@@ -17,9 +17,10 @@ export type GameMode = 'classic' | 'practice' | 'spielanleitung' | '2player';
   styleUrls: ['./start-page.component.css']
 })
 export class StartPageComponent implements OnInit, OnDestroy {
-  selectedMode: GameMode = 'classic';
+  selectedMode: GameMode = 'spielen1';
   leaderboard: LeaderboardEntry[] = [];
   topScores: LeaderboardEntry[] = [];
+  private readonly menuModes: GameMode[] = ['spielanleitung', 'spielen1', 'spielen2', 'practice'];
   private gamepadPollInterval: any;
   private lastKeyboardSelect = 0;
 
@@ -91,6 +92,35 @@ export class StartPageComponent implements OnInit, OnDestroy {
         queryParams: { mode: this.selectedMode }
       });
     }
+
+    // Handle SPIELEN 1 and SPIELEN 2 modes
+    if (this.selectedMode === 'spielen1') {
+      this.startGameWithPlayers(1);
+      return;
+    }
+
+    if (this.selectedMode === 'spielen2') {
+      this.startGameWithPlayers(2);
+      return;
+    }
+
+    this.router.navigate(['/player-name'], {
+      queryParams: { mode: this.selectedMode }
+    });
+  }
+
+  startGameWithPlayers(numPlayers: 1 | 2): void {
+    // Navigate directly to player-name page with players count set
+    // This will skip the player selection screen
+    this.router.navigate(['/player-name'], {
+      queryParams: { 
+        mode: 'classic',
+        players: numPlayers.toString()
+      }
+    });
+  }
+
+
   }
 
   // Gamepad Polling for Mode Selection

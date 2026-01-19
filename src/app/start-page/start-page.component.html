@@ -36,9 +36,16 @@
       <span class="menu-text">SPIELANLEITUNG</span>
     </button>
     <button class="menu-item"
-            [class.selected]="selectedMode === 'classic'"
-            (click)="selectMode('classic')">
+            [class.selected]="selectedMode === 'spielen1'"
+            (click)="startGameWithPlayers(1)">
       <span class="menu-arrow">▶</span>
+      <span class="menu-text">1 SPIELER</span>
+    </button>
+    <button class="menu-item"
+            [class.selected]="selectedMode === 'spielen2'"
+            (click)="startGameWithPlayers(2)">
+      <span class="menu-arrow">▶</span>
+      <span class="menu-text">2 SPIELER</span>
       <span class="menu-text">1 PLAYER</span>
     </button>
     <button class="menu-item"
