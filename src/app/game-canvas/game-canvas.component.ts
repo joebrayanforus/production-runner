@@ -217,9 +217,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   // IFM Logo display control
   showIfmLogo = true;
 
-  // Achievement Toast
-  achievementToast: { title: string; description: string } | null = null;
-
   // Ready/Game Over Screen
   gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' | 'paused' | 'finalexplosion' = 'ready';
   private stateTimer = 0;
@@ -227,38 +224,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly DEATH_DURATION = 300; // 0.3 seconde animation mort
   private readonly FINAL_EXPLOSION_DURATION = 1500; // 1.5 seconds final explosion
   private readonly LEVELCOMPLETE_DURATION = 1000; // 1 seconde Level-Übergang
-
-  // Boost System
-  private boostEnergy = 100;
-  private isBoostKeyPressed = false;
-  private readonly BOOST_DRAIN_RATE = 30; // Energy drained per second
-  private readonly MAX_BOOST_ENERGY = 100;
-  private readonly BOOST_RECHARGE_RATE = 20; // Energy recharged per second
-
-  // Game Stats and Achievement System
-  private stats: GameStats = {
-    sensorDataCollected: 0,
-    repairsSuccessful: 0,
-    errorsFixed: 0,
-    systemPerformance: 0,
-    achievementsUnlocked: {
-      ifm_meister: false,
-      wartungsexperte: false,
-      stoerungsjaeger: false,
-      effizienz_champion: false
-    }
-  };
-  private sensorDataAtLevelStart = 0;
-  private levelTotalSensors = 0;
-
-  // Announcement System
-  private lastAnnouncement: string = '';
-  private announcementCooldown = 0;
-
-  // Lighting System
-  private ambientDarkness = 0.7;
-  private flashlightRadius = 150;
-  private lightingEnabled = false;
 
   // Level-Progression: Geschwindigkeit und Frighten-Dauer pro Level
   private getGhostSpeed(): number {
@@ -1122,66 +1087,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(x + size - 6, y + 2, 4, 4);
     }
-
-    ctx.restore();
-  }
-
-  // Draw Industrial Frame around game area with s.FOX and moneo info
-  private drawIndustrialFrame(ctx: CanvasRenderingContext2D) {
-    ctx.save();
-
-    // Top bar - s.FOX optimization running
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 30);
-
-    // Top bar gradient with metallic effect
-    const topGradient = ctx.createLinearGradient(0, 0, 0, 28);
-    topGradient.addColorStop(0, '#333333');
-    topGradient.addColorStop(0.5, '#1a1a1a');
-    topGradient.addColorStop(1, '#2a2a2a');
-    ctx.fillStyle = topGradient;
-    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 28);
-
-    // IFM orange accent line with glow
-    ctx.shadowBlur = 5;
-    ctx.shadowColor = '#ED6B00';
-    ctx.fillStyle = '#ED6B00';
-    ctx.fillRect(0, 28, this.CANVAS_WIDTH, 2);
-    ctx.shadowBlur = 0;
-
-    // s.FOX system status
-    ctx.font = '8px "Press Start 2P", monospace';
-    ctx.fillStyle = '#00FF88';
-    ctx.textAlign = 'left';
-
-    if (this.gameState === 'ready') {
-      ctx.fillText('s.FOX INITIALIZING...', 10, 20);
-      // Loading bar
-      const loadProgress = (this.stateTimer / this.READY_DURATION) * 100;
-      ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
-      ctx.fillRect(10, 22, 100, 3);
-      ctx.fillStyle = '#00FF88';
-      ctx.fillRect(10, 22, loadProgress, 3);
-    } else if (this.gameState === 'playing') {
-      // Blinking cursor effect
-      const blink = Math.floor(Date.now() / 500) % 2 === 0 ? '_' : '';
-      ctx.fillText(`s.FOX RUNNING${blink}`, 10, 20);
-      // Activity indicator dots
-      const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
-      ctx.fillStyle = '#ED6B00';
-      ctx.fillText(dots, 110, 20);
-    } else if (this.gameState === 'gameover') {
-      ctx.fillStyle = '#FF6B6B';
-      ctx.fillText('SYSTEM HALTED', 10, 20);
-      // Error indicator
-      ctx.fillRect(5, 16, 3, 8);
-    }
-
-    // moneo AI Assistant indicator - top right
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#00FF88';
-    ctx.font = '7px "Press Start 2P", monospace';
-    ctx.fillText('moneo ACTIVE', this.CANVAS_WIDTH - 10, 20);
 
     ctx.restore();
   }
@@ -2156,19 +2061,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     console.log(`🤖 ANNOUNCEMENT: ${text}`);
   }
 
-  // Show Achievement Toast
-  private showAchievementToast(achievement: { id: string; title: string; description: string }) {
-    this.achievementToast = {
-      title: achievement.title,
-      description: achievement.description
-    };
-
-    // Auto-hide after 5 seconds
-    setTimeout(() => {
-      this.achievementToast = null;
-    }, 5000);
-  }
-
   // Update Energy Gauge
   private updateEnergyGauge(deltaTime: number) {
     const deltaSeconds = deltaTime / 1000;
@@ -2474,7 +2366,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.animationFrameId) {
       return;
     }
-    // Play soundtrack in loop during gameplay
     this.audioService.playBackgroundMusic();
     const loop = (timestamp: number) => {
       const delta = timestamp - this.lastFrameTime;
@@ -2592,14 +2483,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.bufferedDirection = gpDir; // Buffer the direction
     }
 
-    // Arcade Input for Player 2 (robot2) in 2-player mode
-    // Note: This is a fallback if keyboard (WASD) is not being used
-    // Keyboard input (WASD) in onKeyDown takes priority
-    if (this.isTwoPlayerMode && this.robot2 && this.gameState === 'playing' && !this.bufferedDirection2) {
-      let gpDir2: string | null = null;
-      gpDir2 = this.inputService.getArcadeDirection(2); // Player 2 joystick
-      if (gpDir2) {
-        this.bufferedDirection2 = gpDir2; // Buffer the direction for player 2
     // Player 2 gamepad input (try second gamepad first, fallback to first if alone) in 2-player mode
     if (this.gameMode === '2player' && this.robot2 && this.gameState === 'playing') {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -2638,103 +2521,18 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Try to apply buffered direction first for smoother cornering
     if (this.bufferedDirection && this.pacman && this.gameState === 'playing') {
-      // Only update direction if it's different from current direction
-      // This prevents double movement when pressing the same direction key
-      if (this.pacman.direction !== this.bufferedDirection) {
-        const canTurn = this.canChangeTo(this.bufferedDirection);
-        if (canTurn) {
-          this.pacman.updateDirection(this.bufferedDirection, this.CELL_SIZE, this.walls);
-          // Update image
-          if (this.bufferedDirection === 'U') this.pacman.image = this.pacmanUpImage;
-          else if (this.bufferedDirection === 'D') this.pacman.image = this.pacmanDownImage;
-          else if (this.bufferedDirection === 'L') this.pacman.image = this.pacmanLeftImage;
-          else if (this.bufferedDirection === 'R') this.pacman.image = this.pacmanRightImage;
-          this.bufferedDirection = null; // Clear buffer after successful turn
-        }
-      } else {
-        // Already moving in this direction, just clear the buffer
-        this.bufferedDirection = null;
+      const canTurn = this.canChangeTo(this.bufferedDirection);
+      if (canTurn) {
+        this.pacman.updateDirection(this.bufferedDirection, this.CELL_SIZE, this.walls);
+        // Update image
+        if (this.bufferedDirection === 'U') this.pacman.image = this.pacmanUpImage;
+        else if (this.bufferedDirection === 'D') this.pacman.image = this.pacmanDownImage;
+        else if (this.bufferedDirection === 'L') this.pacman.image = this.pacmanLeftImage;
+        else if (this.bufferedDirection === 'R') this.pacman.image = this.pacmanRightImage;
+        this.bufferedDirection = null; // Clear buffer after successful turn
       }
     }
 
-    // Pause Menu Navigation / Game Over Menu Navigation
-    let currentDirection: string | null = null;
-    if (this.showPauseOverlay) {
-      // Try arcade joystick first, fallback to standard gamepad
-      currentDirection = this.inputService.getArcadeDirection(1);
-      if (!currentDirection) {
-        currentDirection = this.inputService.getDirection();
-      }
-    }
-
-    // Try to apply buffered direction for robot2 (WASD)
-    if (this.isTwoPlayerMode && this.bufferedDirection2 && this.robot2 && this.gameState === 'playing') {
-      // Only update direction if it's different from current direction
-      // This prevents double movement when pressing the same direction key
-      if (this.robot2.direction !== this.bufferedDirection2) {
-        const canTurn = this.canChangeTo2(this.bufferedDirection2);
-        if (canTurn) {
-          this.robot2.updateDirection(this.bufferedDirection2, this.CELL_SIZE, this.walls);
-          // Update image
-          if (this.bufferedDirection2 === 'U') this.robot2.image = this.robotUpImage;
-          else if (this.bufferedDirection2 === 'D') this.robot2.image = this.robotDownImage;
-          else if (this.bufferedDirection2 === 'L') this.robot2.image = this.robotLeftImage;
-          else if (this.bufferedDirection2 === 'R') this.robot2.image = this.robotRightImage;
-          this.bufferedDirection2 = null; // Clear buffer after successful turn
-        }
-      } else {
-        // Already moving in this direction, just clear the buffer
-        this.bufferedDirection2 = null;
-      }
-    }
-
-    // Gamepad Restart / Exit in Game Over
-    if ((this.gameState as string) === 'gameover') {
-      if (this.inputService.isActionButtonPressed()) {
-        this.restartGame();
-      }
-
-      if (currentDirection === 'L' || currentDirection === 'R') {
-        this.navigatePauseMenu(currentDirection);
-      }
-
-      // Select button (Button 10) or standard A Button (0) - Select
-      if (this.inputService.isArcadeSelectPressed() || this.inputService.isActionButtonPressed()) {
-        this.selectPauseMenuItem();
-      }
-
-      // Pause button (Button 8) - Resume if on Resume option
-      if (this.inputService.isArcadePausePressed() || this.inputService.isPauseButtonPressed()) {
-        if (this.pauseMenuIndex === 0) {
-          this.resumeFromPause();
-        } else {
-          this.selectPauseMenuItem();
-        }
-      }
-    } else {
-      // Arcade Button Handling
-      // Pause button (Button 8)
-      if (this.inputService.isArcadePausePressed() || this.inputService.isPauseButtonPressed()) {
-        if (this.gameState === 'paused') {
-          this.resumeFromPause();
-        } else if (this.gameState === 'playing') {
-          this.openPause();
-        } else if ((this.gameState as string) === 'gameover') {
-          this.openPause();
-        }
-      }
-    }
-
-    // Boost button (Button 12) - only in playing state
-    if (this.gameState === 'playing' && this.gameMode !== 'practice') {
-      const boostPressed = this.inputService.isArcadeBoostPressed();
-      if (boostPressed && !this.isBoostKeyPressed) {
-        this.isBoostKeyPressed = true;
-        console.log('🚀 Boost aktiviert (Arcade Button)');
-      } else if (!boostPressed && this.isBoostKeyPressed) {
-        this.isBoostKeyPressed = false;
-        this.turboSpeed = false;
-        console.log('🛑 Boost deaktiviert (Arcade Button)');
     // Apply buffered direction for Player 2
     if (this.bufferedDirection2 && this.robot2 && this.gameState === 'playing' && this.gameMode === '2player') {
       const canTurn2 = this.canChangeTo2(this.bufferedDirection2);
@@ -3716,22 +3514,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.router.navigate(['/']);
   }
 
-  // Request exit to menu (show confirmation dialog)
-  requestExitToMenu(): void {
-    this.showExitConfirm = true;
-  }
-
-  // Cancel exit to menu (hide confirmation dialog)
-  cancelExitToMenu(): void {
-    this.showExitConfirm = false;
-  }
-
-  // Confirm exit to menu (execute exit)
-  confirmExitToMenu(): void {
-    this.showExitConfirm = false;
-    this.exitGame();
-  }
-
   private resetPositions() {
     if (this.pacman) {
       this.pacman.reset();
@@ -3881,14 +3663,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         console.log(`⚡ Turbo: ${this.turboSpeed ? 'AN' : 'AUS'}`);
         return;
       }
-      // Q,W,E,R,T = Sensor-Ziele umschalten (but don't intercept 'w' in 2-player mode)
-      const keyLower = e.key.toLowerCase();
-      if (['q', 'e', 'r', 't'].includes(keyLower)) {
-        this.showGhostTargets = !this.showGhostTargets;
-        return;
-      }
-      // 'w' should only toggle ghost targets in practice mode if NOT in 2-player mode
-      if (keyLower === 'w' && !this.isTwoPlayerMode) {
+      // Q,W,E,R,T = Sensor-Ziele umschalten
+      if (['q', 'w', 'e', 'r', 't'].includes(e.key.toLowerCase())) {
         this.showGhostTargets = !this.showGhostTargets;
         return;
       }
@@ -3919,11 +3695,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     if (!this.pacman) return;
 
-    // Handle robot2 (WASD keys) in 2-player mode - process BEFORE player 1 arrow keys
-    // to ensure WASD keys are always processed
-    if (this.isTwoPlayerMode && this.robot2) {
-      const key = e.key.toLowerCase();
-      if (key === 'w') {
     // Buffer the direction for Player 1 (Arrow keys)
     if (e.key === 'ArrowUp') {
       this.bufferedDirection = 'U';
@@ -3949,27 +3720,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
       // Try to apply Player 2 direction immediately
       if (this.bufferedDirection2) {
-        // Only update direction if it's different from current direction
-        // This prevents double movement when pressing the same direction key
-        if (this.robot2.direction !== this.bufferedDirection2) {
-          const canTurn = this.canChangeTo2(this.bufferedDirection2);
-          if (canTurn) {
-            this.robot2.updateDirection(this.bufferedDirection2, this.CELL_SIZE, this.walls);
-            // Update robot2 image
-            if (this.bufferedDirection2 === 'U') {
-              this.robot2.image = this.robotUpImage;
-            } else if (this.bufferedDirection2 === 'D') {
-              this.robot2.image = this.robotDownImage;
-            } else if (this.bufferedDirection2 === 'L') {
-              this.robot2.image = this.robotLeftImage;
-            } else if (this.bufferedDirection2 === 'R') {
-              this.robot2.image = this.robotRightImage;
-            }
-            this.bufferedDirection2 = null; // Clear buffer on successful turn
-          }
-        } else {
-          // Already moving in this direction, just clear the buffer
-          this.bufferedDirection2 = null;
         const canTurn2 = this.canChangeTo2(this.bufferedDirection2);
         if (canTurn2) {
           this.robot2.updateDirection(this.bufferedDirection2, this.CELL_SIZE, this.walls);
@@ -4001,44 +3751,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       // Otherwise keep buffered for next frame
     }
-
-    // Buffer the direction for smoother cornering
-    if (e.key === 'ArrowUp') {
-      this.bufferedDirection = 'U';
-    } else if (e.key === 'ArrowDown') {
-      this.bufferedDirection = 'D';
-    } else if (e.key === 'ArrowLeft') {
-      this.bufferedDirection = 'L';
-    } else if (e.key === 'ArrowRight') {
-      this.bufferedDirection = 'R';
-    }
-
-      // Try to apply immediately if possible
-      if (this.bufferedDirection) {
-        // Only update direction if it's different from current direction
-        // This prevents double movement when pressing the same direction key
-        if (this.pacman.direction !== this.bufferedDirection) {
-          const canTurn = this.canChangeTo(this.bufferedDirection);
-          if (canTurn) {
-            this.pacman.updateDirection(this.bufferedDirection, this.CELL_SIZE, this.walls);
-            // Update pacman image
-            if (this.bufferedDirection === 'U') {
-              this.pacman.image = this.pacmanUpImage;
-            } else if (this.bufferedDirection === 'D') {
-              this.pacman.image = this.pacmanDownImage;
-            } else if (this.bufferedDirection === 'L') {
-              this.pacman.image = this.pacmanLeftImage;
-            } else if (this.bufferedDirection === 'R') {
-              this.pacman.image = this.pacmanRightImage;
-            }
-            this.bufferedDirection = null; // Clear buffer on successful turn
-          }
-        } else {
-          // Already moving in this direction, just clear the buffer
-          this.bufferedDirection = null;
-        }
-        // Otherwise keep buffered for next frame
-      }
   }
 
   // KeyUp Handler für Practice Mode
