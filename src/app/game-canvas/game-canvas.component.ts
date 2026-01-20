@@ -67,7 +67,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   // ===== UI / DECOR =====
   private warningSignsPositions: Array<{ x: number; y: number; type: 'achtung' }> = [];
   private statusLEDPositions: Array<{ x: number; y: number; color: 'green' | 'orange' | 'red'; blinkSpeed: number }> = [];
-  private lightingEnabled: boolean = true;
+  private lightingEnabled: boolean = false;
 
 
 
@@ -171,8 +171,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   playerName2 = ''; // Second player name for 2-player mode
   gameMode: GameMode = 'classic'; // Make gameMode accessible in template
 
-  // ===== Achievements / Stats =====
-stats: GameStats = {
+// ===== Achievements / Stats =====
+public stats: GameStats = {
   sensorDataCollected: 0,
   repairsSuccessful: 0,
   errorsFixed: 0,
@@ -182,26 +182,28 @@ stats: GameStats = {
     wartungsexperte: false,
     stoerungsjaeger: false,
     effizienz_champion: false,
-  }
+  },
 };
 
-achievementToast: { title: string; description: string } | null = null;
+public achievementToast: { title: string; description: string } | null = null;
 private achievementToastTimeoutId: any = null;
 
 // For level-based performance calc
 private sensorDataAtLevelStart = 0;
 private levelTotalSensors = 0;
 
-private showAchievementToast(def: AchievementDef) {
+private showAchievementToast(def: AchievementDef): void {
   this.achievementToast = { title: def.title, description: def.description };
 
   if (this.achievementToastTimeoutId) {
     clearTimeout(this.achievementToastTimeoutId);
   }
+
   this.achievementToastTimeoutId = setTimeout(() => {
     this.achievementToast = null;
   }, 4000);
 }
+
 
 
   // 2-Player mode enhanced stats
@@ -4275,88 +4277,93 @@ this.stats.systemPerformance = Math.round(
 
     if (!this.pacman) return;
 
-    // Buffer the direction for smoother cornering
-    if (e.key === 'ArrowUp') {
-      this.bufferedDirection = 'U';
-    } else if (e.key === 'ArrowDown') {
-      this.bufferedDirection = 'D';
-    } else if (e.key === 'ArrowLeft') {
-      this.bufferedDirection = 'L';
-    } else if (e.key === 'ArrowRight') {
-      this.bufferedDirection = 'R';
+// Buffer the direction for smoother cornering
+if (e.key === 'ArrowUp') {
+  this.bufferedDirection = 'U';
+} else if (e.key === 'ArrowDown') {
+  this.bufferedDirection = 'D';
+} else if (e.key === 'ArrowLeft') {
+  this.bufferedDirection = 'L';
+} else if (e.key === 'ArrowRight') {
+  this.bufferedDirection = 'R';
+}
+
+// Try to apply immediately if possible
+if (this.bufferedDirection) {
+  const canTurn = this.canChangeTo(this.bufferedDirection);
+  if (canTurn) {
+    this.pacman.updateDirection(this.bufferedDirection, this.CELL_SIZE, this.walls);
+
+    // Update pacman image
+    if (this.bufferedDirection === 'U') {
+      this.pacman.image = this.pacmanUpImage;
+    } else if (this.bufferedDirection === 'D') {
+      this.pacman.image = this.pacmanDownImage;
+    } else if (this.bufferedDirection === 'L') {
+      this.pacman.image = this.pacmanLeftImage;
+    } else if (this.bufferedDirection === 'R') {
+      this.pacman.image = this.pacmanRightImage;
     }
 
-      // Try to apply immediately if possible
-      if (this.bufferedDirection) {
-        const canTurn = this.canChangeTo(this.bufferedDirection);
-        if (canTurn) {
-          this.pacman.updateDirection(this.bufferedDirection, this.CELL_SIZE, this.walls);
-          // Update pacman image
-          if (this.bufferedDirection === 'U') {
-            this.pacman.image = this.pacmanUpImage;
-          } else if (this.bufferedDirection === 'D') {
-            this.pacman.image = this.pacmanDownImage;
-          } else if (this.bufferedDirection === 'L') {
-            this.pacman.image = this.pacmanLeftImage;
-          } else if (this.bufferedDirection === 'R') {
-            this.pacman.image = this.pacmanRightImage;
-          }
-          this.bufferedDirection = null; // Clear buffer on successful turn
-        }
-        // Otherwise keep buffered for next frame
-      
+    this.bufferedDirection = null; // Clear buffer on successful turn
+  }
+  // Otherwise keep buffered for next frame
+}
 
+// Handle robot2 (WASD keys) in 2-player mode
+if (this.isTwoPlayerMode && this.robot2) {
+  const key = e.key.toLowerCase();
+  if (key === 'w') {
+    this.bufferedDirection2 = 'U';
+  } else if (key === 's') {
+    this.bufferedDirection2 = 'D';
+  } else if (key === 'a') {
+    this.bufferedDirection2 = 'L';
+  } else if (key === 'd') {
+    this.bufferedDirection2 = 'R';
+  }
 
-    // Handle robot2 (WASD keys) in 2-player mode
-    if (this.isTwoPlayerMode && this.robot2) {
-      const key = e.key.toLowerCase();
-      if (key === 'w') {
-        this.bufferedDirection2 = 'U';
-      } else if (key === 's') {
-        this.bufferedDirection2 = 'D';
-      } else if (key === 'a') {
-        this.bufferedDirection2 = 'L';
-      } else if (key === 'd') {
-        this.bufferedDirection2 = 'R';
-      }
+  // Try to apply immediately if possible
+  if (this.bufferedDirection2) {
+    const canTurn = this.canChangeTo2(this.bufferedDirection2);
+    if (canTurn) {
+      this.robot2.updateDirection(this.bufferedDirection2, this.CELL_SIZE, this.walls);
 
-      // Try to apply immediately if possible
-      if (this.bufferedDirection2) {
-        const canTurn = this.canChangeTo2(this.bufferedDirection2);
-        if (canTurn) {
-          this.robot2.updateDirection(this.bufferedDirection2, this.CELL_SIZE, this.walls);
-          // Update robot2 image
-          if (this.bufferedDirection2 === 'U') {
-            this.robot2.image = this.robotUpImage;
-          } else if (this.bufferedDirection2 === 'D') {
-            this.robot2.image = this.robotDownImage;
-          } else if (this.bufferedDirection2 === 'L') {
-            this.robot2.image = this.robotLeftImage;
-          } else if (this.bufferedDirection2 === 'R') {
-            this.robot2.image = this.robotRightImage;
-          }
-          this.bufferedDirection2 = null; // Clear buffer on successful turn
-        }
-        // Otherwise keep buffered for next frame
+      // Update robot2 image
+      if (this.bufferedDirection2 === 'U') {
+        this.robot2.image = this.robotUpImage;
+      } else if (this.bufferedDirection2 === 'D') {
+        this.robot2.image = this.robotDownImage;
+      } else if (this.bufferedDirection2 === 'L') {
+        this.robot2.image = this.robotLeftImage;
+      } else if (this.bufferedDirection2 === 'R') {
+        this.robot2.image = this.robotRightImage;
       }
 
-  // KeyUp Handler für Practice Mode
-  private onKeyUp(e: KeyboardEvent) {
-    if (this.gameMode === 'practice') {
-      if (e.key === 'Shift') {
-        this.isRewinding = false;
-      }
-      if (e.key === '1' || e.key === '2') {
-        this.slowMotion = 1.0;
-      }
-    } else {
-      // Release boost in normal modes
-      if (e.key === 'Shift') {
-        this.isBoostKeyPressed = false;
-        this.turboSpeed = false;
-      }
+      this.bufferedDirection2 = null; // Clear buffer on successful turn
+    }
+    // Otherwise keep buffered for next frame
+  }
+} 
+  }
+// KeyUp Handler für Practice Mode
+private onKeyUp(e: KeyboardEvent) {
+  if (this.gameMode === 'practice') {
+    if (e.key === 'Shift') {
+      this.isRewinding = false;
+    }
+    if (e.key === '1' || e.key === '2') {
+      this.slowMotion = 1.0;
+    }
+  } else {
+    // Release boost in normal modes
+    if (e.key === 'Shift') {
+      this.isBoostKeyPressed = false;
+      this.turboSpeed = false;
     }
   }
+}
+
   requestExitToMenu() {
   this.showExitConfirm = true;
   this.gameState = 'paused';
