@@ -6,12 +6,30 @@
     </video>
     <div class="video-overlay"></div>
   </div>
+  
+  <!-- Background grid lines animation -->
+  <div class="background-animation">
+    <div class="grid-line vertical" *ngFor="let i of [0,1,2,3,4,5,6,7,8,9]"
+         [style.left.%]="i * 10"
+         [style.animation-delay.s]="i * 0.1">
+    </div>
+    <div class="grid-line horizontal" *ngFor="let i of [0,1,2,3,4,5]"
+         [style.top.%]="i * 20"
+         [style.animation-delay.s]="i * 0.15">
+    </div>
 
   <!-- Pixel Clouds -->
   <div class="pixel-clouds">
     <div class="cloud">☁️</div>
     <div class="cloud">☁️</div>
+
   </div>
+
+  <!-- IFM Corner accents -->
+  <div class="corner-accent top-left"></div>
+  <div class="corner-accent top-right"></div>
+  <div class="corner-accent bottom-left"></div>
+  <div class="corner-accent bottom-right"></div>
 
   <!-- IFM Logo Pixel Style -->
   <div class="ifm-logo-section">

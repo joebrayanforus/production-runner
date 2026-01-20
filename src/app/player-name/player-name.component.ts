@@ -18,6 +18,10 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   currentPlayer: 1 | 2 = 1;
   gameMode: GameMode = 'classic';
   is2PlayerMode = false;
+  players: string | null = null;
+  numberOfPlayers: 1 | 2 = 1;
+  currentStep: 'players' | 'name' = 'players';
+  currentPlayerInput: 1 | 2 = 1;
 
   // Virtual Keyboard Variables
   keyboardVisible = true; // Always show keyboard on this page

@@ -24,22 +24,44 @@ export class Block {
   }
 
   updateDirection(newDirection: string, tileSize: number, walls: Set<Block>) {
+    // Don't update if already moving in the same direction
+    if (this.direction === newDirection) {
+      return;
+    }
+    
     const prevDirection = this.direction;
     this.direction = newDirection;
     this.updateVelocity(tileSize);
-    this.x += this.velocityX;
-    this.y += this.velocityY;
+    
+    // Test if the new direction would cause a collision
+    const testX = this.x + this.velocityX;
+    const testY = this.y + this.velocityY;
+    const originalX = this.x;
+    const originalY = this.y;
+    
+    // Temporarily move to test collision
+    this.x = testX;
+    this.y = testY;
 
     // Check collision with walls
+    let hasCollision = false;
     for (const wall of walls) {
       if (this.collidesWith(wall)) {
-        this.x -= this.velocityX;
-        this.y -= this.velocityY;
-        this.direction = prevDirection;
-        this.updateVelocity(tileSize);
+        hasCollision = true;
         break;
       }
     }
+    
+    // Restore original position
+    this.x = originalX;
+    this.y = originalY;
+    
+    // If collision detected, revert to previous direction
+    if (hasCollision) {
+      this.direction = prevDirection;
+      this.updateVelocity(tileSize);
+    }
+    // Otherwise, direction is updated and velocity is set - movement will happen in update loop
   }
 
   updateVelocity(tileSize: number) {

@@ -200,7 +200,9 @@ export class AudioService {
       this.backgroundMusic.loop = true;
       this.backgroundMusic.volume = 0.3;
     }
-  }  play(soundName: string) {
+  }
+
+  play(soundName: string) {
     if (this.isMuted) return;
 
     const sound = this.sounds.get(soundName);
@@ -213,7 +215,16 @@ export class AudioService {
   }
 
   playBackgroundMusic() {
-    // Try to play our custom ifm industrial music first
+    if (this.isMuted) return;
+    
+    // Play soundtrack.mp3 if available
+    if (this.backgroundMusic && !this.isMuted) {
+      this.backgroundMusic.currentTime = 0; // Start from beginning
+      this.backgroundMusic.play().catch(err => console.warn('Failed to play soundtrack:', err));
+      return;
+    }
+
+    // Fallback to industrial music
     const industrialMusic = this.sounds.get('backgroundMusic');
     if (industrialMusic && !this.isMuted) {
       industrialMusic.volume = 0.2; // Subtle industrial ambience
@@ -251,11 +262,19 @@ export class AudioService {
     if (this.backgroundMusic) {
       this.backgroundMusic.pause();
     }
+    // Also pause industrial music if playing
+    const industrialMusic = this.sounds.get('backgroundMusic');
+    if (industrialMusic) {
+      industrialMusic.pause();
+    }
   }
 
   resumeBackgroundMusic() {
-    if (!this.isMuted && this.backgroundMusic) {
-      this.backgroundMusic.play().catch(err => console.warn('Failed to resume background music:', err));
+    if (this.isMuted) return;
+    
+    // Resume soundtrack if it exists
+    if (this.backgroundMusic) {
+      this.backgroundMusic.play().catch(err => console.warn('Failed to resume soundtrack:', err));
     }
   }
 
