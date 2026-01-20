@@ -19,7 +19,7 @@ export class AchievementService {
   {
     id: "ifm_meister",
     title: "IFM Meister",
-    description: "150 sensor data collected",
+    description: "350 sensor data collected",
     // Unlock when at least 350 sensor data items were collected
     isUnlocked: (stats) => stats.sensorDataCollected >= 350,
   },
