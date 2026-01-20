@@ -46,26 +46,6 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Get game mode from route params
     this.route.queryParams.subscribe(params => {
-      this.gameMode = params['mode'] === 'practice' ? 'practice' : 'classic';
-      this.players = params['players'] || null;
-      if (this.players === '2') {
-        this.numberOfPlayers = 2;
-        this.currentStep = 'name';
-        this.focusArea = 'keyboard';
-        this.selectedRowIndex = 0;
-        this.selectedKeyIndex = 0;
-      } else if (this.players === '1') {
-        this.numberOfPlayers = 1;
-        this.currentStep = 'name';
-        this.focusArea = 'keyboard';
-        this.selectedRowIndex = 0;
-        this.selectedKeyIndex = 0;
-      } else {
-        // No players count set, start at player selection
-        this.currentStep = 'players';
-        this.focusArea = 'buttons';
-        this.buttonIndex = 0;
-      }
       this.gameMode = params['mode'] || 'classic';
       this.is2PlayerMode = this.gameMode === '2player';
     });
@@ -191,8 +171,11 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   }
 
   goBack(): void {
-    // Always go back to home page
-    this.router.navigate(['/']);
+    if (this.is2PlayerMode && this.currentPlayer === 2) {
+      this.goBackToPlayer1();
+    } else {
+      this.router.navigate(['/']);
+    }
   }
 
   // Gamepad Polling

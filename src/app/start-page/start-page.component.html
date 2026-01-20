@@ -37,9 +37,9 @@
     </button>
     <button class="menu-item"
             [class.selected]="selectedMode === 'classic'"
-            (click)="startGameWithPlayers(1)">
+            (click)="selectMode('classic')">
       <span class="menu-arrow">▶</span>
-      <span class="menu-text">1 SPIELER</span>
+      <span class="menu-text">1 PLAYER</span>
     </button>
     <button class="menu-item"
             [class.selected]="selectedMode === 'practice'"

@@ -198,12 +198,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private malfunctionMode: 'random' | 'aggressive' | 'maintenance' = 'random';
   private modeTimer = 0;
   private modePhase = 0; // Aktuelle Phase im Scatter/Chase Zyklus
-  // Schwierigere Timings: Kürzere Scatter, längere Chase-Phasen
+  // Einfachere Timings: Längere Scatter, kürzere Chase-Phasen
   private readonly modeDurations = [
-    5000, 25000,  // Phase 0-1: 5s Scatter, 25s Chase
-    4000, 25000,  // Phase 2-3: 4s Scatter, 25s Chase
-    3000, 30000,  // Phase 4-5: 3s Scatter, 30s Chase
-    2000, Infinity // Phase 6-7: 2s Scatter, dann permanent Chase
+    8000, 20000,  // Phase 0-1: 8s Scatter, 20s Chase
+    7000, 20000,  // Phase 2-3: 7s Scatter, 20s Chase
+    6000, 22000,  // Phase 4-5: 6s Scatter, 22s Chase
+    5000, Infinity // Phase 6-7: 5s Scatter, dann permanent Chase
   ];
 
   // Pac-Man Animation
@@ -217,9 +217,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // IFM Logo display control
   showIfmLogo = true;
-
-  // Achievement Toast
-  achievementToast: { title: string; description: string } | null = null;
 
   // Ready/Game Over Screen
   gameState: 'ready' | 'playing' | 'dying' | 'gameover' | 'levelcomplete' | 'paused' | 'finalexplosion' = 'ready';
@@ -257,16 +254,16 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   // Level-Progression: Geschwindigkeit und Frighten-Dauer pro Level
   private getGhostSpeed(): number {
     const baseSpeed = this.CELL_SIZE / 4;
-    // Höhere Grundgeschwindigkeit: +15% pro Level (statt 5%)
-    const speedMultiplier = 1.1 + (this.productionLevel - 1) * 0.15;
-    return Math.min(baseSpeed * speedMultiplier, baseSpeed * 2.0); // Max 200%
+    // Langsamere Geister: +8% pro Level (einfacher für Anfänger)
+    const speedMultiplier = 1.0 + (this.productionLevel - 1) * 0.08;
+    return Math.min(baseSpeed * speedMultiplier, baseSpeed * 1.6); // Max 160%
   }
 
   private getMaintenanceDuration(): number {
-    // Kürzere Maintenance-Zeit: Start mit 6s (statt 10s), -1.5s pro Level
-    const baseDuration = 6000;
-    const reduction = (this.productionLevel - 1) * 1500;
-    return Math.max(baseDuration - reduction, 1000); // Minimum 1 Sekunde
+    // Längere Maintenance-Zeit: Start mit 8s, -1s pro Level (einfacher für Anfänger)
+    const baseDuration = 8000;
+    const reduction = (this.productionLevel - 1) * 1000;
+    return Math.max(baseDuration - reduction, 2000); // Minimum 2 Sekunden
   }
 
   // Legacy function for compatibility
@@ -1120,66 +1117,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  // Draw Industrial Frame around game area with s.FOX and moneo info
-  private drawIndustrialFrame(ctx: CanvasRenderingContext2D) {
-    ctx.save();
-
-    // Top bar - s.FOX optimization running
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 30);
-
-    // Top bar gradient with metallic effect
-    const topGradient = ctx.createLinearGradient(0, 0, 0, 28);
-    topGradient.addColorStop(0, '#333333');
-    topGradient.addColorStop(0.5, '#1a1a1a');
-    topGradient.addColorStop(1, '#2a2a2a');
-    ctx.fillStyle = topGradient;
-    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 28);
-
-    // IFM orange accent line with glow
-    ctx.shadowBlur = 5;
-    ctx.shadowColor = '#ED6B00';
-    ctx.fillStyle = '#ED6B00';
-    ctx.fillRect(0, 28, this.CANVAS_WIDTH, 2);
-    ctx.shadowBlur = 0;
-
-    // s.FOX system status
-    ctx.font = '8px "Press Start 2P", monospace';
-    ctx.fillStyle = '#00FF88';
-    ctx.textAlign = 'left';
-
-    if (this.gameState === 'ready') {
-      ctx.fillText('s.FOX INITIALIZING...', 10, 20);
-      // Loading bar
-      const loadProgress = (this.stateTimer / this.READY_DURATION) * 100;
-      ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
-      ctx.fillRect(10, 22, 100, 3);
-      ctx.fillStyle = '#00FF88';
-      ctx.fillRect(10, 22, loadProgress, 3);
-    } else if (this.gameState === 'playing') {
-      // Blinking cursor effect
-      const blink = Math.floor(Date.now() / 500) % 2 === 0 ? '_' : '';
-      ctx.fillText(`s.FOX RUNNING${blink}`, 10, 20);
-      // Activity indicator dots
-      const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
-      ctx.fillStyle = '#ED6B00';
-      ctx.fillText(dots, 110, 20);
-    } else if (this.gameState === 'gameover') {
-      ctx.fillStyle = '#FF6B6B';
-      ctx.fillText('SYSTEM HALTED', 10, 20);
-      // Error indicator
-      ctx.fillRect(5, 16, 3, 8);
-    }
-
-    // moneo AI Assistant indicator - top right
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#00FF88';
-    ctx.font = '7px "Press Start 2P", monospace';
-    ctx.fillText('moneo ACTIVE', this.CANVAS_WIDTH - 10, 20);
-
-    ctx.restore();
-  }
-
   private drawUI(ctx: CanvasRenderingContext2D) {
     // Draw industrial frame around game area
     this.drawIndustrialFrame(ctx);
@@ -1999,13 +1936,19 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           ghost.type = 'patrol'; // Cyan/Blue - PATROL: Feste Route entlang Korridoren
           this.ghosts.add(ghost);
         } else if (tileMapChar === 'o') {
-          const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.orangeGhostImage);
-          ghost.type = 'random'; // Orange - RANDOM: Zufällige Bewegung
-          this.ghosts.add(ghost);
+          // In Level 1 spawnt der orangene Geist nicht (nur 2 Geister für Anfänger)
+          if (this.productionLevel > 1) {
+            const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.orangeGhostImage);
+            ghost.type = 'random'; // Orange - RANDOM: Zufällige Bewegung
+            this.ghosts.add(ghost);
+          }
         } else if (tileMapChar === 'p') {
-          const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.pinkGhostImage);
-          ghost.type = 'ambush'; // Pink - AMBUSH: Lauert voraus
-          this.ghosts.add(ghost);
+          // In Level 1 spawnt der pinke Geist nicht (nur 2 Geister für Anfänger)
+          if (this.productionLevel > 1) {
+            const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.pinkGhostImage);
+            ghost.type = 'ambush'; // Pink - AMBUSH: Lauert voraus
+            this.ghosts.add(ghost);
+          }
         } else if (tileMapChar === 'r') {
           const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.redGhostImage);
           ghost.type = 'aggressive'; // Red - AGGRESSIVE: Verfolgt direkt
@@ -2140,19 +2083,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     console.log(`🤖 ANNOUNCEMENT: ${text}`);
-  }
-
-  // Show Achievement Toast
-  private showAchievementToast(achievement: { id: string; title: string; description: string }) {
-    this.achievementToast = {
-      title: achievement.title,
-      description: achievement.description
-    };
-
-    // Auto-hide after 5 seconds
-    setTimeout(() => {
-      this.achievementToast = null;
-    }, 5000);
   }
 
   // Update Energy Gauge
@@ -3630,22 +3560,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.router.navigate(['/']);
   }
 
-  // Request exit to menu (show confirmation dialog)
-  requestExitToMenu(): void {
-    this.showExitConfirm = true;
-  }
-
-  // Cancel exit to menu (hide confirmation dialog)
-  cancelExitToMenu(): void {
-    this.showExitConfirm = false;
-  }
-
-  // Confirm exit to menu (execute exit)
-  confirmExitToMenu(): void {
-    this.showExitConfirm = false;
-    this.exitGame();
-  }
-
   private resetPositions() {
     if (this.pacman) {
       this.pacman.reset();
@@ -3797,14 +3711,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         console.log(`⚡ Turbo: ${this.turboSpeed ? 'AN' : 'AUS'}`);
         return;
       }
-      // Q,W,E,R,T = Sensor-Ziele umschalten (but don't intercept 'w' in 2-player mode)
-      const keyLower = e.key.toLowerCase();
-      if (['q', 'e', 'r', 't'].includes(keyLower)) {
-        this.showGhostTargets = !this.showGhostTargets;
-        return;
-      }
-      // 'w' should only toggle ghost targets in practice mode if NOT in 2-player mode
-      if (keyLower === 'w' && !this.isTwoPlayerMode) {
+      // Q,W,E,R,T = Sensor-Ziele umschalten
+      if (['q', 'w', 'e', 'r', 't'].includes(e.key.toLowerCase())) {
         this.showGhostTargets = !this.showGhostTargets;
         return;
       }

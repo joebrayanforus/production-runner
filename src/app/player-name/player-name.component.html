@@ -1,17 +1,13 @@
 <div class="player-name-container">
-  <!-- Animated background particles -->
-  <div class="particles">
-    <div class="particle" *ngFor="let i of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]"
-         [style.left.%]="(i * 5.26)"
-         [style.animation-delay.s]="i * 0.2">
-    </div>
+  <!-- Video Background -->
+  <div class="video-background">
+    <video autoplay loop muted playsinline class="bg-video">
+      <source src="assets/videos/WhatsApp Video 2025-12-17 at 14.28.04.mp4" type="video/mp4">
+    </video>
+    <div class="video-overlay"></div>
   </div>
-
-<<<<<<< Updated upstream
-  <!-- Background grid animation -->
-=======
+  
   <!-- Background grid lines animation -->
->>>>>>> Stashed changes
   <div class="background-animation">
     <div class="grid-line vertical" *ngFor="let i of [0,1,2,3,4,5,6,7,8,9]"
          [style.left.%]="i * 10"
@@ -21,6 +17,12 @@
          [style.top.%]="i * 20"
          [style.animation-delay.s]="i * 0.15">
     </div>
+
+  <!-- Pixel Clouds -->
+  <div class="pixel-clouds">
+    <div class="cloud">☁️</div>
+    <div class="cloud">☁️</div>
+
   </div>
 
   <!-- IFM Corner accents -->
