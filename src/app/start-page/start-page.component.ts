@@ -20,7 +20,6 @@ export class StartPageComponent implements OnInit, OnDestroy {
   selectedMode: GameMode = 'classic';
   leaderboard: LeaderboardEntry[] = [];
   topScores: LeaderboardEntry[] = [];
-  private readonly menuModes: GameMode[] = ['spielanleitung', 'classic', 'practice', '2player'];
   private gamepadPollInterval: any;
   private lastKeyboardSelect = 0;
 
@@ -92,27 +91,6 @@ export class StartPageComponent implements OnInit, OnDestroy {
         queryParams: { mode: this.selectedMode }
       });
     }
-
-    // Handle 2-player mode
-    if (this.selectedMode === '2player') {
-      this.startGameWithPlayers(2);
-      return;
-    }
-
-    this.router.navigate(['/player-name'], {
-      queryParams: { mode: this.selectedMode }
-    });
-  }
-
-  startGameWithPlayers(numPlayers: 1 | 2): void {
-    // Navigate directly to player-name page with players count set
-    // This will skip the player selection screen
-    this.router.navigate(['/player-name'], {
-      queryParams: { 
-        mode: 'classic',
-        players: numPlayers.toString()
-      }
-    });
   }
 
   // Gamepad Polling for Mode Selection
