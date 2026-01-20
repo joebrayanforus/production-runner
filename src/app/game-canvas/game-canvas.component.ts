@@ -227,23 +227,55 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Level-Progression: Geschwindigkeit und Frighten-Dauer pro Level
   private getGhostSpeed(): number {
-    const baseSpeed = this.CELL_SIZE / 4;
-    // Langsamere Geister: +8% pro Level (einfacher für Anfänger)
-    const speedMultiplier = 1.0 + (this.productionLevel - 1) * 0.08;
-    return Math.min(baseSpeed * speedMultiplier, baseSpeed * 1.6); // Max 160%
+  const baseSpeed = this.CELL_SIZE / 4;
+
+  // existing scaling
+  const speedMultiplier = 1.0 + (this.productionLevel - 1) * 0.08;
+
+  // Level 1 easier: -65% speed 
+  const level1Multiplier = this.productionLevel === 1 ? 0.35 : 1.0;
+
+  const speed = baseSpeed * speedMultiplier * level1Multiplier;
+  return Math.min(speed, baseSpeed * 1.6); // Max 160%
+}
+
+private getMaxMalfunctionsForLevel(): number {
+  // Level 1 = only 2 ghosts
+  return this.productionLevel === 1 ? 2 : 4;
+}
+
+private getMalfunctionSpawnInterval(): number {
+  return this.productionLevel === 1 ? 1600 : this.MALFUNCTION_SPAWN_INTERVAL; // 800 normal
+}
+
+
+
+    private getMaintenanceDuration(): number {
+    // Base frightened/maintenance time (ms)
+    let baseDuration = 8000;
+
+    // Level 1 easier: +5s
+    if (this.productionLevel === 1) {
+      baseDuration += 5000; // +5000ms
+    }
+
+    const reduction = (this.productionLevel - 1) * 1000;
+    return Math.max(baseDuration - reduction, 2000); // Minimum 2 seconds
   }
 
-  private getMaintenanceDuration(): number {
-    // Längere Maintenance-Zeit: Start mit 8s, -1s pro Level (einfacher für Anfänger)
-    const baseDuration = 8000;
-    const reduction = (this.productionLevel - 1) * 1000;
-    return Math.max(baseDuration - reduction, 2000); // Minimum 2 Sekunden
-  }
 
   // Legacy function for compatibility
   private getFrightenedDuration(): number {
-    return this.getMaintenanceDuration();
+    let base = 10000;
+
+    // Level 1 bonus +5s
+    if (this.productionLevel === 1) base += 5000;
+
+    // optional: reduce with higher levels (si e kishe më herët)
+    const reduction = (this.productionLevel - 1) * 1000;
+    return Math.max(base - reduction, 2000);
   }
+
 
   // CYAN (Inky) Patrol-Route: Feste Waypoints entlang der Korridore
   private patrolWaypoints: { x: number; y: number }[] = [];
@@ -1763,6 +1795,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   // Voice Announcements
   private lastAnnouncement = '';
   private announcementCooldown = 0;
+  private level1LifeBonusGiven = false;
+
 
   // Practice Mode: Zeit-Rückspulung
   private gameHistory: Array<{
@@ -1967,7 +2001,14 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           // Nichts hinzufügen - bleibt leer
         }
       }
+      // +1 life bonus only once for Level 1
+      if (this.productionLevel === 1 && !this.level1LifeBonusGiven) {
+        this.lives++;
+        this.level1LifeBonusGiven = true;
+      }
+
     }
+
     // Aggressiver (roter) Sensor soll nie in der Ghost-Box starten
     const aggressiveGhost = [...this.ghosts].find(g => g.type === 'aggressive');
     if (aggressiveGhost) {
@@ -2773,7 +2814,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Ghost Release Timer - force each ghost out of the house quickly
     this.ghostReleaseTimer += deltaTime;
-    while (this.ghostReleaseTimer >= this.GHOST_RELEASE_INTERVAL && this.ghostsReleased < this.malfunctions.size) {
+    while (this.ghostReleaseTimer >= this.GHOST_RELEASE_INTERVAL && this.ghostsReleased < this.ghosts.size) {
+
       this.ghostReleaseTimer -= this.GHOST_RELEASE_INTERVAL;
       this.ghostsReleased++;
       let index = 0;
@@ -3595,6 +3637,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadMap();
     this.resetPositions();
     this.lives = 3;
+    this.level1LifeBonusGiven = false;
     this.score = 0;
     this.pelletStreak = 0;
     this.streakMultiplier = 1.0;
@@ -3602,7 +3645,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.pelletCountingEnabled = false;
     this.currentLevel = 1;
     this.scaredTimer = 0;
-    this.scaredDuration = 10000;
+    this.scaredDuration = this.getFrightenedDuration();
     this.gameOver = false;
     this.modePhase = 0;
     this.modeTimer = 0;
