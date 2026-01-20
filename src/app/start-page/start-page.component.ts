@@ -7,7 +7,7 @@ import {
   LeaderboardEntry
 } from '../services/leaderboard.service';
 
-export type GameMode = 'classic' | 'practice' | 'spielanleitung' | 'spielen1' | 'spielen2';
+export type GameMode = 'classic' | 'practice' | 'spielanleitung' | '2player';
 
 @Component({
   selector: 'app-start-page',
@@ -17,10 +17,10 @@ export type GameMode = 'classic' | 'practice' | 'spielanleitung' | 'spielen1' | 
   styleUrls: ['./start-page.component.css']
 })
 export class StartPageComponent implements OnInit, OnDestroy {
-  selectedMode: GameMode = 'spielen1';
+  selectedMode: GameMode = 'classic';
   leaderboard: LeaderboardEntry[] = [];
   topScores: LeaderboardEntry[] = [];
-  private readonly menuModes: GameMode[] = ['spielanleitung', 'spielen1', 'spielen2', 'practice'];
+  private readonly menuModes: GameMode[] = ['spielanleitung', 'classic', 'practice', '2player'];
   private gamepadPollInterval: any;
   private lastKeyboardSelect = 0;
 
@@ -93,13 +93,8 @@ export class StartPageComponent implements OnInit, OnDestroy {
       });
     }
 
-    // Handle SPIELEN 1 and SPIELEN 2 modes
-    if (this.selectedMode === 'spielen1') {
-      this.startGameWithPlayers(1);
-      return;
-    }
-
-    if (this.selectedMode === 'spielen2') {
+    // Handle 2-player mode
+    if (this.selectedMode === '2player') {
       this.startGameWithPlayers(2);
       return;
     }
@@ -118,9 +113,6 @@ export class StartPageComponent implements OnInit, OnDestroy {
         players: numPlayers.toString()
       }
     });
-  }
-
-
   }
 
   // Gamepad Polling for Mode Selection

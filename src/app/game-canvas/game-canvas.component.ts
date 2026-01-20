@@ -7,6 +7,7 @@ import { GameManager } from '../models/game-manager';
 import { Block } from '../models/Block';
 import { AudioService } from '../services/audio.service';
 import { InputService } from '../services/input.service';
+import { GameStats } from '../models/game-stats';
 
 export type GameMode = 'classic' | 'practice' | '2player';
 
@@ -227,13 +228,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly DEATH_DURATION = 300; // 0.3 seconde animation mort
   private readonly FINAL_EXPLOSION_DURATION = 1500; // 1.5 seconds final explosion
   private readonly LEVELCOMPLETE_DURATION = 1000; // 1 seconde Level-Übergang
-
-  // Boost System
-  private boostEnergy = 100;
-  private isBoostKeyPressed = false;
-  private readonly BOOST_DRAIN_RATE = 30; // Energy drained per second
-  private readonly MAX_BOOST_ENERGY = 100;
-  private readonly BOOST_RECHARGE_RATE = 20; // Energy recharged per second
 
   // Game Stats and Achievement System
   private stats: GameStats = {
@@ -1840,6 +1834,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   slowMotion = 1.0;          // Practice Mode: Zeitlupe (1.0 = normal)
   turboSpeed = false;        // Turbo Mode: 2x Geschwindigkeit
   turboSpeed2 = false;       // Player 2 Turbo Mode
+  isTwoPlayerMode = false;   // Flag for 2-player mode
 
   // Energy Gauge System for Turbo
   private boostEnergy = 100;           // Current energy (0-100)
@@ -1849,15 +1844,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly BOOST_RECHARGE_RATE = 8; // Energy recharged per second when not boosting (was 15)
   private isBoostKeyPressed = false;
   private isBoostKeyPressed2 = false;  // Player 2 boost state
-
-  // Dynamic Lighting System
-  private lightingEnabled = false;
-  private flashlightRadius = 120;
-  private ambientDarkness = 0.85; // 0 = fully dark, 1 = fully lit
-
-  // Voice Announcements
-  private lastAnnouncement = '';
-  private announcementCooldown = 0;
 
   // Practice Mode: Zeit-Rückspulung
   private gameHistory: Array<{
@@ -2261,92 +2247,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  // Draw Industrial Frame around game area with s.FOX and moneo info
-  private drawIndustrialFrame(ctx: CanvasRenderingContext2D) {
-    ctx.save();
-
-    // Top bar - s.FOX optimization running
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 30);
-
-    // Top bar gradient with metallic effect
-    const topGradient = ctx.createLinearGradient(0, 0, 0, 28);
-    topGradient.addColorStop(0, '#333333');
-    topGradient.addColorStop(0.5, '#1a1a1a');
-    topGradient.addColorStop(1, '#2a2a2a');
-    ctx.fillStyle = topGradient;
-    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 28);
-
-    // IFM orange accent line with glow
-    ctx.shadowBlur = 5;
-    ctx.shadowColor = '#ED6B00';
-    ctx.fillStyle = '#ED6B00';
-    ctx.fillRect(0, 28, this.CANVAS_WIDTH, 2);
-    ctx.shadowBlur = 0;
-
-    // s.FOX system status
-    ctx.font = '8px "Press Start 2P", monospace';
-    ctx.fillStyle = '#00FF88';
-    ctx.textAlign = 'left';
-
-    if (this.gameState === 'ready') {
-      ctx.fillText('s.FOX INITIALIZING...', 10, 20);
-      // Loading bar
-      const loadProgress = (this.stateTimer / this.READY_DURATION) * 100;
-      ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
-      ctx.fillRect(10, 22, 100, 3);
-      ctx.fillStyle = '#00FF88';
-      ctx.fillRect(10, 22, loadProgress, 3);
-    } else if (this.gameState === 'playing') {
-      // Blinking cursor effect
-      const blink = Math.floor(Date.now() / 500) % 2 === 0 ? '_' : '';
-      ctx.fillText(`s.FOX RUNNING${blink}`, 10, 20);
-      // Activity indicator dots
-      const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
-      ctx.fillStyle = '#ED6B00';
-      ctx.fillText(dots, 110, 20);
-    } else if (this.gameState === 'gameover') {
-      ctx.fillStyle = '#FF6B6B';
-      ctx.fillText('SYSTEM HALTED', 10, 20);
-      // Error indicator
-      ctx.fillRect(5, 16, 3, 8);
-    }
-
-    // moneo AI Assistant indicator - top right
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#00FF88';
-    ctx.font = '7px "Press Start 2P", monospace';
-    ctx.fillText('moneo IAIA', this.CANVAS_WIDTH - 10, 12);
-
-    // AI status indicator with LED
-    const aiStatus = this.gameState === 'playing' ? 'ANALYZING' : 'STANDBY';
-    ctx.fillStyle = this.gameState === 'playing' ? '#ED6B00' : '#808080';
-    ctx.fillText(aiStatus, this.CANVAS_WIDTH - 10, 22);
-
-    // Animated LED indicator
-    const ledPulse = this.gameState === 'playing'
-      ? 0.5 + Math.sin(Date.now() / 200) * 0.5
-      : 0.3;
-    const ledColor = this.gameState === 'playing' ? '#ED6B00' : '#808080';
-    ctx.fillStyle = `rgba(237, 107, 0, ${ledPulse})`;
-    ctx.beginPath();
-    ctx.arc(this.CANVAS_WIDTH - 80, 19, 3, 0, Math.PI * 2);
-    ctx.fill();
-    // LED glow
-    if (this.gameState === 'playing') {
-      ctx.shadowBlur = 8;
-      ctx.shadowColor = ledColor;
-      ctx.beginPath();
-      ctx.arc(this.CANVAS_WIDTH - 80, 19, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    }
-
-    // No bottom bar - clean game area
-
-    ctx.restore();
-  }
-
   // Draw Energy Gauge
   private drawEnergyGauge(ctx: CanvasRenderingContext2D) {
     const barWidth = this.gameMode === '2player' ? 120 : 150;
@@ -2474,15 +2374,10 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.animationFrameId) {
       return;
     }
-<<<<<<< Updated upstream
-    // Play soundtrack in loop during gameplay
-    this.audioService.playBackgroundMusic();
-=======
     // Start soundtrack when game loop starts (only if game is playing)
     if (this.gameState === 'playing') {
       this.audioService.playBackgroundMusic();
     }
->>>>>>> Stashed changes
     const loop = (timestamp: number) => {
       const delta = timestamp - this.lastFrameTime;
       if (delta > 1000 / this.FPS) { // target FPS
@@ -2607,6 +2502,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       gpDir2 = this.inputService.getArcadeDirection(2); // Player 2 joystick
       if (gpDir2) {
         this.bufferedDirection2 = gpDir2; // Buffer the direction for player 2
+      }
+    }
+
     // Player 2 gamepad input (try second gamepad first, fallback to first if alone) in 2-player mode
     if (this.gameMode === '2player' && this.robot2 && this.gameState === 'playing') {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -2726,8 +2624,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           this.resumeFromPause();
         } else if (this.gameState === 'playing') {
           this.openPause();
-        } else if ((this.gameState as string) === 'gameover') {
-          this.openPause();
         }
       }
     }
@@ -2742,6 +2638,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         this.isBoostKeyPressed = false;
         this.turboSpeed = false;
         console.log('🛑 Boost deaktiviert (Arcade Button)');
+      }
+    }
+
     // Apply buffered direction for Player 2
     if (this.bufferedDirection2 && this.robot2 && this.gameState === 'playing' && this.gameMode === '2player') {
       const canTurn2 = this.canChangeTo2(this.bufferedDirection2);
@@ -2770,7 +2669,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // State Machine
-    switch (this.gameState) {
+    const currentGameState = this.gameState;
+    switch (currentGameState) {
       case 'ready':
         this.stateTimer += deltaTime;
         if (this.stateTimer >= this.READY_DURATION) {
@@ -3935,11 +3835,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
     if (!this.pacman) return;
 
-    // Handle robot2 (WASD keys) in 2-player mode - process BEFORE player 1 arrow keys
-    // to ensure WASD keys are always processed
-    if (this.isTwoPlayerMode && this.robot2) {
-      const key = e.key.toLowerCase();
-      if (key === 'w') {
     // Buffer the direction for Player 1 (Arrow keys)
     if (e.key === 'ArrowUp') {
       this.bufferedDirection = 'U';
@@ -3986,14 +3881,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         } else {
           // Already moving in this direction, just clear the buffer
           this.bufferedDirection2 = null;
-        const canTurn2 = this.canChangeTo2(this.bufferedDirection2);
-        if (canTurn2) {
-          this.robot2.updateDirection(this.bufferedDirection2, this.CELL_SIZE, this.walls);
-          if (this.bufferedDirection2 === 'U') this.robot2.image = this.robotUpImage;
-          else if (this.bufferedDirection2 === 'D') this.robot2.image = this.robotDownImage;
-          else if (this.bufferedDirection2 === 'L') this.robot2.image = this.robotLeftImage;
-          else if (this.bufferedDirection2 === 'R') this.robot2.image = this.robotRightImage;
-          this.bufferedDirection2 = null;
         }
       }
     }
@@ -4018,43 +3905,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       // Otherwise keep buffered for next frame
     }
 
-    // Buffer the direction for smoother cornering
-    if (e.key === 'ArrowUp') {
-      this.bufferedDirection = 'U';
-    } else if (e.key === 'ArrowDown') {
-      this.bufferedDirection = 'D';
-    } else if (e.key === 'ArrowLeft') {
-      this.bufferedDirection = 'L';
-    } else if (e.key === 'ArrowRight') {
-      this.bufferedDirection = 'R';
-    }
-
-      // Try to apply immediately if possible
-      if (this.bufferedDirection) {
-        // Only update direction if it's different from current direction
-        // This prevents double movement when pressing the same direction key
-        if (this.pacman.direction !== this.bufferedDirection) {
-          const canTurn = this.canChangeTo(this.bufferedDirection);
-          if (canTurn) {
-            this.pacman.updateDirection(this.bufferedDirection, this.CELL_SIZE, this.walls);
-            // Update pacman image
-            if (this.bufferedDirection === 'U') {
-              this.pacman.image = this.pacmanUpImage;
-            } else if (this.bufferedDirection === 'D') {
-              this.pacman.image = this.pacmanDownImage;
-            } else if (this.bufferedDirection === 'L') {
-              this.pacman.image = this.pacmanLeftImage;
-            } else if (this.bufferedDirection === 'R') {
-              this.pacman.image = this.pacmanRightImage;
-            }
-            this.bufferedDirection = null; // Clear buffer on successful turn
-          }
-        } else {
-          // Already moving in this direction, just clear the buffer
-          this.bufferedDirection = null;
-        }
-        // Otherwise keep buffered for next frame
-      }
   }
 
   // KeyUp Handler für Practice Mode
@@ -4138,10 +3988,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       // Return to Menu
       this.router.navigate(['/']);
     }
-  }
-
-  requestExitToMenu() {
-    this.showExitConfirm = true;
   }
 
   // ============================================================================
@@ -4252,16 +4098,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
       ctx.restore();
     });
-  }
-
-  confirmExitToMenu() {
-    this.showExitConfirm = false;
-    this.stopGameLoop();
-    this.router.navigate(['/']);
-  }
-
-  cancelExitToMenu() {
-    this.showExitConfirm = false;
   }
 
   toggleSpielanleitung() {

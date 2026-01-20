@@ -195,17 +195,15 @@ export class AudioService {
       this.sounds.set(key, audio);
     }
 
-<<<<<<< Updated upstream
-    // Setup background music (soundtrack)
-=======
     // Setup background music - use soundtrack.mp3
->>>>>>> Stashed changes
     this.backgroundMusic = this.sounds.get('soundtrack') || this.sounds.get('theme') || null;
     if (this.backgroundMusic) {
       this.backgroundMusic.loop = true;
       this.backgroundMusic.volume = 0.2;
     }
-  }  play(soundName: string) {
+  }
+
+  play(soundName: string) {
     if (this.isMuted) return;
 
     const sound = this.sounds.get(soundName);

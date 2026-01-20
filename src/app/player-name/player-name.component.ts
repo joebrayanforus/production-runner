@@ -18,6 +18,10 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   currentPlayer: 1 | 2 = 1;
   gameMode: GameMode = 'classic';
   is2PlayerMode = false;
+  players: string | null = null;
+  numberOfPlayers: 1 | 2 = 1;
+  currentStep: 'players' | 'name' = 'players';
+  currentPlayerInput: 1 | 2 = 1;
 
   // Virtual Keyboard Variables
   keyboardVisible = true; // Always show keyboard on this page
@@ -63,7 +67,7 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
         this.buttonIndex = 0;
       }
       this.gameMode = params['mode'] || 'classic';
-      this.is2PlayerMode = this.gameMode === 'spielen2';
+      this.is2PlayerMode = this.gameMode === '2player';
     });
 
     // Start gamepad polling for keyboard navigation
@@ -187,33 +191,8 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
   }
 
   goBack(): void {
-    // If players count was already set via query params (from start page),
-    // always go back to home page instead of showing player selection
-    if (this.players) {
-      this.router.navigate(['/']);
-      return;
-    }
-
-    if (this.currentStep === 'name' && this.numberOfPlayers === 2 && this.currentPlayerInput === 2) {
-      // Retour au joueur 1
-      this.currentPlayerInput = 1;
-      this.playerName2 = '';
-      this.focusArea = 'keyboard';
-      this.selectedRowIndex = 0;
-      this.selectedKeyIndex = 0;
-    } else if (this.currentStep === 'name') {
-      // Retour à la sélection du nombre de joueurs
-      this.currentStep = 'players';
-      this.focusArea = 'buttons';
-      this.buttonIndex = this.numberOfPlayers === 1 ? 0 : 1;
-      this.playerName = '';
-      this.playerName2 = '';
-      this.currentPlayerInput = 1;
-    if (this.is2PlayerMode && this.currentPlayer === 2) {
-      this.goBackToPlayer1();
-    } else {
-      this.router.navigate(['/']);
-    }
+    // Always go back to home page
+    this.router.navigate(['/']);
   }
 
   // Gamepad Polling
