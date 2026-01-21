@@ -3,21 +3,114 @@
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  background: linear-gradient(135deg, #0a0e1a 0%, #1a1f3a 25%, #0f1929 50%, #1d2647 75%, #0d1321 100%);
+  background-size: 400% 400%;
+  animation: bgMove 35s ease-in-out infinite;
   position: relative;
   overflow: hidden;
 }
-/* IFM Logo in Game */
-.game-ifm-logo {
+
+/* Animated gradient movement */
+@keyframes bgMove {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 50% 100%; }
+  100% { background-position: 100% 0%; }
+}
+
+/* Subtle scanline overlay */
+.game-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(77,159,255,0.04) 0px,
+    rgba(77,159,255,0.04) 2px,
+    transparent 3px,
+    transparent 5px
+  );
+  animation: scanMove 20s linear infinite;
+}
+
+@keyframes scanMove {
+  0% { background-position-y: 0; }
+  100% { background-position-y: 200px; }
+}
+
+/* Floating particle dots (industrial colors) */
+.game-container::after {
+  content: '';
+  position: absolute;
+  inset: -5%;
+  pointer-events: none;
+  opacity: 0.45;
+  background-image:
+    radial-gradient(circle at 10% 20%, rgba(237,107,0,0.18) 3px, transparent 4px),
+    radial-gradient(circle at 30% 80%, rgba(0,255,136,0.15) 2px, transparent 3px),
+    radial-gradient(circle at 70% 40%, rgba(77,159,255,0.2) 3px, transparent 4px),
+    radial-gradient(circle at 85% 65%, rgba(237,107,0,0.15) 2px, transparent 3px),
+    radial-gradient(circle at 45% 30%, rgba(255,215,0,0.16) 2px, transparent 3px),
+    radial-gradient(circle at 55% 75%, rgba(147,112,219,0.14) 2px, transparent 3px),
+    radial-gradient(circle at 20% 55%, rgba(77,159,255,0.17) 3px, transparent 4px);
+  animation: particlesDrift 40s linear infinite;
+}
+
+@keyframes particlesDrift {
+  0%   { transform: translate3d(0, 0, 0); }
+  50%  { transform: translate3d(50px, -30px, 0); }
+  100% { transform: translate3d(100px, -60px, 0); }
+}
+/* Score Display Top Center */
+.game-score-display {
   position: absolute;
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
-  background: rgba(255, 255, 255, 0.95);
-  padding: 8px 12px;
-  border-radius: 8px;
-  box-shadow: 0 4px 15px rgba(237, 107, 0, 0.2);
+  background: linear-gradient(145deg, rgba(237,107,0,0.95), rgba(237,107,0,0.85));
+  padding: 12px 30px;
+  border-radius: 12px;
+  box-shadow:
+    0 4px 20px rgba(237, 107, 0, 0.5),
+    0 0 30px rgba(237, 107, 0, 0.3),
+    inset 0 2px 10px rgba(255,255,255,0.2);
+  border: 2px solid rgba(255,255,255,0.3);
+  text-align: center;
+  animation: scoreGlow 2s ease-in-out infinite;
+}
+
+.score-value {
+  font-size: 32px;
+  font-weight: bold;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  line-height: 1;
+  letter-spacing: 2px;
+}
+
+.score-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  margin-top: 4px;
+}
+
+@keyframes scoreGlow {
+  0%, 100% {
+    box-shadow:
+      0 4px 20px rgba(237,107,0,0.5),
+      0 0 30px rgba(237,107,0,0.3),
+      inset 0 2px 10px rgba(255,255,255,0.2);
+  }
+  50% {
+    box-shadow:
+      0 6px 30px rgba(237,107,0,0.7),
+      0 0 40px rgba(237,107,0,0.5),
+      inset 0 2px 15px rgba(255,255,255,0.3);
+  }
 }
 
 .game-logo-img {
@@ -29,11 +122,42 @@
 .arcade-cabinet {
   position: relative;
   padding: 20px;
-  background: linear-gradient(145deg, #ffffff, #f0f0f0);
-  border-radius: 12px;
+  background: linear-gradient(145deg, #141d32, #0a0e1a, #0f1624);
+  border-radius: 16px;
   box-shadow:
-    0 8px 30px rgba(237, 107, 0, 0.2),
-    inset 0 0 20px rgba(255, 255, 255, 0.5);
+    0 10px 40px rgba(237, 107, 0, 0.3),
+    0 5px 20px rgba(77, 159, 255, 0.15),
+    inset 0 0 30px rgba(10, 14, 26, 0.7),
+    inset 0 -2px 10px rgba(77, 159, 255, 0.1);
+  transition: transform 0.6s ease, box-shadow 0.6s ease;
+  animation: cabinetPulse 8s ease-in-out infinite;
+  border: 1px solid rgba(77, 159, 255, 0.1);
+}
+
+@keyframes cabinetPulse {
+  0%, 100% {
+    box-shadow:
+      0 10px 40px rgba(237,107,0,0.3),
+      0 5px 20px rgba(77,159,255,0.15),
+      inset 0 0 30px rgba(10,14,26,0.7),
+      inset 0 -2px 10px rgba(77,159,255,0.1);
+  }
+  50% {
+    box-shadow:
+      0 15px 50px rgba(237,107,0,0.4),
+      0 8px 30px rgba(77,159,255,0.25),
+      inset 0 0 40px rgba(10,14,26,0.8),
+      inset 0 -2px 15px rgba(77,159,255,0.2);
+  }
+}
+
+.arcade-cabinet:hover {
+  transform: translateY(-3px) scale(1.015);
+  box-shadow:
+    0 15px 50px rgba(237,107,0,0.45),
+    0 10px 35px rgba(77,159,255,0.3),
+    inset 0 0 40px rgba(10,14,26,0.7),
+    inset 0 -3px 15px rgba(77,159,255,0.25);
 }
 
 .arcade-screen-frame {
