@@ -172,6 +172,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private shieldRipples: Array<{radius: number, alpha: number}> = [];
   private comboDisplayTimer = 0;
   private maxHealthDisplayTimer = 0; // Timer for "MAX HEALTH" message
+  private levelDisplayTimer = 0; // Timer for level announcement message
 
   // Death animation - maze destruction
   private mazeDestruction: Map<Block, {offsetY: number, rotation: number, speed: number}> = new Map();
@@ -281,8 +282,6 @@ private getMalfunctionSpawnInterval(): number {
     // Reduce frighten duration by 300ms per level above level 1
     const reduction = (this.productionLevel - 1) * 300;
     return Math.max(base - reduction, 3000); // Minimum 3 seconds
-    const reduction = (this.productionLevel - 1) * 1000;
-    return Math.max(base - reduction, 2000);
   }
 
 
@@ -1259,30 +1258,23 @@ private getMalfunctionSpawnInterval(): number {
       ctx.textAlign = 'left';
     }
 
-    // Production Level - Center in top bar
+    // Production Level - 2-player names only (no duplicate level display)
     ctx.textAlign = 'center';
     ctx.font = 'bold 8px "Press Start 2P", monospace';
     ctx.fillStyle = '#1a1a1a';
 
     if (this.gameMode === '2player') {
-      // Show player names on same line as level - larger and more visible
-      ctx.fillStyle = '#1a1a1a';
-      const levelText = `LVL ${this.productionLevel}`;
-      ctx.fillText(levelText, this.CANVAS_WIDTH / 2, 20);
-
-      // Player 1 name (Orange) - Left of center, larger font
+      // Show player names only - level is already displayed in arcade box
+      // Player 1 name (Orange) - Left side
       ctx.fillStyle = '#ED6B00';
-      ctx.textAlign = 'right';
-      ctx.font = 'bold 9px "Press Start 2P", monospace';
-      ctx.fillText(this.playerName || 'PLAYER1', this.CANVAS_WIDTH / 2 - 50, 20);
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 10px "Press Start 2P", monospace';
+      ctx.fillText(this.playerName || 'P1', 10, 65);
 
-      // Player 2 name (Blue) - Right of center, larger font
+      // Player 2 name (Blue) - Right side but not overlapping level box
       ctx.fillStyle = '#4D9FFF';
       ctx.textAlign = 'left';
-      ctx.font = 'bold 9px "Press Start 2P", monospace';
-      ctx.fillText(this.player2Name || 'PLAYER2', this.CANVAS_WIDTH / 2 + 50, 20);
-    } else {
-      ctx.fillText(`LVL: ${this.productionLevel}`, this.CANVAS_WIDTH / 2, 20);
+      ctx.fillText(this.player2Name || 'P2', 10, 80);
     }
 
     ctx.textAlign = 'left';
@@ -1334,6 +1326,32 @@ private getMalfunctionSpawnInterval(): number {
       const healthAlpha = this.maxHealthDisplayTimer / 1000;
       ctx.fillStyle = `rgba(255, 215, 0, ${healthAlpha})`; // Gold color
       ctx.fillText('MAX HEALTH!', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2 + 40);
+      ctx.restore();
+    }
+
+    // Level announcement display - same style as combo (simple text, no box)
+    if (this.levelDisplayTimer > 0) {
+      ctx.save();
+      ctx.font = 'bold 20px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      const levelAlpha = this.levelDisplayTimer / 2000; // Fade based on timer
+      ctx.fillStyle = `rgba(255, 215, 0, ${levelAlpha})`; // Gold color like MAX HEALTH
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = `rgba(255, 215, 0, ${levelAlpha})`;
+      ctx.fillText(`LEVEL ${this.productionLevel}`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      ctx.restore();
+    }
+      ctx.lineWidth = 4;
+    // Level announcement display - same style as combo (simple text, no box)
+    if (this.levelDisplayTimer > 0) {
+      ctx.save();
+      ctx.font = 'bold 20px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      const levelAlpha = this.levelDisplayTimer / 2000; // Fade based on timer
+      ctx.fillStyle = `rgba(255, 215, 0, ${levelAlpha})`; // Gold color like MAX HEALTH
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = `rgba(255, 215, 0, ${levelAlpha})`;
+      ctx.fillText(`LEVEL ${this.productionLevel}`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
       ctx.restore();
     }
 
@@ -2071,6 +2089,51 @@ private getMalfunctionSpawnInterval(): number {
       aggressiveGhost.updateVelocity(this.CELL_SIZE);
     }
 
+    // For levels >= 2, also release patrol ghost (cyan) outside immediately
+    if (this.productionLevel >= 2) {
+      const patrolGhost = [...this.ghosts].find(g => g.type === 'patrol');
+      if (patrolGhost) {
+        const spawnX = 11 * this.CELL_SIZE;
+        const spawnY = 11 * this.CELL_SIZE;
+        patrolGhost.x = spawnX;
+        patrolGhost.y = spawnY;
+        patrolGhost.startX = spawnX;
+        patrolGhost.startY = spawnY;
+        patrolGhost.direction = 'L';
+        patrolGhost.updateVelocity(this.CELL_SIZE);
+      }
+    }
+
+    // For levels >= 3, also release ambush ghost (pink) outside
+    if (this.productionLevel >= 3) {
+      const ambushGhost = [...this.ghosts].find(g => g.type === 'ambush');
+      if (ambushGhost) {
+        const spawnX = 16 * this.CELL_SIZE;
+        const spawnY = 11 * this.CELL_SIZE;
+        ambushGhost.x = spawnX;
+        ambushGhost.y = spawnY;
+        ambushGhost.startX = spawnX;
+        ambushGhost.startY = spawnY;
+        ambushGhost.direction = 'R';
+        ambushGhost.updateVelocity(this.CELL_SIZE);
+      }
+    }
+
+    // For levels >= 4, also release random ghost (orange) outside
+    if (this.productionLevel >= 4) {
+      const randomGhost = [...this.ghosts].find(g => g.type === 'random');
+      if (randomGhost) {
+        const spawnX = 14 * this.CELL_SIZE;
+        const spawnY = 8 * this.CELL_SIZE;
+        randomGhost.x = spawnX;
+        randomGhost.y = spawnY;
+        randomGhost.startX = spawnX;
+        randomGhost.startY = spawnY;
+        randomGhost.direction = 'U';
+        randomGhost.updateVelocity(this.CELL_SIZE);
+      }
+    }
+
     // Speichere Gesamtanzahl der Pellets für Cherry-Spawn
     this.totalPellets = this.foods.size + this.powerPellets.size;
 
@@ -2126,6 +2189,9 @@ private getMalfunctionSpawnInterval(): number {
     this.gameState = 'ready';
     this.stateTimer = 0;
     this.scaredDuration = this.getFrightenedDuration();
+
+    // Display level announcement at game start
+    this.levelDisplayTimer = 2500; // Display for 2.5 seconds
 
     // Announce game start
     setTimeout(() => {
@@ -2663,6 +2729,8 @@ private getMalfunctionSpawnInterval(): number {
         if (this.stateTimer >= this.READY_DURATION) {
           this.gameState = 'playing';
           this.stateTimer = 0;
+          // Show level announcement at game start
+          this.levelDisplayTimer = 2000; // Display for 2 seconds
         }
         return; // Keine Bewegung während Ready
 
@@ -2788,6 +2856,11 @@ private getMalfunctionSpawnInterval(): number {
       this.maxHealthDisplayTimer -= deltaTime;
     }
 
+    // Décrémenter le timer de level display
+    if (this.levelDisplayTimer > 0) {
+      this.levelDisplayTimer -= deltaTime;
+    }
+
     // Décrémenter le timer de combo reset
     if (this.comboResetTimer > 0) {
       this.comboResetTimer -= deltaTime;
@@ -2866,15 +2939,16 @@ private getMalfunctionSpawnInterval(): number {
       }
     }
 
-    // Ghost Release Timer - force each ghost out of the house quickly
+    // Ghost Release Timer - force each ghost out of the house quickly based on level
+    const maxGhostsForLevel = this.getMaxMalfunctionsForLevel();
     this.ghostReleaseTimer += deltaTime;
-    while (this.ghostReleaseTimer >= this.GHOST_RELEASE_INTERVAL && this.ghostsReleased < this.ghosts.size) {
+    while (this.ghostReleaseTimer >= this.GHOST_RELEASE_INTERVAL && this.ghostsReleased < maxGhostsForLevel) {
 
       this.ghostReleaseTimer -= this.GHOST_RELEASE_INTERVAL;
       this.ghostsReleased++;
       let index = 0;
       for (const ghost of this.ghosts) {
-        if (index === this.ghostsReleased - 1) {
+        if (index === this.ghostsReleased - 1 && index < maxGhostsForLevel) {
           // If the ghost is still inside the house, teleport it to the door and push upward
           const inHouse = ghost.y > 340 && ghost.y < 400 && ghost.x > 200 && ghost.x < 360;
           if (inHouse) {
@@ -2963,6 +3037,9 @@ private getMalfunctionSpawnInterval(): number {
   private loadNextLevel() {
     // Increment production level (continues indefinitely)
     this.productionLevel++;
+
+    // Show level announcement when entering new level
+    this.levelDisplayTimer = 2500; // Display for 2.5 seconds
 
     this.walls.clear();
     this.foods.clear();
