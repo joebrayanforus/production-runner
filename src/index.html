@@ -8,6 +8,44 @@
   <link rel="icon" type="image/x-icon" href="favicon.ico">
 </head>
 <body>
+  <!-- Global moving icons background behind the app -->
+  <div class="background-icons" aria-hidden="true">
+    <span class="bg-icon" style="left:5%; top:15%; font-size:26px; animation-duration:22s">⚙️</span>
+    <span class="bg-icon" style="left:80%; top:10%; font-size:22px; animation-duration:28s">🔧</span>
+    <span class="bg-icon" style="left:30%; top:70%; font-size:24px; animation-duration:25s">🛠️</span>
+    <span class="bg-icon" style="left:60%; top:40%; font-size:20px; animation-duration:30s">📟</span>
+    <span class="bg-icon" style="left:15%; top:85%; font-size:18px; animation-duration:26s">⚙️</span>
+    <span class="bg-icon" style="left:90%; top:60%; font-size:24px; animation-duration:24s">🔧</span>
+    <span class="bg-icon" style="left:42%; top:12%; font-size:20px; animation-duration:27s">💡</span>
+    <span class="bg-icon" style="left:68%; top:82%; font-size:22px; animation-duration:29s">⚡</span>
+    <span class="bg-icon" style="left:25%; top:48%; font-size:18px; animation-duration:31s">🔩</span>
+    <span class="bg-icon" style="left:88%; top:35%; font-size:24px; animation-duration:23s">⚙️</span>
+    <span class="bg-icon spark" style="left:12%; top:25%; font-size:14px; animation-duration:2.5s">✨</span>
+    <span class="bg-icon spark" style="left:78%; top:55%; font-size:16px; animation-duration:3s">✨</span>
+    <span class="bg-icon spark" style="left:35%; top:90%; font-size:12px; animation-duration:2.8s">✨</span>
+    <span class="bg-icon spark" style="left:92%; top:18%; font-size:15px; animation-duration:3.2s">✨</span>
+    <span class="bg-icon spark" style="left:48%; top:68%; font-size:13px; animation-duration:2.6s">✨</span>
+    <span class="bg-icon spark" style="left:20%; top:38%; font-size:14px; animation-duration:3.1s">✨</span>
+  </div>
+
+  <!-- Animated stars layer -->
+  <div class="stars-layer" aria-hidden="true"></div>
+
   <app-root></app-root>
+  <script>
+  (function(){
+    var root = document.documentElement, raf = 0;
+    window.addEventListener('mousemove', function(e){
+      var x = (e.clientX / window.innerWidth - 0.5) * 20;
+      var y = (e.clientY / window.innerHeight - 0.5) * 20;
+      if (raf) return;
+      raf = requestAnimationFrame(function(){
+        root.style.setProperty('--parallaxX', (-x) + 'px');
+        root.style.setProperty('--parallaxY', (-y) + 'px');
+        raf = 0;
+      });
+    });
+  })();
+  </script>
 </body>
 </html>

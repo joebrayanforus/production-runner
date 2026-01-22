@@ -294,41 +294,9 @@ private getMalfunctionSpawnInterval(): number {
     ];
   }
   private draw(ctx: CanvasRenderingContext2D) {
-    // Transparent background - no fill
-    // ctx.fillStyle = '#1E2A3A';
-    // ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
-
-    // Subtle grid pattern
-    ctx.strokeStyle = 'rgba(245, 245, 245, 0.05)';
-    ctx.lineWidth = 0.5;
-    for (let x = 0; x < this.CANVAS_WIDTH; x += this.CELL_SIZE) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, this.CANVAS_HEIGHT);
-      ctx.stroke();
-    }
-    for (let y = 0; y < this.CANVAS_HEIGHT; y += this.CELL_SIZE) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(this.CANVAS_WIDTH, y);
-      ctx.stroke();
-    }
-
-    // Thicker grid every 5 cells
-    ctx.strokeStyle = 'rgba(245, 245, 245, 0.1)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < this.CANVAS_WIDTH; x += this.CELL_SIZE * 5) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, this.CANVAS_HEIGHT);
-      ctx.stroke();
-    }
-    for (let y = 0; y < this.CANVAS_HEIGHT; y += this.CELL_SIZE * 5) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(this.CANVAS_WIDTH, y);
-      ctx.stroke();
-    }
+    // Fill with solid black to match classic labyrinth background
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
 
     // Coordinate annotations - transparent (hidden)
     ctx.font = '6px monospace';
@@ -813,6 +781,59 @@ private getMalfunctionSpawnInterval(): number {
     ctx.restore();
   }
 
+  // Animated background with gradient and particles
+  private drawAnimatedBackground(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+
+    // Animated gradient background
+    const time = Date.now() / 5000;
+    const gradient = ctx.createLinearGradient(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+
+    // Dynamic colors based on time
+    const hue1 = (time * 10) % 60; // Cycles through orange tones
+    const hue2 = (time * 15 + 180) % 60; // Offset cyan tones
+
+    gradient.addColorStop(0, `hsl(${hue1}, 15%, 98%)`);
+    gradient.addColorStop(0.5, '#FFFFFF');
+    gradient.addColorStop(1, `hsl(${hue2 + 180}, 20%, 97%)`);
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+
+    // Floating particles
+    const particleTime = Date.now();
+    for (let i = 0; i < 15; i++) {
+      const seed = i * 123.456;
+      const x = ((particleTime / (30 + i * 2) + seed) % this.CANVAS_WIDTH);
+      const y = ((particleTime / (40 + i * 3) + seed * 2) % this.CANVAS_HEIGHT);
+      const size = 2 + (i % 3);
+      const alpha = 0.1 + Math.sin(particleTime / 800 + i) * 0.05;
+
+      const color = i % 3 === 0 ? '#ED6B00' : (i % 3 === 1 ? '#00FF88' : '#4D9FFF');
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Animated diagonal waves
+    ctx.globalAlpha = 0.03;
+    const waveOffset = (particleTime / 30) % 150;
+    for (let i = -this.CANVAS_HEIGHT; i < this.CANVAS_WIDTH + this.CANVAS_HEIGHT; i += 150) {
+      ctx.strokeStyle = '#ED6B00';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(i + waveOffset, 0);
+      ctx.lineTo(i + waveOffset + this.CANVAS_HEIGHT, this.CANVAS_HEIGHT);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
   private drawRobot(ctx: CanvasRenderingContext2D) {
     if (!this.robot) return;
 
@@ -1169,50 +1190,64 @@ private getMalfunctionSpawnInterval(): number {
 
     // In 2-player mode, show both scores and lives
     if (this.gameMode === '2player') {
-      // Player 1 Score - Top left
+      // Player 1 Score - Large display bottom left
       ctx.fillStyle = '#ED6B00';
-      ctx.font = 'bold 8px "Press Start 2P", monospace';
-      ctx.fillText(`${this.efficiency}`, 5, 14);
+      ctx.font = 'bold 16px "Press Start 2P", monospace';
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = '#ED6B00';
+      ctx.fillText(`${this.efficiency}`, 10, this.CANVAS_HEIGHT - 10);
+      ctx.shadowBlur = 0;
 
-      // Draw P1 lives as squares
+      // Draw P1 lives as squares - below score
       for (let i = 0; i < this.systemHealth; i++) {
         ctx.fillStyle = '#ED6B00';
-        ctx.fillRect(5 + i * 12, 18, 10, 10);
+        ctx.fillRect(10 + i * 12, this.CANVAS_HEIGHT - 30, 10, 10);
         ctx.strokeStyle = '#1a1a1a';
         ctx.lineWidth = 1;
-        ctx.strokeRect(5 + i * 12, 18, 10, 10);
+        ctx.strokeRect(10 + i * 12, this.CANVAS_HEIGHT - 30, 10, 10);
       }
 
-      // Player 2 Score - Top right
+      // Player 2 Score - Large display bottom right
       ctx.fillStyle = '#4D9FFF';
       ctx.textAlign = 'right';
-      ctx.font = 'bold 8px "Press Start 2P", monospace';
-      ctx.fillText(`${this.efficiency2}`, this.CANVAS_WIDTH - 5, 14);
+      ctx.font = 'bold 16px "Press Start 2P", monospace';
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = '#4D9FFF';
+      ctx.fillText(`${this.efficiency2}`, this.CANVAS_WIDTH - 10, this.CANVAS_HEIGHT - 10);
+      ctx.shadowBlur = 0;
 
-      // Draw P2 lives as squares
+      // Draw P2 lives as squares - below score
       for (let i = 0; i < this.systemHealth2; i++) {
         ctx.fillStyle = '#4D9FFF';
-        ctx.fillRect(this.CANVAS_WIDTH - 15 - i * 12, 18, 10, 10);
+        ctx.fillRect(this.CANVAS_WIDTH - 20 - i * 12, this.CANVAS_HEIGHT - 30, 10, 10);
         ctx.strokeStyle = '#1a1a1a';
         ctx.lineWidth = 1;
-        ctx.strokeRect(this.CANVAS_WIDTH - 15 - i * 12, 18, 10, 10);
+        ctx.strokeRect(this.CANVAS_WIDTH - 20 - i * 12, this.CANVAS_HEIGHT - 30, 10, 10);
       }
 
       ctx.textAlign = 'left';
       ctx.fillStyle = '#1a1a1a';
     } else {
-      // Single player mode - show score and lives as squares
+      // Single player mode - Large score display at bottom center
+      ctx.textAlign = 'center';
       ctx.fillStyle = '#ED6B00';
-      ctx.fillText(`SCORE: ${this.efficiency}`, 5, 14);
+      ctx.font = 'bold 20px "Press Start 2P", monospace';
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#ED6B00';
+      ctx.fillText(`${this.efficiency}`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT - 12);
+      ctx.shadowBlur = 0;
 
-      // Draw lives as squares for single player too
+      // Draw lives as squares above score, centered
+      const livesStartX = (this.CANVAS_WIDTH / 2) - ((this.systemHealth * 12) / 2);
       for (let i = 0; i < this.systemHealth; i++) {
         ctx.fillStyle = '#ED6B00';
-        ctx.fillRect(5 + i * 12, 18, 10, 10);
+        ctx.fillRect(livesStartX + i * 12, this.CANVAS_HEIGHT - 38, 10, 10);
         ctx.strokeStyle = '#1a1a1a';
         ctx.lineWidth = 1;
-        ctx.strokeRect(5 + i * 12, 18, 10, 10);
+        ctx.strokeRect(livesStartX + i * 12, this.CANVAS_HEIGHT - 38, 10, 10);
       }
+
+      ctx.textAlign = 'left';
     }
 
     // Production Level - Center in top bar
@@ -1952,19 +1987,13 @@ private getMalfunctionSpawnInterval(): number {
           ghost.type = 'patrol'; // Cyan/Blue - PATROL: Feste Route entlang Korridoren
           this.ghosts.add(ghost);
         } else if (tileMapChar === 'o') {
-          // In Level 1 spawnt der orangene Geist nicht (nur 2 Geister für Anfänger)
-          if (this.productionLevel > 1) {
-            const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.orangeGhostImage);
-            ghost.type = 'random'; // Orange - RANDOM: Zufällige Bewegung
-            this.ghosts.add(ghost);
-          }
+          const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.orangeGhostImage);
+          ghost.type = 'random'; // Orange - RANDOM: Zufällige Bewegung
+          this.ghosts.add(ghost);
         } else if (tileMapChar === 'p') {
-          // In Level 1 spawnt der pinke Geist nicht (nur 2 Geister für Anfänger)
-          if (this.productionLevel > 1) {
-            const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.pinkGhostImage);
-            ghost.type = 'ambush'; // Pink - AMBUSH: Lauert voraus
-            this.ghosts.add(ghost);
-          }
+          const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.pinkGhostImage);
+          ghost.type = 'ambush'; // Pink - AMBUSH: Lauert voraus
+          this.ghosts.add(ghost);
         } else if (tileMapChar === 'r') {
           const ghost = new Block(x, y, this.CELL_SIZE, this.CELL_SIZE, this.redGhostImage);
           ghost.type = 'aggressive'; // Red - AGGRESSIVE: Verfolgt direkt
