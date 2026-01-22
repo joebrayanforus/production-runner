@@ -231,14 +231,14 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private getGhostSpeed(): number {
   const baseSpeed = this.CELL_SIZE / 4;
 
-  // Progressive speed increase: 8% per level after level 1
-  const speedMultiplier = 1.0 + (this.productionLevel - 1) * 0.12;
+  // Progressive speed increase: 15% per level after level 1 (faster difficulty increase)
+  const speedMultiplier = 1.0 + (this.productionLevel - 1) * 0.15;
 
   // Level 1 easier: -65% speed
   const level1Multiplier = this.productionLevel === 1 ? 0.35 : 1.0;
 
   const speed = baseSpeed * speedMultiplier * level1Multiplier;
-  return Math.min(speed, baseSpeed * 3.0); // Max 300% (no more cap)
+  return Math.min(speed, baseSpeed * 3.5); // Max 350% (higher cap)
 }
 
 private getMaxMalfunctionsForLevel(): number {
