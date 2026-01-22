@@ -171,6 +171,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private successBurst = 0;
   private shieldRipples: Array<{radius: number, alpha: number}> = [];
   private comboDisplayTimer = 0;
+  private maxHealthDisplayTimer = 0; // Timer for "MAX HEALTH" message
 
   // Death animation - maze destruction
   private mazeDestruction: Map<Block, {offsetY: number, rotation: number, speed: number}> = new Map();
@@ -232,7 +233,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   // existing scaling
   const speedMultiplier = 1.0 + (this.productionLevel - 1) * 0.08;
 
-  // Level 1 easier: -65% speed 
+  // Level 1 easier: -65% speed
   const level1Multiplier = this.productionLevel === 1 ? 0.35 : 1.0;
 
   const speed = baseSpeed * speedMultiplier * level1Multiplier;
@@ -1314,6 +1315,17 @@ private getMalfunctionSpawnInterval(): number {
       const comboAlpha = this.comboDisplayTimer / 1000;
       ctx.fillStyle = `rgba(237, 107, 0, ${comboAlpha})`; // IFM Orange
       ctx.fillText(`${this.pelletStreak}x COMBO!`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      ctx.restore();
+    }
+
+    // Max Health message display - center of maze (same style as combo)
+    if (this.maxHealthDisplayTimer > 0) {
+      ctx.save();
+      ctx.font = 'bold 16px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      const healthAlpha = this.maxHealthDisplayTimer / 1000;
+      ctx.fillStyle = `rgba(255, 215, 0, ${healthAlpha})`; // Gold color
+      ctx.fillText('MAX HEALTH!', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2 + 40);
       ctx.restore();
     }
 
@@ -2763,6 +2775,11 @@ private getMalfunctionSpawnInterval(): number {
       this.comboDisplayTimer -= deltaTime;
     }
 
+    // Décrémenter le timer de max health display
+    if (this.maxHealthDisplayTimer > 0) {
+      this.maxHealthDisplayTimer -= deltaTime;
+    }
+
     // Décrémenter le timer de combo reset
     if (this.comboResetTimer > 0) {
       this.comboResetTimer -= deltaTime;
@@ -3478,6 +3495,9 @@ private getMalfunctionSpawnInterval(): number {
           // Extra life every 2 checkpoints (max 3 lives)
           if (this.checkpointsCollected % 2 === 0 && this.systemHealth < 3) {
             this.systemHealth++;
+          } else if (this.checkpointsCollected % 2 === 0 && this.systemHealth >= 3) {
+            // Show max health message when at capacity
+            this.maxHealthDisplayTimer = 1000; // Display for 1 second
           }
         }
       });
@@ -3492,8 +3512,11 @@ private getMalfunctionSpawnInterval(): number {
           this.qualityCheckpoints.delete(checkpoint);
           this.audioService.play('eatghost');
           // Extra life every 2 checkpoints for Player 2
-          if (this.systemHealth2 < 3) {
+          if (this.checkpointsCollected % 2 === 0 && this.systemHealth2 < 3) {
             this.systemHealth2++;
+          } else if (this.checkpointsCollected % 2 === 0 && this.systemHealth2 >= 3) {
+            // Show max health message when at capacity for player 2
+            this.maxHealthDisplayTimer = 1000; // Display for 1 second
           }
         }
       });
@@ -3536,6 +3559,9 @@ private getMalfunctionSpawnInterval(): number {
       // System Health bonus (capped at 3)
       if (this.systemHealth < 3) {
         this.systemHealth += 1;
+      } else {
+        // Show max health message when at capacity
+        this.maxHealthDisplayTimer = 1000; // Display for 1 second
       }
 
       this.cherry = null;
@@ -3549,6 +3575,9 @@ private getMalfunctionSpawnInterval(): number {
       this.efficiency2 += 500;
       if (this.systemHealth2 < 3) {
         this.systemHealth2 += 1;
+      } else {
+        // Show max health message when at capacity
+        this.maxHealthDisplayTimer = 1000; // Display for 1 second
       }
       this.cherry = null;
       this.cherrySpawnCooldown = 300;
