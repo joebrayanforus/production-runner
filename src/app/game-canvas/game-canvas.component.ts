@@ -3391,8 +3391,8 @@ private getMalfunctionSpawnInterval(): number {
           this.pelletStreak++;
           this.comboResetTimer = this.COMBO_RESET_DELAY; // Reset le timer à chaque pellet
 
-          // Show combo display for high streaks
-          if (this.pelletStreak >= 10) {
+          // Show combo display only at specific milestones (10, 20, 30, 40, etc.)
+          if (this.pelletStreak % 10 === 0 && this.pelletStreak >= 10) {
             this.comboDisplayTimer = 1000;
           }
 
