@@ -230,23 +230,28 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private getGhostSpeed(): number {
   const baseSpeed = this.CELL_SIZE / 4;
 
-  // existing scaling
-  const speedMultiplier = 1.0 + (this.productionLevel - 1) * 0.08;
+  // Progressive speed increase: 8% per level after level 1
+  const speedMultiplier = 1.0 + (this.productionLevel - 1) * 0.12;
 
   // Level 1 easier: -65% speed
   const level1Multiplier = this.productionLevel === 1 ? 0.35 : 1.0;
 
   const speed = baseSpeed * speedMultiplier * level1Multiplier;
-  return Math.min(speed, baseSpeed * 1.6); // Max 160%
+  return Math.min(speed, baseSpeed * 3.0); // Max 300% (no more cap)
 }
 
 private getMaxMalfunctionsForLevel(): number {
-  // Level 1 = only 2 ghosts
-  return this.productionLevel === 1 ? 2 : 4;
+  // Level 1 = 2 ghosts, Level 2-3 = 3 ghosts, Level 4+ = 4 ghosts
+  if (this.productionLevel === 1) return 2;
+  if (this.productionLevel <= 3) return 3;
+  return 4;
 }
 
 private getMalfunctionSpawnInterval(): number {
-  return this.productionLevel === 1 ? 1600 : this.MALFUNCTION_SPAWN_INTERVAL; // 800 normal
+  // Level 1: slower spawn (1600ms), Level 2+: faster (800ms), Level 5+: very fast (600ms)
+  if (this.productionLevel === 1) return 1600;
+  if (this.productionLevel <= 4) return 800;
+  return 600;
 }
 
 
@@ -260,7 +265,8 @@ private getMalfunctionSpawnInterval(): number {
       baseDuration += 5000; // +5000ms
     }
 
-    const reduction = (this.productionLevel - 1) * 1000;
+    // Reduce maintenance duration by 300ms per level above level 1
+    const reduction = (this.productionLevel - 1) * 300;
     return Math.max(baseDuration - reduction, 2000); // Minimum 2 seconds
   }
 
@@ -272,7 +278,9 @@ private getMalfunctionSpawnInterval(): number {
     // Level 1 bonus +5s
     if (this.productionLevel === 1) base += 5000;
 
-    // optional: reduce with higher levels (si e kishe më herët)
+    // Reduce frighten duration by 300ms per level above level 1
+    const reduction = (this.productionLevel - 1) * 300;
+    return Math.max(base - reduction, 3000); // Minimum 3 seconds
     const reduction = (this.productionLevel - 1) * 1000;
     return Math.max(base - reduction, 2000);
   }
@@ -2953,6 +2961,9 @@ private getMalfunctionSpawnInterval(): number {
   }
 
   private loadNextLevel() {
+    // Increment production level (continues indefinitely)
+    this.productionLevel++;
+
     this.walls.clear();
     this.foods.clear();
     this.powerPellets.clear();
