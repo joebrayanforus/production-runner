@@ -287,22 +287,6 @@ private getMalfunctionSpawnInterval(): number {
   return 600;
 }
 
-
-
-    private getMaintenanceDuration(): number {
-    // Base frightened/maintenance time (ms)
-    let baseDuration = 8000;
-
-    // Level 1 easier: +5s
-    if (this.productionLevel === 1) {
-      baseDuration += 5000; // +5000ms
-    }
-
-    // Reduce maintenance duration by 300ms per level above level 1
-    const reduction = (this.productionLevel - 1) * 300;
-    return Math.max(baseDuration - reduction, 2000); // Minimum 2 seconds
-  }
-
   private getMaintenanceDuration(): number {
     // Längere Maintenance-Zeit: Start mit 8s, -1s pro Level (einfacher für Anfänger)
     const baseDuration = 8000;
