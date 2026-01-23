@@ -206,6 +206,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private successBurst = 0;
   private shieldRipples: Array<{radius: number, alpha: number}> = [];
   private comboDisplayTimer = 0;
+  private maxHealthDisplayTimer = 0; // Timer for "MAX HEALTH" message
+  private levelDisplayTimer = 0; // Timer for level announcement message
 
   // Death animation - maze destruction
   private mazeDestruction: Map<Block, {offsetY: number, rotation: number, speed: number}> = new Map();
@@ -259,10 +261,46 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Level-Progression: Geschwindigkeit und Frighten-Dauer pro Level
   private getGhostSpeed(): number {
-    const baseSpeed = this.CELL_SIZE / 4;
-    // Langsamere Geister: +8% pro Level (einfacher für Anfänger)
-    const speedMultiplier = 1.0 + (this.productionLevel - 1) * 0.08;
-    return Math.min(baseSpeed * speedMultiplier, baseSpeed * 1.6); // Max 160%
+  const baseSpeed = this.CELL_SIZE / 4;
+
+  // Progressive speed increase: 15% per level after level 1 (faster difficulty increase)
+  const speedMultiplier = 1.0 + (this.productionLevel - 1) * 0.15;
+
+  // Level 1 easier: -65% speed
+  const level1Multiplier = this.productionLevel === 1 ? 0.35 : 1.0;
+
+  const speed = baseSpeed * speedMultiplier * level1Multiplier;
+  return Math.min(speed, baseSpeed * 3.5); // Max 350% (higher cap)
+}
+
+private getMaxMalfunctionsForLevel(): number {
+  // Level 1 = 2 ghosts, Level 2-3 = 3 ghosts, Level 4+ = 4 ghosts
+  if (this.productionLevel === 1) return 2;
+  if (this.productionLevel <= 3) return 3;
+  return 4;
+}
+
+private getMalfunctionSpawnInterval(): number {
+  // Level 1: slower spawn (1600ms), Level 2+: faster (800ms), Level 5+: very fast (600ms)
+  if (this.productionLevel === 1) return 1600;
+  if (this.productionLevel <= 4) return 800;
+  return 600;
+}
+
+
+
+    private getMaintenanceDuration(): number {
+    // Base frightened/maintenance time (ms)
+    let baseDuration = 8000;
+
+    // Level 1 easier: +5s
+    if (this.productionLevel === 1) {
+      baseDuration += 5000; // +5000ms
+    }
+
+    // Reduce maintenance duration by 300ms per level above level 1
+    const reduction = (this.productionLevel - 1) * 300;
+    return Math.max(baseDuration - reduction, 2000); // Minimum 2 seconds
   }
 
   private getMaintenanceDuration(): number {
@@ -274,7 +312,14 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Legacy function for compatibility
   private getFrightenedDuration(): number {
-    return this.getMaintenanceDuration();
+    let base = 10000;
+
+    // Level 1 bonus +5s
+    if (this.productionLevel === 1) base += 5000;
+
+    // Reduce frighten duration by 300ms per level above level 1
+    const reduction = (this.productionLevel - 1) * 300;
+    return Math.max(base - reduction, 3000); // Minimum 3 seconds
   }
 
   // CYAN (Inky) Patrol-Route: Feste Waypoints entlang der Korridore
@@ -1319,6 +1364,43 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.restore();
     }
 
+    // Max Health message display - center of maze (same style as combo)
+    if (this.maxHealthDisplayTimer > 0) {
+      ctx.save();
+      ctx.font = 'bold 16px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      const healthAlpha = this.maxHealthDisplayTimer / 1000;
+      ctx.fillStyle = `rgba(255, 215, 0, ${healthAlpha})`; // Gold color
+      ctx.fillText('MAX HEALTH!', this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2 + 40);
+      ctx.restore();
+    }
+
+    // Level announcement display - same style as combo (simple text, no box)
+    if (this.levelDisplayTimer > 0) {
+      ctx.save();
+      ctx.font = 'bold 20px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      const levelAlpha = this.levelDisplayTimer / 2000; // Fade based on timer
+      ctx.fillStyle = `rgba(255, 215, 0, ${levelAlpha})`; // Gold color like MAX HEALTH
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = `rgba(255, 215, 0, ${levelAlpha})`;
+      ctx.fillText(`LEVEL ${this.productionLevel}`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      ctx.restore();
+    }
+      ctx.lineWidth = 4;
+    // Level announcement display - same style as combo (simple text, no box)
+    if (this.levelDisplayTimer > 0) {
+      ctx.save();
+      ctx.font = 'bold 20px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      const levelAlpha = this.levelDisplayTimer / 2000; // Fade based on timer
+      ctx.fillStyle = `rgba(255, 215, 0, ${levelAlpha})`; // Gold color like MAX HEALTH
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = `rgba(255, 215, 0, ${levelAlpha})`;
+      ctx.fillText(`LEVEL ${this.productionLevel}`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      ctx.restore();
+    }
+
     // Draw particles
     this.drawParticles(ctx);
 
@@ -2041,6 +2123,51 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       aggressiveGhost.updateVelocity(this.CELL_SIZE);
     }
 
+    // For levels >= 2, also release patrol ghost (cyan) outside immediately
+    if (this.productionLevel >= 2) {
+      const patrolGhost = [...this.ghosts].find(g => g.type === 'patrol');
+      if (patrolGhost) {
+        const spawnX = 11 * this.CELL_SIZE;
+        const spawnY = 11 * this.CELL_SIZE;
+        patrolGhost.x = spawnX;
+        patrolGhost.y = spawnY;
+        patrolGhost.startX = spawnX;
+        patrolGhost.startY = spawnY;
+        patrolGhost.direction = 'L';
+        patrolGhost.updateVelocity(this.CELL_SIZE);
+      }
+    }
+
+    // For levels >= 3, also release ambush ghost (pink) outside
+    if (this.productionLevel >= 3) {
+      const ambushGhost = [...this.ghosts].find(g => g.type === 'ambush');
+      if (ambushGhost) {
+        const spawnX = 16 * this.CELL_SIZE;
+        const spawnY = 11 * this.CELL_SIZE;
+        ambushGhost.x = spawnX;
+        ambushGhost.y = spawnY;
+        ambushGhost.startX = spawnX;
+        ambushGhost.startY = spawnY;
+        ambushGhost.direction = 'R';
+        ambushGhost.updateVelocity(this.CELL_SIZE);
+      }
+    }
+
+    // For levels >= 4, also release random ghost (orange) outside
+    if (this.productionLevel >= 4) {
+      const randomGhost = [...this.ghosts].find(g => g.type === 'random');
+      if (randomGhost) {
+        const spawnX = 14 * this.CELL_SIZE;
+        const spawnY = 8 * this.CELL_SIZE;
+        randomGhost.x = spawnX;
+        randomGhost.y = spawnY;
+        randomGhost.startX = spawnX;
+        randomGhost.startY = spawnY;
+        randomGhost.direction = 'U';
+        randomGhost.updateVelocity(this.CELL_SIZE);
+      }
+    }
+
     // Speichere Gesamtanzahl der Pellets für Cherry-Spawn
     this.totalPellets = this.foods.size + this.powerPellets.size;
 
@@ -2096,6 +2223,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.gameState = 'ready';
     this.stateTimer = 0;
     this.scaredDuration = this.getFrightenedDuration();
+
+    // Display level announcement at game start
+    this.levelDisplayTimer = 2500; // Display for 2.5 seconds
 
     // Announce game start
     setTimeout(() => {
@@ -2636,6 +2766,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
         if (this.stateTimer >= this.READY_DURATION) {
           this.gameState = 'playing';
           this.stateTimer = 0;
+          // Show level announcement at game start
+          this.levelDisplayTimer = 2000; // Display for 2 seconds
         }
         return; // Keine Bewegung während Ready
 
@@ -2756,6 +2888,16 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.comboDisplayTimer -= deltaTime;
     }
 
+    // Décrémenter le timer de max health display
+    if (this.maxHealthDisplayTimer > 0) {
+      this.maxHealthDisplayTimer -= deltaTime;
+    }
+
+    // Décrémenter le timer de level display
+    if (this.levelDisplayTimer > 0) {
+      this.levelDisplayTimer -= deltaTime;
+    }
+
     // Décrémenter le timer de combo reset
     if (this.comboResetTimer > 0) {
       this.comboResetTimer -= deltaTime;
@@ -2834,14 +2976,16 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
-    // Ghost Release Timer - force each ghost out of the house quickly
+    // Ghost Release Timer - force each ghost out of the house quickly based on level
+    const maxGhostsForLevel = this.getMaxMalfunctionsForLevel();
     this.ghostReleaseTimer += deltaTime;
-    while (this.ghostReleaseTimer >= this.GHOST_RELEASE_INTERVAL && this.ghostsReleased < this.malfunctions.size) {
+    while (this.ghostReleaseTimer >= this.GHOST_RELEASE_INTERVAL && this.ghostsReleased < maxGhostsForLevel) {
+
       this.ghostReleaseTimer -= this.GHOST_RELEASE_INTERVAL;
       this.ghostsReleased++;
       let index = 0;
       for (const ghost of this.ghosts) {
-        if (index === this.ghostsReleased - 1) {
+        if (index === this.ghostsReleased - 1 && index < maxGhostsForLevel) {
           // If the ghost is still inside the house, teleport it to the door and push upward
           const inHouse = ghost.y > 340 && ghost.y < 400 && ghost.x > 200 && ghost.x < 360;
           if (inHouse) {
@@ -2928,6 +3072,12 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private loadNextLevel() {
+    // Increment production level (continues indefinitely)
+    this.productionLevel++;
+
+    // Show level announcement when entering new level
+    this.levelDisplayTimer = 2500; // Display for 2.5 seconds
+
     this.walls.clear();
     this.foods.clear();
     this.powerPellets.clear();
@@ -3366,8 +3516,8 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           this.pelletStreak++;
           this.comboResetTimer = this.COMBO_RESET_DELAY; // Reset le timer à chaque pellet
 
-          // Show combo display for high streaks
-          if (this.pelletStreak >= 10) {
+          // Show combo display only at specific milestones (10, 20, 30, 40, etc.)
+          if (this.pelletStreak % 10 === 0 && this.pelletStreak >= 10) {
             this.comboDisplayTimer = 1000;
           }
 
@@ -3470,6 +3620,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           // Extra life every 2 checkpoints (max 3 lives)
           if (this.checkpointsCollected % 2 === 0 && this.systemHealth < 3) {
             this.systemHealth++;
+          } else if (this.checkpointsCollected % 2 === 0 && this.systemHealth >= 3) {
+            // Show max health message when at capacity
+            this.maxHealthDisplayTimer = 1000; // Display for 1 second
           }
         }
       });
@@ -3484,8 +3637,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
           this.qualityCheckpoints.delete(checkpoint);
           this.audioService.play('eatghost');
           // Extra life every 2 checkpoints for Player 2
-          if (this.systemHealth2 < 3) {
+          if (this.checkpointsCollected % 2 === 0 && this.systemHealth2 < 3) {
             this.systemHealth2++;
+          } else if (this.checkpointsCollected % 2 === 0 && this.systemHealth2 >= 3) {
+            // Show max health message when at capacity for player 2
+            this.maxHealthDisplayTimer = 1000; // Display for 1 second
           }
         }
       });
@@ -3528,6 +3684,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       // System Health bonus (capped at 3)
       if (this.systemHealth < 3) {
         this.systemHealth += 1;
+      } else {
+        // Show max health message when at capacity
+        this.maxHealthDisplayTimer = 1000; // Display for 1 second
       }
 
       this.cherry = null;
@@ -3541,6 +3700,9 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.efficiency2 += 500;
       if (this.systemHealth2 < 3) {
         this.systemHealth2 += 1;
+      } else {
+        // Show max health message when at capacity
+        this.maxHealthDisplayTimer = 1000; // Display for 1 second
       }
       this.cherry = null;
       this.cherrySpawnCooldown = 300;

@@ -1,5 +1,11 @@
 
 <div class="game-container">
+  <!-- Level Display Badge - Top Left -->
+  <div class="level-badge" *ngIf="gameState === 'playing' || gameState === 'ready' || gameState === 'levelcomplete'">
+    <div class="level-number">{{ productionLevel }}</div>
+    <div class="level-label">LEVEL</div>
+  </div>
+
   <div class="arcade-cabinet">
       <div class="arcade-screen-frame">
       <div class="game-info-bar">
