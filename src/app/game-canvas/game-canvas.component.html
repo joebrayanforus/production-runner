@@ -24,11 +24,11 @@
       <!-- Game Over Overlay -->
       <div class="overlay" *ngIf="gameState === 'gameover'">
         <div class="overlay-panel wide">
-          <h2>⚡ GAME OVER</h2>
+          <h2>GAME OVER</h2>
           <p>PRODUCTION SCORE: <strong>{{ efficiency }} UNITS</strong></p>
 
           <div class="leaderboard-block">
-            <h3>🏆 HIGH SCORES</h3>
+            <h3>HIGH SCORES</h3>
             <table class="overlay-table" *ngIf="leaderboard.length > 0">
               <thead>
                 <tr>
@@ -51,8 +51,8 @@
           </div>
 
           <div class="overlay-actions below">
-            <button class="btn primary" [class.selected]="gameOverMenuIndex === 0" (click)="restartGame()">🔄 RESTART</button>
-            <button class="btn ghost" [class.selected]="gameOverMenuIndex === 1" (click)="exitGame()">❌ EXIT</button>
+            <button class="btn primary" [class.selected]="gameOverMenuIndex === 0" (click)="restartGame()">RESTART</button>
+            <button class="btn ghost" [class.selected]="gameOverMenuIndex === 1" (click)="exitGame()">EXIT</button>
           </div>
         </div>
       </div>
@@ -197,19 +197,12 @@
 <!-- Pause Overlay -->
 <div class="overlay" *ngIf="showPauseOverlay">
   <div class="overlay-panel">
-    <h2>⏸️ PAUSED</h2>
+    <h2>PAUSED</h2>
     <p>GAME PAUSED</p>
     <div class="overlay-actions">
-      <button class="btn primary" [class.selected]="pauseMenuIndex === 0" (click)="resumeFromPause()">▶️ RESUME</button>
-      <button class="btn ghost" [class.selected]="pauseMenuIndex === 1" (click)="restartGame()">🔄 RESTART</button>
-      <button class="btn ghost" [class.selected]="pauseMenuIndex === 2" (click)="requestExitToMenu()">🏠 MENU</button>
-    </div>
-    <div *ngIf="showExitConfirm" class="exit-confirm">
-      <p>EXIT TO MENU?</p>
-      <div class="overlay-actions">
-        <button class="btn ghost" (click)="cancelExitToMenu()">NO</button>
-        <button class="btn primary" (click)="confirmExitToMenu()">YES</button>
-      </div>
+      <button class="btn primary" [class.selected]="pauseMenuIndex === 0" (click)="resumeFromPause()">RESUME</button>
+      <button class="btn ghost" [class.selected]="pauseMenuIndex === 1" (click)="restartGame()">RESTART</button>
+      <button class="btn ghost" [class.selected]="pauseMenuIndex === 2" (click)="requestExitToMenu()">MENU</button>
     </div>
   </div>
 </div>

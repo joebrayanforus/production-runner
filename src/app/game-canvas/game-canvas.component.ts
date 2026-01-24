@@ -39,6 +39,41 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private lastFrameTime = 0;
   private readonly FPS = 60;
   private onKeyDownBound = (e: KeyboardEvent) => this.onKeyDown(e);
+  
+  // ===== UI / DECOR =====
+  private warningSignsPositions: Array<{ x: number; y: number; type: 'achtung' }> = [];
+  private statusLEDPositions: Array<{ x: number; y: number; color: 'green' | 'orange' | 'red'; blinkSpeed: number }> = [];
+  
+  // ===== STATS & ACHIEVEMENTS =====
+  stats: {
+    sensorDataCollected: number;
+    repairsSuccessful: number;
+    errorsFixed: number;
+    systemPerformance: number;
+    achievementsUnlocked: {
+      ifm_meister: boolean;
+      wartungsexperte: boolean;
+      stoerungsjaeger: boolean;
+      effizienz_champion: boolean;
+    };
+  } = {
+    sensorDataCollected: 0,
+    repairsSuccessful: 0,
+    errorsFixed: 0,
+    systemPerformance: 0,
+    achievementsUnlocked: {
+      ifm_meister: false,
+      wartungsexperte: false,
+      stoerungsjaeger: false,
+      effizienz_champion: false,
+    }
+  };
+  
+  achievementToast: string | null = null;
+
+
+
+
   // Assets - Industrial Equipment
   private malfunctionBlueImage = new Image();
   private malfunctionOrangeImage = new Image();
@@ -182,9 +217,6 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   // Particle System for visual effects
   private particles: Particle[] = [];
 
-  // Decorative Industrial Elements
-  private warningSignsPositions: Array<{x: number, y: number, type: 'achtung' | 'verboten' | 'warnung'}> = [];
-  private statusLEDPositions: Array<{x: number, y: number, color: 'green' | 'red' | 'orange', blinkSpeed: number}> = [];
 
   // Malfunction Spawning Timer
   private malfunctionSpawnTimer = 0;
@@ -255,22 +287,12 @@ private getMalfunctionSpawnInterval(): number {
   return 600;
 }
 
-
-
-    private getMaintenanceDuration(): number {
-    // Base frightened/maintenance time (ms)
-    let baseDuration = 8000;
-
-    // Level 1 easier: +5s
-    if (this.productionLevel === 1) {
-      baseDuration += 5000; // +5000ms
-    }
-
-    // Reduce maintenance duration by 300ms per level above level 1
-    const reduction = (this.productionLevel - 1) * 300;
-    return Math.max(baseDuration - reduction, 2000); // Minimum 2 seconds
+  private getMaintenanceDuration(): number {
+    // Längere Maintenance-Zeit: Start mit 8s, -1s pro Level (einfacher für Anfänger)
+    const baseDuration = 8000;
+    const reduction = (this.productionLevel - 1) * 1000;
+    return Math.max(baseDuration - reduction, 2000); // Minimum 2 Sekunden
   }
-
 
   // Legacy function for compatibility
   private getFrightenedDuration(): number {
@@ -283,7 +305,6 @@ private getMalfunctionSpawnInterval(): number {
     const reduction = (this.productionLevel - 1) * 300;
     return Math.max(base - reduction, 3000); // Minimum 3 seconds
   }
-
 
   // CYAN (Inky) Patrol-Route: Feste Waypoints entlang der Korridore
   private patrolWaypoints: { x: number; y: number }[] = [];
@@ -319,7 +340,7 @@ private getMalfunctionSpawnInterval(): number {
     }
 
     // Draw decorative industrial elements
-    this.drawIndustrialDecorations(ctx);
+   // this.drawIndustrialDecorations(ctx);
 
     // Draw production line walls (pipes, conveyors, machinery)
     this.walls.forEach(wall => {
@@ -1154,39 +1175,40 @@ private getMalfunctionSpawnInterval(): number {
 
   private drawUI(ctx: CanvasRenderingContext2D) {
     // Draw industrial frame around game area
-    this.drawIndustrialFrame(ctx);
+    this.drawIndustrialDecorations(ctx);
 
-    // IFM Logo on the score bar - very visible
+
+    // IFM Logo on the score bar - moved to very top, outside game field
     ctx.save();
 
-    // Logo background plate - WHITE for maximum visibility
+    // Logo background plate - WHITE for maximum visibility (smaller, at absolute top)
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(5, 32, 60, 20);
+    ctx.fillRect(18, 2, 60, 18);
 
     // Border - thick orange border
     ctx.strokeStyle = '#ED6B00';
     ctx.lineWidth = 2;
-    ctx.strokeRect(5, 32, 60, 20);
+    ctx.strokeRect(18, 2, 60, 18);
 
-    // IFM letters - BIG with strong glow
+    // IFM letters - smaller to fit in top bar without overlapping
     ctx.shadowBlur = 10;
     ctx.shadowColor = '#ED6B00';
     ctx.fillStyle = '#ED6B00';
 
     // Letter I
-    ctx.fillRect(11, 36, 5, 12);
+    ctx.fillRect(23, 6, 5, 12);
 
     // Letter F
-    ctx.fillRect(21, 36, 5, 12);
-    ctx.fillRect(21, 36, 12, 4);
-    ctx.fillRect(21, 42, 9, 3);
+    ctx.fillRect(33, 6, 5, 12);
+    ctx.fillRect(33, 6, 11, 4);
+    ctx.fillRect(33, 12, 9, 3);
 
     // Letter M
-    ctx.fillRect(38, 36, 5, 12);
-    ctx.fillRect(38, 36, 4, 4);
-    ctx.fillRect(44, 38, 3, 3);
-    ctx.fillRect(49, 36, 4, 4);
-    ctx.fillRect(53, 36, 5, 12);
+    ctx.fillRect(50, 6, 5, 12);
+    ctx.fillRect(50, 6, 4, 4);
+    ctx.fillRect(56, 8, 3, 3);
+    ctx.fillRect(60, 6, 4, 4);
+    ctx.fillRect(64, 6, 5, 12);
 
     ctx.shadowBlur = 0;
     ctx.restore();
@@ -1196,121 +1218,129 @@ private getMalfunctionSpawnInterval(): number {
     ctx.fillStyle = '#1a1a1a';
     ctx.textAlign = 'left';
 
-    // In 2-player mode, show both scores and lives
+    // In 2-player mode, show both scores and lives (moved outward)
     if (this.gameMode === '2player') {
-      // Player 1 Score - Large display bottom left
+      // Player 1 Score - Large display bottom left (scaled up 20%, moved outward, above border)
       ctx.fillStyle = '#ED6B00';
-      ctx.font = 'bold 16px "Press Start 2P", monospace';
-      ctx.shadowBlur = 8;
+      ctx.font = 'bold 19px "Press Start 2P", monospace';
+      ctx.shadowBlur = 10;
       ctx.shadowColor = '#ED6B00';
-      ctx.fillText(`${this.efficiency}`, 10, this.CANVAS_HEIGHT - 10);
+      ctx.fillText(`${this.efficiency}`, 18, this.CANVAS_HEIGHT - 26);
       ctx.shadowBlur = 0;
 
-      // Draw P1 lives as squares - below score
+      // Draw P1 lives as squares - below score (scaled up 20%, moved outward, above border)
       for (let i = 0; i < this.systemHealth; i++) {
         ctx.fillStyle = '#ED6B00';
-        ctx.fillRect(10 + i * 12, this.CANVAS_HEIGHT - 30, 10, 10);
+        ctx.fillRect(18 + i * 14, this.CANVAS_HEIGHT - 50, 12, 12);
         ctx.strokeStyle = '#1a1a1a';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(10 + i * 12, this.CANVAS_HEIGHT - 30, 10, 10);
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(18 + i * 14, this.CANVAS_HEIGHT - 50, 12, 12);
       }
 
-      // Player 2 Score - Large display bottom right
+      // Player 2 Score - Large display bottom right (scaled up 20%, moved outward, above border)
       ctx.fillStyle = '#4D9FFF';
       ctx.textAlign = 'right';
-      ctx.font = 'bold 16px "Press Start 2P", monospace';
-      ctx.shadowBlur = 8;
+      ctx.font = 'bold 19px "Press Start 2P", monospace';
+      ctx.shadowBlur = 10;
       ctx.shadowColor = '#4D9FFF';
-      ctx.fillText(`${this.efficiency2}`, this.CANVAS_WIDTH - 10, this.CANVAS_HEIGHT - 10);
+      ctx.fillText(`${this.efficiency2}`, this.CANVAS_WIDTH - 18, this.CANVAS_HEIGHT - 26);
       ctx.shadowBlur = 0;
 
-      // Draw P2 lives as squares - below score
+      // Draw P2 lives as squares - below score (scaled up 20%, moved outward, above border)
       for (let i = 0; i < this.systemHealth2; i++) {
         ctx.fillStyle = '#4D9FFF';
-        ctx.fillRect(this.CANVAS_WIDTH - 20 - i * 12, this.CANVAS_HEIGHT - 30, 10, 10);
+        ctx.fillRect(this.CANVAS_WIDTH - 30 - i * 14, this.CANVAS_HEIGHT - 50, 12, 12);
         ctx.strokeStyle = '#1a1a1a';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(this.CANVAS_WIDTH - 20 - i * 12, this.CANVAS_HEIGHT - 30, 10, 10);
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(this.CANVAS_WIDTH - 30 - i * 14, this.CANVAS_HEIGHT - 50, 12, 12);
       }
 
       ctx.textAlign = 'left';
       ctx.fillStyle = '#1a1a1a';
     } else {
-      // Single player mode - Large score display at bottom center
+      // Single player mode - Large score display at bottom center (scaled up 20%, moved outward, above border)
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ED6B00';
-      ctx.font = 'bold 20px "Press Start 2P", monospace';
-      ctx.shadowBlur = 10;
+      ctx.font = 'bold 24px "Press Start 2P", monospace';
+      ctx.shadowBlur = 12;
       ctx.shadowColor = '#ED6B00';
-      ctx.fillText(`${this.efficiency}`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT - 12);
+      ctx.fillText(`${this.efficiency}`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT - 28);
       ctx.shadowBlur = 0;
 
-      // Draw lives as squares above score, centered
-      const livesStartX = (this.CANVAS_WIDTH / 2) - ((this.systemHealth * 12) / 2);
+      // Draw lives as squares above score, centered (scaled up 20%, moved outward, above border)
+      const livesStartX = (this.CANVAS_WIDTH / 2) - ((this.systemHealth * 14) / 2);
       for (let i = 0; i < this.systemHealth; i++) {
         ctx.fillStyle = '#ED6B00';
-        ctx.fillRect(livesStartX + i * 12, this.CANVAS_HEIGHT - 38, 10, 10);
+        ctx.fillRect(livesStartX + i * 14, this.CANVAS_HEIGHT - 60, 12, 12);
         ctx.strokeStyle = '#1a1a1a';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(livesStartX + i * 12, this.CANVAS_HEIGHT - 38, 10, 10);
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(livesStartX + i * 14, this.CANVAS_HEIGHT - 60, 12, 12);
       }
 
       ctx.textAlign = 'left';
     }
 
-    // Production Level - 2-player names only (no duplicate level display)
+    // Production Level - Center in top bar (scaled up 20%, moved outward)
+    const TOP_BAR_CENTER_Y = 15 + 15; // TOP_BAR_Y + center offset
     ctx.textAlign = 'center';
-    ctx.font = 'bold 8px "Press Start 2P", monospace';
+    ctx.font = 'bold 10px "Press Start 2P", monospace';
     ctx.fillStyle = '#1a1a1a';
 
     if (this.gameMode === '2player') {
-      // Show player names only - level is already displayed in arcade box
-      // Player 1 name (Orange) - Left side
-      ctx.fillStyle = '#ED6B00';
-      ctx.textAlign = 'left';
-      ctx.font = 'bold 10px "Press Start 2P", monospace';
-      ctx.fillText(this.playerName || 'P1', 10, 65);
+      // Show player names on same line as level - larger and more visible
+      ctx.fillStyle = '#1a1a1a';
+      const levelText = `LVL ${this.productionLevel}`;
+      ctx.fillText(levelText, this.CANVAS_WIDTH / 2, TOP_BAR_CENTER_Y);
 
-      // Player 2 name (Blue) - Right side but not overlapping level box
+      // Player 1 name (Orange) - Left of center, larger font (scaled up 20%, moved outward)
+      ctx.fillStyle = '#ED6B00';
+      ctx.textAlign = 'right';
+      ctx.font = 'bold 11px "Press Start 2P", monospace';
+      ctx.fillText(this.playerName || 'PLAYER1', this.CANVAS_WIDTH / 2 - 60, TOP_BAR_CENTER_Y);
+
+      // Player 2 name (Blue) - Right of center, larger font (scaled up 20%, moved outward)
       ctx.fillStyle = '#4D9FFF';
       ctx.textAlign = 'left';
-      ctx.fillText(this.player2Name || 'P2', 10, 80);
+      ctx.font = 'bold 11px "Press Start 2P", monospace';
+      ctx.fillText(this.player2Name || 'PLAYER2', this.CANVAS_WIDTH / 2 + 60, TOP_BAR_CENTER_Y);
+    } else {
+      ctx.fillText(`LVL: ${this.productionLevel}`, this.CANVAS_WIDTH / 2, TOP_BAR_CENTER_Y);
     }
 
     ctx.textAlign = 'left';
 
-    // High Score as "Best Performance"
+    // High Score as "Best Performance" (scaled up 20%, moved outward)
     ctx.textAlign = 'right';
-    ctx.font = '10px "Press Start 2P", monospace';
+    ctx.font = '12px "Press Start 2P", monospace';
     ctx.fillStyle = '#ED6B00';
     const hiScorePercent = Math.min(100, Math.floor((this.getHighScore() / 1000) * 100));
-    ctx.fillText(`BEST: ${hiScorePercent}%`, this.CANVAS_WIDTH - 10, 45);
+    ctx.fillText(`BEST: ${hiScorePercent}%`, this.CANVAS_WIDTH - 18, 69);
 
-    // Practice Mode Status-Anzeige
+    // Practice Mode Status-Anzeige (scaled up 20%, moved outward, below top bar)
     if (this.gameMode === 'practice') {
-      ctx.font = '8px monospace';
-      let statusY = 30;
+      ctx.font = '10px monospace';
+      let statusY = 50; // Below top bar (15 + 30 + 5)
       if (this.isInvincible) {
         ctx.fillStyle = '#00FF88';
-        ctx.fillText('SAFETY MODE', this.CANVAS_WIDTH - 10, statusY);
-        statusY += 12;
+        ctx.fillText('SAFETY MODE', this.CANVAS_WIDTH - 18, statusY);
+        statusY += 14;
       }
       if (this.turboSpeed && this.boostEnergy > 0) {
         ctx.fillStyle = '#ED6B00';
-        ctx.fillText('BOOST ACTIVE', this.CANVAS_WIDTH - 10, statusY);
-        statusY += 12;
+        ctx.fillText('BOOST ACTIVE', this.CANVAS_WIDTH - 18, statusY);
+        statusY += 14;
       }
       if (this.slowMotion < 1.0) {
-        ctx.fillStyle = '#1a1a1a';
-        ctx.fillText(`SLOW ${this.slowMotion}x`, this.CANVAS_WIDTH - 10, statusY);
+        ctx.fillStyle = '#4D9FFF';
+        ctx.fillText(`SLOW ${this.slowMotion}x`, this.CANVAS_WIDTH - 18, statusY);
       }
     }
     ctx.textAlign = 'left';
 
-    // Combo counter display - center of maze
+    // Combo counter display - center of maze (scaled up 20%)
     if (this.pelletStreak >= 10 && this.comboDisplayTimer > 0) {
       ctx.save();
-      ctx.font = 'bold 16px "Press Start 2P", monospace';
+      ctx.font = 'bold 19px "Press Start 2P", monospace';
       ctx.textAlign = 'center';
       const comboAlpha = this.comboDisplayTimer / 1000;
       ctx.fillStyle = `rgba(237, 107, 0, ${comboAlpha})`; // IFM Orange
@@ -1374,37 +1404,37 @@ private getMalfunctionSpawnInterval(): number {
 
     // Lives now shown as colored squares in top bar for all modes
 
-    // Active bonus effects display with circular progress
-    ctx.font = '12px monospace';
+    // Active bonus effects display with circular progress (scaled up 20%, moved outward)
+    ctx.font = '14px monospace';
     ctx.textAlign = 'right';
-    let effectY = this.CANVAS_HEIGHT - 30;
+    let effectY = this.CANVAS_HEIGHT - 42;
 
     if (this.shieldActive) {
       // Shield text
       ctx.fillStyle = '#4169E1';
-      ctx.fillText('🛡️ SHIELD', this.CANVAS_WIDTH - 50, effectY);
+      ctx.fillText('🛡️ SHIELD', this.CANVAS_WIDTH - 66, effectY);
 
       // Circular progress bar
       const progress = this.bonusEffectTimer / 10000; // 10 seconds max
-      const centerX = this.CANVAS_WIDTH - 20;
-      const centerY = effectY - 5;
-      const radius = 8;
+      const centerX = this.CANVAS_WIDTH - 30;
+      const centerY = effectY - 6;
+      const radius = 10;
 
       // Background circle
       ctx.strokeStyle = 'rgba(65, 105, 225, 0.3)';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.4;
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
       ctx.stroke();
 
       // Progress arc
       ctx.strokeStyle = '#4169E1';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 3.6;
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * progress));
       ctx.stroke();
 
-      effectY -= 25;
+      effectY -= 30;
     }
 
     ctx.textAlign = 'left';
@@ -1868,8 +1898,6 @@ private getMalfunctionSpawnInterval(): number {
   // Voice Announcements
   private lastAnnouncement = '';
   private announcementCooldown = 0;
-  private level1LifeBonusGiven = false;
-
 
   // Practice Mode: Zeit-Rückspulung
   private gameHistory: Array<{
@@ -1884,9 +1912,6 @@ private getMalfunctionSpawnInterval(): number {
   // Leaderboard
   leaderboard: any[] = [];
 
-  // Exit confirmation modal
-  showExitConfirm = false;
-  private pausedForExitConfirm = false;
   showPauseOverlay = false;
   pauseMenuIndex = 0; // 0 = Resume, 1 = Restart, 2 = Exit
   gameOverMenuIndex = 0; // 0 = Restart, 1 = Menu
@@ -2068,14 +2093,7 @@ private getMalfunctionSpawnInterval(): number {
           // Nichts hinzufügen - bleibt leer
         }
       }
-      // +1 life bonus only once for Level 1
-      if (this.productionLevel === 1 && !this.level1LifeBonusGiven) {
-        this.lives++;
-        this.level1LifeBonusGiven = true;
-      }
-
     }
-
     // Aggressiver (roter) Sensor soll nie in der Ghost-Box starten
     const aggressiveGhost = [...this.ghosts].find(g => g.type === 'aggressive');
     if (aggressiveGhost) {
@@ -2319,79 +2337,82 @@ private getMalfunctionSpawnInterval(): number {
   private drawIndustrialFrame(ctx: CanvasRenderingContext2D) {
     ctx.save();
 
+    const TOP_BAR_Y = 15; // Offset after canvas padding (60px) - back to original position
+    const TOP_BAR_HEIGHT = 30;
+
     // Top bar - s.FOX optimization running
     ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 30);
+    ctx.fillRect(0, TOP_BAR_Y, this.CANVAS_WIDTH, TOP_BAR_HEIGHT);
 
     // Top bar gradient with metallic effect
-    const topGradient = ctx.createLinearGradient(0, 0, 0, 28);
+    const topGradient = ctx.createLinearGradient(0, TOP_BAR_Y, 0, TOP_BAR_Y + 28);
     topGradient.addColorStop(0, '#333333');
     topGradient.addColorStop(0.5, '#1a1a1a');
     topGradient.addColorStop(1, '#2a2a2a');
     ctx.fillStyle = topGradient;
-    ctx.fillRect(0, 0, this.CANVAS_WIDTH, 28);
+    ctx.fillRect(0, TOP_BAR_Y, this.CANVAS_WIDTH, 28);
 
     // IFM orange accent line with glow
     ctx.shadowBlur = 5;
     ctx.shadowColor = '#ED6B00';
     ctx.fillStyle = '#ED6B00';
-    ctx.fillRect(0, 28, this.CANVAS_WIDTH, 2);
+    ctx.fillRect(0, TOP_BAR_Y + 28, this.CANVAS_WIDTH, 2);
     ctx.shadowBlur = 0;
 
-    // s.FOX system status
-    ctx.font = '8px "Press Start 2P", monospace';
+    // s.FOX system status (scaled up 20%, moved outward)
+    ctx.font = '10px "Press Start 2P", monospace';
     ctx.fillStyle = '#00FF88';
     ctx.textAlign = 'left';
 
     if (this.gameState === 'ready') {
-      ctx.fillText('s.FOX INITIALIZING...', 10, 20);
+      ctx.fillText('s.FOX INITIALIZING...', 18, TOP_BAR_Y + 24);
       // Loading bar
       const loadProgress = (this.stateTimer / this.READY_DURATION) * 100;
       ctx.fillStyle = 'rgba(0, 255, 136, 0.2)';
-      ctx.fillRect(10, 22, 100, 3);
+      ctx.fillRect(18, TOP_BAR_Y + 26, 120, 4);
       ctx.fillStyle = '#00FF88';
-      ctx.fillRect(10, 22, loadProgress, 3);
+      ctx.fillRect(18, TOP_BAR_Y + 26, loadProgress * 1.2, 4);
     } else if (this.gameState === 'playing') {
       // Blinking cursor effect
       const blink = Math.floor(Date.now() / 500) % 2 === 0 ? '_' : '';
-      ctx.fillText(`s.FOX RUNNING${blink}`, 10, 20);
+      ctx.fillText(`s.FOX RUNNING${blink}`, 18, TOP_BAR_Y + 24);
       // Activity indicator dots
       const dots = '.'.repeat((Math.floor(Date.now() / 300) % 3) + 1);
       ctx.fillStyle = '#ED6B00';
-      ctx.fillText(dots, 110, 20);
+      ctx.fillText(dots, 138, TOP_BAR_Y + 24);
     } else if (this.gameState === 'gameover') {
       ctx.fillStyle = '#FF6B6B';
-      ctx.fillText('SYSTEM HALTED', 10, 20);
+      ctx.fillText('SYSTEM HALTED', 18, TOP_BAR_Y + 24);
       // Error indicator
-      ctx.fillRect(5, 16, 3, 8);
+      ctx.fillRect(12, TOP_BAR_Y + 19, 4, 10);
     }
 
-    // moneo AI Assistant indicator - top right
+    // moneo AI Assistant indicator - top right (scaled up 20%, moved outward)
     ctx.textAlign = 'right';
     ctx.fillStyle = '#00FF88';
-    ctx.font = '7px "Press Start 2P", monospace';
-    ctx.fillText('moneo IAIA', this.CANVAS_WIDTH - 10, 12);
+    ctx.font = '8px "Press Start 2P", monospace';
+    ctx.fillText('moneo IAIA', this.CANVAS_WIDTH - 18, TOP_BAR_Y + 14);
 
-    // AI status indicator with LED
+    // AI status indicator with LED (scaled up 20%, moved outward)
     const aiStatus = this.gameState === 'playing' ? 'ANALYZING' : 'STANDBY';
     ctx.fillStyle = this.gameState === 'playing' ? '#ED6B00' : '#808080';
-    ctx.fillText(aiStatus, this.CANVAS_WIDTH - 10, 22);
+    ctx.fillText(aiStatus, this.CANVAS_WIDTH - 18, TOP_BAR_Y + 26);
 
-    // Animated LED indicator
+    // Animated LED indicator (scaled up 20%, moved outward)
     const ledPulse = this.gameState === 'playing'
       ? 0.5 + Math.sin(Date.now() / 200) * 0.5
       : 0.3;
     const ledColor = this.gameState === 'playing' ? '#ED6B00' : '#808080';
     ctx.fillStyle = `rgba(237, 107, 0, ${ledPulse})`;
     ctx.beginPath();
-    ctx.arc(this.CANVAS_WIDTH - 80, 19, 3, 0, Math.PI * 2);
+    ctx.arc(this.CANVAS_WIDTH - 102, TOP_BAR_Y + 23, 4, 0, Math.PI * 2);
     ctx.fill();
     // LED glow
     if (this.gameState === 'playing') {
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 10;
       ctx.shadowColor = ledColor;
       ctx.beginPath();
-      ctx.arc(this.CANVAS_WIDTH - 80, 19, 3, 0, Math.PI * 2);
+      ctx.arc(this.CANVAS_WIDTH - 102, TOP_BAR_Y + 23, 4, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
     }
@@ -2401,13 +2422,13 @@ private getMalfunctionSpawnInterval(): number {
     ctx.restore();
   }
 
-  // Draw Energy Gauge
+  // Draw Energy Gauge (moved outward)
   private drawEnergyGauge(ctx: CanvasRenderingContext2D) {
     const barWidth = this.gameMode === '2player' ? 120 : 150;
     const barHeight = 10;
-    // Position at bottom, below maze (maze ends around y=620, leave space)
-    const barX = this.gameMode === '2player' ? this.CANVAS_WIDTH - barWidth - 5 : this.CANVAS_WIDTH - barWidth - 15;
-    const barY = this.CANVAS_HEIGHT - 15; // Bottom of canvas
+    // Position at bottom, moved slightly up to avoid overlap with game field
+    const barX = this.gameMode === '2player' ? this.CANVAS_WIDTH - barWidth - 18 : this.CANVAS_WIDTH - barWidth - 18;
+    const barY = this.CANVAS_HEIGHT - 18; // Moved slightly up to avoid overlap
 
     // Background
     ctx.fillStyle = 'rgba(26, 26, 26, 0.8)';
@@ -2448,12 +2469,12 @@ private getMalfunctionSpawnInterval(): number {
     ctx.textAlign = 'left';
   }
 
-  // Draw Player 2 Energy Gauge (left side, blue)
+  // Draw Player 2 Energy Gauge (left side, blue, moved outward)
   private drawEnergyGauge2(ctx: CanvasRenderingContext2D) {
     const barWidth = 120;
     const barHeight = 10;
-    const barX = 5; // Left side for Player 2
-    const barY = this.CANVAS_HEIGHT - 15; // Bottom of canvas, same as P1
+    const barX = 18; // Left side for Player 2, moved outward
+    const barY = this.CANVAS_HEIGHT - 18; // Moved slightly up to avoid overlap
 
     // Background
     ctx.fillStyle = 'rgba(26, 26, 26, 0.8)';
@@ -2606,12 +2627,12 @@ private getMalfunctionSpawnInterval(): number {
     }
 
     // Gamepad Input for Pause Menu
-    if (this.showPauseOverlay && !this.showExitConfirm) {
+    if (this.showPauseOverlay) {
       const now = Date.now();
       if (now - this.lastGamepadMenuAction > this.GAMEPAD_MENU_COOLDOWN) {
         const menuDir = this.inputService.getDirectionChange();
-        if (menuDir === 'U' || menuDir === 'D') {
-          this.navigatePauseMenu(menuDir === 'U' ? 'up' : 'down');
+        if (menuDir === 'L' || menuDir === 'R') {
+          this.navigatePauseMenu(menuDir === 'L' ? 'left' : 'right');
           this.lastGamepadMenuAction = now;
         }
         if (this.inputService.isActionButtonPressed()) {
@@ -2627,8 +2648,8 @@ private getMalfunctionSpawnInterval(): number {
       const now = Date.now();
       if (now - this.lastGamepadMenuAction > this.GAMEPAD_MENU_COOLDOWN) {
         const menuDir = this.inputService.getDirectionChange();
-        if (menuDir === 'U' || menuDir === 'D') {
-          this.navigateGameOverMenu(menuDir === 'U' ? 'up' : 'down');
+        if (menuDir === 'L' || menuDir === 'R') {
+          this.navigateGameOverMenu(menuDir === 'L' ? 'left' : 'right');
           this.lastGamepadMenuAction = now;
         }
         if (this.inputService.isActionButtonPressed()) {
@@ -3780,10 +3801,24 @@ private getMalfunctionSpawnInterval(): number {
     this.powerPellets.clear();
     this.ghosts.clear();
     this.cherry = null;
+    this.stats = {
+    sensorDataCollected: 0,
+    repairsSuccessful: 0,
+    errorsFixed: 0,
+    systemPerformance: 0,
+    achievementsUnlocked: {
+    ifm_meister: false,
+    wartungsexperte: false,
+    stoerungsjaeger: false,
+    effizienz_champion: false,
+  }
+};
+
+  this.achievementToast = null;
+
     this.loadMap();
     this.resetPositions();
     this.lives = 3;
-    this.level1LifeBonusGiven = false;
     this.score = 0;
     this.pelletStreak = 0;
     this.streakMultiplier = 1.0;
@@ -3791,7 +3826,7 @@ private getMalfunctionSpawnInterval(): number {
     this.pelletCountingEnabled = false;
     this.currentLevel = 1;
     this.scaredTimer = 0;
-    this.scaredDuration = this.getFrightenedDuration();
+    this.scaredDuration = 10000;
     this.gameOver = false;
     this.modePhase = 0;
     this.modeTimer = 0;
@@ -3802,6 +3837,8 @@ private getMalfunctionSpawnInterval(): number {
     this.boostEnergy = this.MAX_BOOST_ENERGY;
     this.isBoostKeyPressed = false;
     this.gameOverMenuIndex = 0; // Reset menu index
+    this.pauseMenuIndex = 0; // Reset pause menu index
+    this.showPauseOverlay = false; // Close pause overlay if open
     this.inputService.resetButtonStates();
     this.startGameLoop();
   }
@@ -3823,9 +3860,39 @@ private getMalfunctionSpawnInterval(): number {
       return;
     }
 
-    // Restart bei Game Over
+    // Keyboard navigation for Pause Menu
+    if (this.showPauseOverlay) {
+      if (e.key === 'ArrowLeft') {
+        this.navigatePauseMenu('left');
+        e.preventDefault();
+        return;
+      } else if (e.key === 'ArrowRight') {
+        this.navigatePauseMenu('right');
+        e.preventDefault();
+        return;
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        this.selectPauseMenuItem();
+        e.preventDefault();
+        return;
+      }
+    }
+
+    // Keyboard navigation for Game Over Menu
     if (this.gameState === 'gameover') {
-      this.restartGame();
+      if (e.key === 'ArrowLeft') {
+        this.navigateGameOverMenu('left');
+        e.preventDefault();
+        return;
+      } else if (e.key === 'ArrowRight') {
+        this.navigateGameOverMenu('right');
+        e.preventDefault();
+        return;
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        this.selectGameOverMenuItem();
+        e.preventDefault();
+        return;
+      }
+      // Don't auto-restart on any key - only on menu selection
       return;
     }
 
@@ -3969,7 +4036,10 @@ private getMalfunctionSpawnInterval(): number {
         this.isBoostKeyPressed2 = false;
         console.log('🛑 P2 Boost deaktiviert (Shift losgelassen)');
       }
+
+      this.bufferedDirection2 = null; // Clear buffer on successful turn
     }
+    // Otherwise keep buffered for next frame
   }
 
   private openPause() {
@@ -3981,7 +4051,6 @@ private getMalfunctionSpawnInterval(): number {
 
   resumeFromPause() {
     this.showPauseOverlay = false;
-    this.showExitConfirm = false;
     if (!this.gameOver) {
       this.gameState = 'playing';
       this.startGameLoop();
@@ -3990,9 +4059,9 @@ private getMalfunctionSpawnInterval(): number {
   }
 
   navigatePauseMenu(direction: string) {
-    if (direction === 'up') {
+    if (direction === 'left') {
       this.pauseMenuIndex = (this.pauseMenuIndex - 1 + 3) % 3;
-    } else if (direction === 'down') {
+    } else if (direction === 'right') {
       this.pauseMenuIndex = (this.pauseMenuIndex + 1) % 3;
     }
   }
@@ -4012,9 +4081,9 @@ private getMalfunctionSpawnInterval(): number {
   }
 
   navigateGameOverMenu(direction: string) {
-    if (direction === 'up') {
+    if (direction === 'left') {
       this.gameOverMenuIndex = (this.gameOverMenuIndex - 1 + 2) % 2;
-    } else if (direction === 'down') {
+    } else if (direction === 'right') {
       this.gameOverMenuIndex = (this.gameOverMenuIndex + 1) % 2;
     }
   }
@@ -4030,7 +4099,7 @@ private getMalfunctionSpawnInterval(): number {
   }
 
   requestExitToMenu() {
-    this.showExitConfirm = true;
+    this.exitGame(); // Directly exit, no confirmation
   }
 
   // ============================================================================
@@ -4038,23 +4107,13 @@ private getMalfunctionSpawnInterval(): number {
   // ============================================================================
 
   private initializeIndustrialDecorations() {
-    // Warning Signs - Positioned near corners and danger zones (keep only ACHTUNG)
-    this.warningSignsPositions = [
-      { x: 2 * this.CELL_SIZE, y: 3 * this.CELL_SIZE, type: 'achtung' },
-      { x: 25 * this.CELL_SIZE, y: 3 * this.CELL_SIZE, type: 'achtung' },
-      { x: 2 * this.CELL_SIZE, y: 24 * this.CELL_SIZE, type: 'achtung' },
-      { x: 25 * this.CELL_SIZE, y: 24 * this.CELL_SIZE, type: 'achtung' }
-    ];
+    // Warning Signs - REMOVED to avoid overlap with game field
+    // These were causing overlap issues, so we'll disable them completely
+    this.warningSignsPositions = [];
 
-    // Status LEDs - Blinking indicators (keep blinking dots)
-    this.statusLEDPositions = [
-      { x: 3 * this.CELL_SIZE, y: 6 * this.CELL_SIZE, color: 'green', blinkSpeed: 1000 },
-      { x: 24 * this.CELL_SIZE, y: 6 * this.CELL_SIZE, color: 'green', blinkSpeed: 1200 },
-      { x: 3 * this.CELL_SIZE, y: 21 * this.CELL_SIZE, color: 'orange', blinkSpeed: 800 },
-      { x: 24 * this.CELL_SIZE, y: 21 * this.CELL_SIZE, color: 'red', blinkSpeed: 600 },
-      { x: 10 * this.CELL_SIZE, y: 14 * this.CELL_SIZE, color: 'green', blinkSpeed: 1500 },
-      { x: 17 * this.CELL_SIZE, y: 14 * this.CELL_SIZE, color: 'green', blinkSpeed: 1300 }
-    ];
+    // Status LEDs - REMOVED to avoid overlapping with paths
+    // These were causing overlap issues, so we'll disable them for now
+    this.statusLEDPositions = [];
   }
 
   private drawIndustrialDecorations(ctx: CanvasRenderingContext2D) {
@@ -4143,15 +4202,6 @@ private getMalfunctionSpawnInterval(): number {
     });
   }
 
-  confirmExitToMenu() {
-    this.showExitConfirm = false;
-    this.stopGameLoop();
-    this.router.navigate(['/']);
-  }
-
-  cancelExitToMenu() {
-    this.showExitConfirm = false;
-  }
 
   toggleSpielanleitung() {
     this.showSpielanleitung = !this.showSpielanleitung;
