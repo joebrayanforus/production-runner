@@ -27,14 +27,16 @@ export class Block {
     const prevDirection = this.direction;
     this.direction = newDirection;
     this.updateVelocity(tileSize);
-    this.x += this.velocityX;
-    this.y += this.velocityY;
+
+    // Test if the new direction is possible by checking for collisions
+    // but don't actually move yet - let the main game loop handle movement
+    const testX = this.x + this.velocityX;
+    const testY = this.y + this.velocityY;
 
     // Check collision with walls
     for (const wall of walls) {
-      if (this.collidesWith(wall)) {
-        this.x -= this.velocityX;
-        this.y -= this.velocityY;
+      if (this.collidesAtPosition(testX, testY, wall)) {
+        // If we can't go in the new direction, revert
         this.direction = prevDirection;
         this.updateVelocity(tileSize);
         break;
@@ -70,5 +72,12 @@ export class Block {
            this.x + this.width > other.x &&
            this.y < other.y + other.height &&
            this.y + this.height > other.y;
+  }
+
+  private collidesAtPosition(testX: number, testY: number, other: Block): boolean {
+    return testX < other.x + other.width &&
+           testX + this.width > other.x &&
+           testY < other.y + other.height &&
+           testY + this.height > other.y;
   }
 }

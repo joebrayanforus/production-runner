@@ -2268,9 +2268,20 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     // Update Advanced Maze Features
     this.updateAdvancedMazeFeatures(deltaTime);
 
-    // Update Boost Mode based on key state and energy
+    // Update Boost Mode based on key state and energy (keyboard or arcade)
     if (this.gameMode !== 'practice') {
-      if (this.isBoostKeyPressed && this.boostEnergy > 0) {
+      // Check arcade buttons 4 (L) and 3 (Y) for boost
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const gp1 = gamepads[0];
+      let arcadeBoostActive = false;
+      
+      if (gp1) {
+        // Arcade buttons 4 (L) and 3 (Y) for boost
+        arcadeBoostActive = gp1.buttons[4]?.pressed || gp1.buttons[3]?.pressed;
+      }
+      
+      const isBoostActive = this.isBoostKeyPressed || arcadeBoostActive;
+      if (isBoostActive && this.boostEnergy > 0) {
         this.turboSpeed = true;
       } else {
         this.turboSpeed = false;

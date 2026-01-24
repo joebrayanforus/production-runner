@@ -185,7 +185,7 @@ export class AudioService {
   private loadOriginalSounds() {
     // Load original sound files as fallback
     const soundFiles = {
-      'theme': 'assets/mp3/theme.mp3'  // Keep original theme
+      'theme': 'assets/mp3/soundtrack.mp3'  // Load new soundtrack
     };
 
     for (const [key, path] of Object.entries(soundFiles)) {
