@@ -2576,33 +2576,45 @@ private getMalfunctionSpawnInterval(): number {
     // Update Advanced Maze Features
     this.updateAdvancedMazeFeatures(deltaTime);
 
-    // Update Boost Mode based on key state and energy (keyboard or gamepad)
+    // Update Boost Mode based on key state and energy (keyboard or gamepad/arcade)
     if (this.gameMode !== 'practice') {
-      const isBoostActive = this.isBoostKeyPressed || this.inputService.isBoostButtonHeld();
+      // Player 1 boost: Check keyboard (Ctrl) + arcade buttons (4=L, 3=Y)
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const gp1 = gamepads[0];
+      let arcadeBoostP1 = false;
+      
+      if (gp1) {
+        // Arcade buttons 4 (L) and 3 (Y) for Player 1 boost
+        arcadeBoostP1 = gp1.buttons[4]?.pressed || gp1.buttons[3]?.pressed;
+      }
+      
+      const isBoostActive = this.isBoostKeyPressed || this.inputService.isBoostButtonHeld() || arcadeBoostP1;
       if (isBoostActive && this.boostEnergy > 0) {
         this.turboSpeed = true;
       } else {
         this.turboSpeed = false;
       }
 
-      // Player 2 boost activation (keyboard + gamepad)
+      // Player 2 boost activation (keyboard + gamepad/arcade)
       if (this.gameMode === '2player') {
-        // Check gamepad 1 for Player 2 boost (buttons 0-3 for arcade compatibility)
-        const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+        // Check gamepad 1 for Player 2 boost (arcade buttons 4=L, 3=Y)
+        let arcadeBoostP2 = false;
         let gamepadBoostP2 = false;
 
-        // Try gamepad index 1 first, fallback to gamepad 0 buttons 8-11 for arcade
-        const gp2 = gamepads[1] || gamepads[0];
+        // Try gamepad index 1 first
+        const gp2 = gamepads[1];
         if (gp2) {
-          // Standard gamepad: buttons 0-3
-          // Arcade setup: buttons 8-11 for Player 2
-          gamepadBoostP2 = gp2.buttons[0]?.pressed || gp2.buttons[1]?.pressed ||
-                          gp2.buttons[2]?.pressed || gp2.buttons[3]?.pressed ||
-                          gp2.buttons[8]?.pressed || gp2.buttons[9]?.pressed ||
-                          gp2.buttons[10]?.pressed || gp2.buttons[11]?.pressed;
+          // Arcade buttons 4 (L) and 3 (Y) for Player 2 boost
+          arcadeBoostP2 = gp2.buttons[4]?.pressed || gp2.buttons[3]?.pressed;
+        }
+        
+        // Fallback to gamepad 0 buttons 8-11 for Player 2 if no gamepad 1
+        if (!gp2 && gamepads[0]) {
+          gamepadBoostP2 = gamepads[0].buttons[8]?.pressed || gamepads[0].buttons[9]?.pressed ||
+                          gamepads[0].buttons[10]?.pressed || gamepads[0].buttons[11]?.pressed;
         }
 
-        const isBoostActive2 = this.isBoostKeyPressed2 || gamepadBoostP2;
+        const isBoostActive2 = this.isBoostKeyPressed2 || gamepadBoostP2 || arcadeBoostP2;
         if (isBoostActive2 && this.boostEnergy2 > 0) {
           this.turboSpeed2 = true;
         } else {
