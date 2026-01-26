@@ -2628,11 +2628,15 @@ private getMalfunctionSpawnInterval(): number {
       this.handleSpielanleitungGamepad();
     }
 
-    // Gamepad Pause Button (Button 9)
+    // Gamepad Pause Button (Button 9 - Start, Button 10 - Select)
     if (this.inputService.isPauseButtonPressed()) {
       if (this.gameState === 'paused') {
         this.resumeFromPause();
       } else if (this.gameState === 'playing') {
+        this.openPause();
+        this.pauseMenuIndex = 0; // Reset to Resume
+      } else if (this.gameState === 'gameover') {
+        // allow exit confirm from gameover via pause overlay
         this.openPause();
         this.pauseMenuIndex = 0; // Reset to Resume
       }
