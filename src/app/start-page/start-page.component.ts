@@ -54,7 +54,7 @@ export class StartPageComponent implements OnInit, OnDestroy {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(event.key)) {
       event.preventDefault();
     }
-    const modes: GameMode[] = ['spielanleitung', 'classic', 'practice', '2player'];
+    const modes: GameMode[] = ['spielanleitung', 'classic', '2player', 'practice'];
     const currentIndex = modes.indexOf(this.selectedMode);
 
     if (['ArrowUp', 'ArrowLeft'].includes(event.key)) {
@@ -140,14 +140,18 @@ export class StartPageComponent implements OnInit, OnDestroy {
   }
 
   private handleModeNavigation(direction: string): void {
-    // Toggle between classic and practice with any direction key
-    switch (direction) {
-      case 'L':
-      case 'U':
-      case 'R':
-      case 'D':
-        this.selectedMode = this.selectedMode === 'classic' ? 'practice' : 'classic';
-        break;
+    const modes: GameMode[] = ['spielanleitung', 'classic', '2player', 'practice'];
+    const currentIndex = modes.indexOf(this.selectedMode);
+
+    // Navigate through all modes based on direction
+    if (direction === 'U' || direction === 'L') {
+      // Navigate to previous mode (with wrap around)
+      const newIndex = currentIndex === 0 ? modes.length - 1 : currentIndex - 1;
+      this.selectedMode = modes[newIndex];
+    } else if (direction === 'D' || direction === 'R') {
+      // Navigate to next mode (with wrap around)
+      const newIndex = (currentIndex + 1) % modes.length;
+      this.selectedMode = modes[newIndex];
     }
   }
 }

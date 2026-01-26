@@ -2313,13 +2313,22 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
+    // Gamepad Pause Button (Button 9 - Start, Button 10 - Select)
+    if (this.inputService.isPauseButtonPressed()) {
+      if (this.gameState === 'paused') {
+        this.resumeFromPause();
+      } else if (this.gameState === 'playing') {
+        this.openPause();
+      } else if (this.gameState === 'gameover') {
+        // allow exit confirm from gameover via pause overlay
+        this.openPause();
+      }
+    }
+
     // Gamepad Restart / Exit in Game Over
     if (this.gameState === 'gameover') {
       if (this.inputService.isActionButtonPressed()) {
         this.restartGame();
-      }
-      if (this.inputService.isPauseButtonPressed()) {
-        this.exitGame();
       }
     }
 

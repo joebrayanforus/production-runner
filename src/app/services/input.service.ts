@@ -70,6 +70,7 @@ export class InputService {
   private lastActionButtonState = false;
   private lastBoostButtonState = false;
   private lastPauseButtonState = false;
+  private lastSelectButtonState = false;
   private lastLeftShoulderState = false;
   private lastRightShoulderState = false;
   private lastBackButtonState = false;
@@ -209,6 +210,7 @@ export class InputService {
 
   /**
    * Check if pause button was just pressed
+   * Checks both Start (button 9) and Select (button 10) buttons
    */
   public isPauseButtonPressed(): boolean {
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -216,8 +218,8 @@ export class InputService {
 
     for (const gp of gamepads) {
       if (!gp) continue;
-      // Start/Menu button (usually 9)
-      if (gp.buttons[9]?.pressed) {
+      // Start/Menu button (button 9) OR Select button (button 10)
+      if (gp.buttons[9]?.pressed || gp.buttons[10]?.pressed) {
         currentState = true;
         break;
       }
@@ -295,6 +297,7 @@ export class InputService {
     this.lastActionButtonState = false;
     this.lastBoostButtonState = false;
     this.lastPauseButtonState = false;
+    this.lastSelectButtonState = false;
     this.lastLeftShoulderState = false;
     this.lastRightShoulderState = false;
     this.lastBackButtonState = false;
