@@ -3135,12 +3135,17 @@ private getMalfunctionSpawnInterval(): number {
   // Tunnel-Wraparound: Teleportiert Entity zur anderen Seite
   private handleTunnelWraparound(entity: Block) {
     // Linke Seite -> Rechte Seite
-    if (entity.x < -this.CELL_SIZE) {
-      entity.x = this.CANVAS_WIDTH;
+    // Wenn irgendein Teil der Entity links außerhalb des sichtbaren Spielfelds ist,
+    // wird sie direkt auf die rechte Seite gesetzt.
+    if (entity.x < 0) {
+      entity.x = this.CANVAS_WIDTH - entity.width;
     }
+
     // Rechte Seite -> Linke Seite
-    if (entity.x > this.CANVAS_WIDTH) {
-      entity.x = -this.CELL_SIZE;
+    // Wenn irgendein Teil der Entity rechts außerhalb des sichtbaren Spielfelds ist,
+    // wird sie direkt auf die linke Seite gesetzt.
+    if (entity.x + entity.width > this.CANVAS_WIDTH) {
+      entity.x = 0;
     }
   }
 
@@ -3333,9 +3338,6 @@ private getMalfunctionSpawnInterval(): number {
       this.pacman.x += this.pacman.velocityX;
       this.pacman.y += this.pacman.velocityY;
 
-      // Tunnel-Wraparound für Pac-Man
-      this.handleTunnelWraparound(this.pacman);
-
       // Check wall collisions (außer Ghost Door)
       let collided = false;
       for (const wall of this.walls) {
@@ -3348,6 +3350,11 @@ private getMalfunctionSpawnInterval(): number {
           collided = true;
           break;
         }
+      }
+
+      // Wenn keine Wand getroffen wurde, Tunnel-Wraparound anwenden
+      if (!collided) {
+        this.handleTunnelWraparound(this.pacman);
       }
 
       // Stop moving if we hit a wall
@@ -3366,8 +3373,6 @@ private getMalfunctionSpawnInterval(): number {
         this.robot2.x += this.robot2.velocityX;
         this.robot2.y += this.robot2.velocityY;
 
-        this.handleTunnelWraparound(this.robot2);
-
         let collided2 = false;
         for (const wall of this.walls) {
           if (wall.type === 'ghost-door') continue;
@@ -3378,6 +3383,12 @@ private getMalfunctionSpawnInterval(): number {
             break;
           }
         }
+
+        // Nur teleportieren, wenn keine Wand getroffen wurde
+        if (!collided2) {
+          this.handleTunnelWraparound(this.robot2);
+        }
+
         if (collided2) break;
       }
     }
@@ -3485,10 +3496,8 @@ private getMalfunctionSpawnInterval(): number {
       ghost.x += ghost.velocityX;
       ghost.y += ghost.velocityY;
 
-      // Tunnel-Wraparound für Geister
-      this.handleTunnelWraparound(ghost);
-
       // Ghost wall collision
+      let ghostCollided = false;
       for (const wall of this.walls) {
         // Geister können durch Ghost Door
         if (wall.type === 'ghost-door') continue;
@@ -3496,9 +3505,16 @@ private getMalfunctionSpawnInterval(): number {
         if (this.collision(ghost, wall)) {
           ghost.x -= ghost.velocityX;
           ghost.y -= ghost.velocityY;
+          ghostCollided = true;
           // Bei Kollision neue Richtung berechnen
           this.updateGhostAI(ghost);
+          break;
         }
+      }
+
+      // Nur wenn kein Zusammenstoß stattfand, Tunnel-Wraparound anwenden
+      if (!ghostCollided) {
+        this.handleTunnelWraparound(ghost);
       }
     }
 
