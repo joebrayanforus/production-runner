@@ -119,30 +119,30 @@ export class InputService {
   }
 
   /**
-   * Internal method to read current joystick/dpad direction
+   * Internal method to read current joystick/dpad direction.
+   * Uses only gamepad index 0 so that in 2-player/arcade mode, Player 1 is always
+   * controller 0 and Player 2 is controller 1 (no cross-talk).
    */
   private getCurrentDirection(): string | null {
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const gp = gamepads[0];
+    if (!gp) return null;
 
-    for (const gp of gamepads) {
-      if (!gp) continue;
+    // Stick Axis (Standard Layout: Axis 0 = Left Stick X, Axis 1 = Left Stick Y)
+    const x = gp.axes[0];
+    const y = gp.axes[1];
+    const threshold = 0.5;
 
-      // Stick Axis (Standard Layout: Axis 0 = Left Stick X, Axis 1 = Left Stick Y)
-      const x = gp.axes[0];
-      const y = gp.axes[1];
-      const threshold = 0.5;
+    // D-Pad Buttons (Standard Layout: 12=Up, 13=Down, 14=Left, 15=Right)
+    const up = gp.buttons[12]?.pressed;
+    const down = gp.buttons[13]?.pressed;
+    const left = gp.buttons[14]?.pressed;
+    const right = gp.buttons[15]?.pressed;
 
-      // D-Pad Buttons (Standard Layout: 12=Up, 13=Down, 14=Left, 15=Right)
-      const up = gp.buttons[12]?.pressed;
-      const down = gp.buttons[13]?.pressed;
-      const left = gp.buttons[14]?.pressed;
-      const right = gp.buttons[15]?.pressed;
-
-      if (y < -threshold || up) return 'U';
-      if (y > threshold || down) return 'D';
-      if (x < -threshold || left) return 'L';
-      if (x > threshold || right) return 'R';
-    }
+    if (y < -threshold || up) return 'U';
+    if (y > threshold || down) return 'D';
+    if (x < -threshold || left) return 'L';
+    if (x > threshold || right) return 'R';
     return null;
   }
 
@@ -193,19 +193,13 @@ export class InputService {
   }
 
   /**
-   * Check if boost button is currently held down
+   * Check if boost button is currently held down (gamepad 0 only, for Player 1)
    */
   public isBoostButtonHeld(): boolean {
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-
-    for (const gp of gamepads) {
-      if (!gp) continue;
-      // Y button (button 3) - boost button
-      if (gp.buttons[3]?.pressed) {
-        return true;
-      }
-    }
-    return false;
+    const gp = gamepads[0];
+    if (!gp) return false;
+    return !!(gp.buttons[3]?.pressed);
   }
 
   /**
@@ -271,20 +265,13 @@ export class InputService {
   }
 
   /**
-   * Back/View button - just pressed
+   * Back/View button (gamepad 0, button 8) - just pressed.
+   * Use this for arcade "Back" or "Exit" wired to gamepad button 8 (same as Escape).
    */
   public isBackButtonPressed(): boolean {
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-    let currentState = false;
-
-    for (const gp of gamepads) {
-      if (!gp) continue;
-      if (gp.buttons[8]?.pressed) {
-        currentState = true;
-        break;
-      }
-    }
-
+    const gp = gamepads[0];
+    const currentState = !!(gp?.buttons[8]?.pressed);
     const justPressed = currentState && !this.lastBackButtonState;
     this.lastBackButtonState = currentState;
     return justPressed;

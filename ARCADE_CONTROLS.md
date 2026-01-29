@@ -45,6 +45,17 @@ The boost is activated using **any of these**:
 - **Button 4 (L)** - Top Left
 - **Button 3 (Y)** - Bottom Left
 
+### Back / Exit (Cabinet or Gamepad 0)
+
+Wire a dedicated **Back** or **Exit** button on your arcade cabinet to **Gamepad Button 8** (View/Select on standard gamepads). It behaves like the **Escape** key:
+
+- **Name entry screen**: Go back (or back to Player 1 in 2-player)
+- **During game / Boss fight**: Open pause menu; press again to resume
+- **Game over**: Open pause/exit menu
+- **SPIELANLEITUNG (instructions)**: Close instructions overlay
+
+If your cabinet has no Button 8, you can still use **Button 1 (B)** on the name entry screen to go back.
+
 ## Implementation Details
 
 ### Arcade Button to Gamepad Button Mapping
