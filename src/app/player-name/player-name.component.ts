@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { InputService } from '../services/input.service';
 
 export type GameMode = 'classic' | 'practice' | '2player';
 
@@ -36,7 +37,8 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
 
   constructor(
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private inputService: InputService
   ) {}
 
   ngOnInit(): void {
@@ -174,7 +176,16 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Gamepad Polling
+  // Gamepad Polling - track previous button state to fire only on "just pressed"
+  private gamepadPrevButtons: { [key: number]: boolean } = {};
+
+  private wasGamepadButtonJustPressed(gamepad: Gamepad, index: number): boolean {
+    const now = gamepad.buttons[index]?.pressed ?? false;
+    const prev = this.gamepadPrevButtons[index] ?? false;
+    this.gamepadPrevButtons[index] = now;
+    return now && !prev;
+  }
+
   private startGamepadPolling(): void {
     let lastDirection = '';
     let directionHoldTime = 0;
@@ -192,35 +203,61 @@ export class PlayerNameComponent implements OnInit, OnDestroy {
       else if (gamepad.axes[0] < -threshold || gamepad.buttons[14]?.pressed) currentDirection = 'L';
       else if (gamepad.axes[0] > threshold || gamepad.buttons[15]?.pressed) currentDirection = 'R';
 
-      // Handle direction input
-      if (currentDirection && currentDirection === lastDirection) {
-        directionHoldTime += 100;
-        // Auto-repeat after 300ms
-        if (directionHoldTime > 300) {
-          this.navigateKeyboard(currentDirection);
-        }
-      } else if (currentDirection && currentDirection !== lastDirection) {
+      // Handle direction: switch between keyboard focus and button focus (Delete / Start / Back)
+      if (currentDirection && currentDirection !== lastDirection) {
         lastDirection = currentDirection;
         directionHoldTime = 0;
-        this.navigateKeyboard(currentDirection);
+
+        if (this.focusArea === 'keyboard') {
+          const lastRowIndex = this.keyboardRows.length - 1;
+          if (currentDirection === 'D' && this.selectedRowIndex === lastRowIndex) {
+            // Move focus from keyboard to buttons (default to Start)
+            this.focusArea = 'buttons';
+            this.buttonIndex = 1;
+          } else {
+            this.navigateKeyboard(currentDirection);
+          }
+        } else {
+          // focusArea === 'buttons'
+          const lastRowIndex = this.keyboardRows.length - 1;
+          if (currentDirection === 'U') {
+            this.focusArea = 'keyboard';
+            this.selectedRowIndex = lastRowIndex;
+            this.selectedKeyIndex = Math.min(this.selectedKeyIndex, this.keyboardRows[lastRowIndex].length - 1);
+          } else if (currentDirection === 'L') {
+            this.buttonIndex = Math.max(0, this.buttonIndex - 1);
+          } else if (currentDirection === 'R') {
+            this.buttonIndex = Math.min(2, this.buttonIndex + 1);
+          }
+        }
+      } else if (currentDirection && currentDirection === lastDirection) {
+        directionHoldTime += 100;
+        if (this.focusArea === 'keyboard' && directionHoldTime > 300) {
+          this.navigateKeyboard(currentDirection);
+        }
       } else {
         lastDirection = '';
         directionHoldTime = 0;
       }
 
-      // A Button (0) - Select
-      if (gamepad.buttons[0]?.pressed) {
-        this.selectKey();
+      // A Button (0) or Start (9) - Select / Activate
+      const aJust = this.wasGamepadButtonJustPressed(gamepad, 0);
+      const startJust = this.wasGamepadButtonJustPressed(gamepad, 9);
+      if (aJust || startJust) {
+        if (this.focusArea === 'buttons') {
+          this.triggerButton();
+        } else {
+          this.selectKey();
+        }
       }
 
-      // B Button (1) - Go back
-      if (gamepad.buttons[1]?.pressed) {
+      // B Button (1) - Back (only on just pressed to avoid double action with triggerButton)
+      if (this.wasGamepadButtonJustPressed(gamepad, 1)) {
         this.goBack();
       }
-
-      // Start Button (9) - Start game
-      if (gamepad.buttons[9]?.pressed && this.isPlayerNameValid()) {
-        this.startGame();
+      // Arcade Back button (8) - same as Escape
+      if (this.inputService.isBackButtonPressed()) {
+        this.goBack();
       }
     }, 100);
   }

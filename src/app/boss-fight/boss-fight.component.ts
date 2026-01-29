@@ -2325,6 +2325,17 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
+    // Arcade Back button (Button 8) - same as Escape: open/close pause
+    if (this.inputService.isBackButtonPressed()) {
+      if (this.gameState === 'paused') {
+        this.resumeFromPause();
+      } else if (this.gameState === 'playing') {
+        this.openPause();
+      } else if (this.gameState === 'gameover') {
+        this.openPause();
+      }
+    }
+
     // Gamepad Restart / Exit in Game Over
     if (this.gameState === 'gameover') {
       if (this.inputService.isActionButtonPressed()) {

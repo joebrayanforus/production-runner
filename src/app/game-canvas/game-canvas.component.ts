@@ -2642,6 +2642,19 @@ private getMalfunctionSpawnInterval(): number {
       }
     }
 
+    // Arcade Back button (Button 8) - same as Escape: open/close pause
+    if (this.inputService.isBackButtonPressed()) {
+      if (this.gameState === 'paused') {
+        this.resumeFromPause();
+      } else if (this.gameState === 'playing') {
+        this.openPause();
+        this.pauseMenuIndex = 0;
+      } else if (this.gameState === 'gameover') {
+        this.openPause();
+        this.pauseMenuIndex = 0;
+      }
+    }
+
     // Gamepad Input for Pause Menu
     if (this.showPauseOverlay) {
       const now = Date.now();
