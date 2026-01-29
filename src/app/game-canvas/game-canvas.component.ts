@@ -39,11 +39,11 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private lastFrameTime = 0;
   private readonly FPS = 60;
   private onKeyDownBound = (e: KeyboardEvent) => this.onKeyDown(e);
-  
+
   // ===== UI / DECOR =====
   private warningSignsPositions: Array<{ x: number; y: number; type: 'achtung' }> = [];
   private statusLEDPositions: Array<{ x: number; y: number; color: 'green' | 'orange' | 'red'; blinkSpeed: number }> = [];
-  
+
   // ===== STATS & ACHIEVEMENTS =====
   stats: {
     sensorDataCollected: number;
@@ -68,7 +68,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
       effizienz_champion: false,
     }
   };
-  
+
   achievementToast: string | null = null;
 
 
@@ -1884,6 +1884,8 @@ private getMalfunctionSpawnInterval(): number {
   // Energy Gauge System for Turbo
   private boostEnergy = 100;           // Current energy (0-100)
   private boostEnergy2 = 100;          // Player 2 energy (0-100)
+  private boostEnergyDisplay = 100;    // Smooth display value for Player 1
+  private boostEnergyDisplay2 = 100;   // Smooth display value for Player 2
   private readonly MAX_BOOST_ENERGY = 100;
   private readonly BOOST_DRAIN_RATE = 40;  // Energy consumed per second (was 25)
   private readonly BOOST_RECHARGE_RATE = 8; // Energy recharged per second when not boosting (was 15)
@@ -2430,23 +2432,38 @@ private getMalfunctionSpawnInterval(): number {
     const barX = this.gameMode === '2player' ? this.CANVAS_WIDTH - barWidth - 18 : this.CANVAS_WIDTH - barWidth - 18;
     const barY = this.CANVAS_HEIGHT - 18; // Moved slightly up to avoid overlap
 
-    // Background
+    // Smooth lerp for display value
+    const lerpSpeed = 0.15;
+    this.boostEnergyDisplay += (this.boostEnergy - this.boostEnergyDisplay) * lerpSpeed;
+
+    // Check if boost is active
+    const isBoostActive = this.isBoostKeyPressed || this.inputService.isBoostButtonHeld();
+
+    // Background with glow when boosting
     ctx.fillStyle = 'rgba(26, 26, 26, 0.8)';
     ctx.fillRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
 
-    // Border (Orange for Player 1)
-    ctx.strokeStyle = '#ED6B00';
+    // Border (Orange for Player 1) with pulse effect when boosting
+    if (isBoostActive && this.boostEnergy > 0) {
+      const pulse = Math.sin(Date.now() / 100) * 0.3 + 0.7;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = `rgba(237, 107, 0, ${pulse})`;
+      ctx.strokeStyle = `rgba(237, 107, 0, ${pulse})`;
+    } else {
+      ctx.strokeStyle = '#ED6B00';
+    }
     ctx.lineWidth = 2;
     ctx.strokeRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
+    ctx.shadowBlur = 0;
 
-    // Energy bar
-    const energyWidth = (this.boostEnergy / this.MAX_BOOST_ENERGY) * barWidth;
+    // Energy bar with smooth animation
+    const energyWidth = (this.boostEnergyDisplay / this.MAX_BOOST_ENERGY) * barWidth;
     const gradient = ctx.createLinearGradient(barX, barY, barX + energyWidth, barY);
 
-    if (this.boostEnergy > 60) {
+    if (this.boostEnergyDisplay > 60) {
       gradient.addColorStop(0, '#00FF88');
       gradient.addColorStop(1, '#00CC6A');
-    } else if (this.boostEnergy > 30) {
+    } else if (this.boostEnergyDisplay > 30) {
       gradient.addColorStop(0, '#FFD700');
       gradient.addColorStop(1, '#FFA500');
     } else {
@@ -2457,13 +2474,22 @@ private getMalfunctionSpawnInterval(): number {
     ctx.fillStyle = gradient;
     ctx.fillRect(barX, barY, energyWidth, barHeight);
 
+    // Add animated drain effect when boosting
+    if (isBoostActive && this.boostEnergy > 0) {
+      const drainEffect = Math.sin(Date.now() / 50) * 0.2 + 0.8;
+      ctx.globalAlpha = drainEffect;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(barX, barY, energyWidth, barHeight);
+      ctx.globalAlpha = 1.0;
+    }
+
     // Text
     ctx.font = 'bold 7px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#fff';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 2;
-    const text = `P1 BOOST: ${Math.floor(this.boostEnergy)}%`;
+    const text = `P1 BOOST: ${Math.floor(this.boostEnergyDisplay)}%`;
     ctx.strokeText(text, barX + barWidth / 2, barY + 8);
     ctx.fillText(text, barX + barWidth / 2, barY + 11);
     ctx.textAlign = 'left';
@@ -2476,23 +2502,38 @@ private getMalfunctionSpawnInterval(): number {
     const barX = 18; // Left side for Player 2, moved outward
     const barY = this.CANVAS_HEIGHT - 18; // Moved slightly up to avoid overlap
 
+    // Smooth lerp for display value
+    const lerpSpeed = 0.15;
+    this.boostEnergyDisplay2 += (this.boostEnergy2 - this.boostEnergyDisplay2) * lerpSpeed;
+
+    // Check if boost is active for Player 2
+    const isBoostActive2 = this.isBoostKeyPressed2;
+
     // Background
     ctx.fillStyle = 'rgba(26, 26, 26, 0.8)';
     ctx.fillRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
 
-    // Border (Blue for Player 2)
-    ctx.strokeStyle = '#4D9FFF';
+    // Border (Blue for Player 2) with pulse effect when boosting
+    if (isBoostActive2 && this.boostEnergy2 > 0) {
+      const pulse = Math.sin(Date.now() / 100) * 0.3 + 0.7;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = `rgba(77, 159, 255, ${pulse})`;
+      ctx.strokeStyle = `rgba(77, 159, 255, ${pulse})`;
+    } else {
+      ctx.strokeStyle = '#4D9FFF';
+    }
     ctx.lineWidth = 2;
     ctx.strokeRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
+    ctx.shadowBlur = 0;
 
-    // Energy bar
-    const energyWidth = (this.boostEnergy2 / this.MAX_BOOST_ENERGY) * barWidth;
+    // Energy bar with smooth animation
+    const energyWidth = (this.boostEnergyDisplay2 / this.MAX_BOOST_ENERGY) * barWidth;
     const gradient = ctx.createLinearGradient(barX, barY, barX + energyWidth, barY);
 
-    if (this.boostEnergy2 > 60) {
+    if (this.boostEnergyDisplay2 > 60) {
       gradient.addColorStop(0, '#00FF88');
       gradient.addColorStop(1, '#00CC6A');
-    } else if (this.boostEnergy2 > 30) {
+    } else if (this.boostEnergyDisplay2 > 30) {
       gradient.addColorStop(0, '#FFD700');
       gradient.addColorStop(1, '#FFA500');
     } else {
@@ -2503,13 +2544,22 @@ private getMalfunctionSpawnInterval(): number {
     ctx.fillStyle = gradient;
     ctx.fillRect(barX, barY, energyWidth, barHeight);
 
+    // Add animated drain effect when boosting
+    if (isBoostActive2 && this.boostEnergy2 > 0) {
+      const drainEffect = Math.sin(Date.now() / 50) * 0.2 + 0.8;
+      ctx.globalAlpha = drainEffect;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(barX, barY, energyWidth, barHeight);
+      ctx.globalAlpha = 1.0;
+    }
+
     // Text
     ctx.font = 'bold 7px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#fff';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 2;
-    const text = `P2 BOOST: ${Math.floor(this.boostEnergy2)}%`;
+    const text = `P2 BOOST: ${Math.floor(this.boostEnergyDisplay2)}%`;
     ctx.strokeText(text, barX + barWidth / 2, barY + 8);
     ctx.fillText(text, barX + barWidth / 2, barY + 11);
     ctx.textAlign = 'left';
@@ -2582,12 +2632,12 @@ private getMalfunctionSpawnInterval(): number {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
       const gp1 = gamepads[0];
       let arcadeBoostP1 = false;
-      
+
       if (gp1) {
         // Arcade buttons 4 (L) and 3 (Y) for Player 1 boost
         arcadeBoostP1 = gp1.buttons[4]?.pressed || gp1.buttons[3]?.pressed;
       }
-      
+
       const isBoostActive = this.isBoostKeyPressed || this.inputService.isBoostButtonHeld() || arcadeBoostP1;
       if (isBoostActive && this.boostEnergy > 0) {
         this.turboSpeed = true;
@@ -2607,7 +2657,7 @@ private getMalfunctionSpawnInterval(): number {
           // Arcade buttons 4 (L) and 3 (Y) for Player 2 boost
           arcadeBoostP2 = gp2.buttons[4]?.pressed || gp2.buttons[3]?.pressed;
         }
-        
+
         // Fallback to gamepad 0 buttons 8-11 for Player 2 if no gamepad 1
         if (!gp2 && gamepads[0]) {
           gamepadBoostP2 = gamepads[0].buttons[8]?.pressed || gamepads[0].buttons[9]?.pressed ||
