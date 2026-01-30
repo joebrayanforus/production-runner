@@ -90,6 +90,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private sensorDataImage = new Image();
   private ghostDoorImage = new Image();
   private lifeIconImage = new Image();
+  private backgroundFoxImage = new Image();
 
   // Additional industrial elements
   private wallCornerImage = new Image();
@@ -326,6 +327,14 @@ private getMalfunctionSpawnInterval(): number {
     // Fill with solid black to match classic labyrinth background
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+
+    // Fox background image in the playable area (behind dots and between walls)
+    if (this.backgroundFoxImage.complete && this.backgroundFoxImage.naturalWidth > 0) {
+      ctx.drawImage(this.backgroundFoxImage, 0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+      // Dark overlay so the image doesn't overpower the game elements
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+    }
 
     // Coordinate annotations - transparent (hidden)
     ctx.font = '6px monospace';
@@ -1978,6 +1987,7 @@ private getMalfunctionSpawnInterval(): number {
     this.maintenanceStationImage.src = 'assets/svg/maintenance-station.svg';
     this.ghostDoorImage.src = 'assets/svg/ghost-door.svg';
     this.lifeIconImage.src = 'assets/svg/life-icon.svg';
+    this.backgroundFoxImage.src = 'assets/img/fox_fox.webp';
     this.powerFoodImage.src = 'assets/svg/maintenance-station.svg';
     this.scaredGhostImage.src = 'assets/svg/malfunction-temperature.svg';
     this.cherryImage.src = 'assets/svg/bonus-diagnostic.svg';
@@ -2588,6 +2598,7 @@ private getMalfunctionSpawnInterval(): number {
     this.startGameLoop();
   }
   ngOnDestroy(): void {
+    this.audioService.stopBackgroundMusic();
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
     }
@@ -2910,6 +2921,7 @@ private getMalfunctionSpawnInterval(): number {
         if (this.stateTimer >= this.FINAL_EXPLOSION_DURATION) {
           this.gameState = 'gameover';
           this.gameOver = true;
+          this.audioService.stopBackgroundMusic();
           // Load leaderboard immediately
           this.loadLeaderboard();
           // Submit final score to backend
@@ -3185,7 +3197,7 @@ private getMalfunctionSpawnInterval(): number {
       this.animationFrameId = 0;
       this.lastFrameTime = 0;
     }
-    this.audioService.stopBackgroundMusic();
+    // Do not stop background music here – only stop on game over or exit (so pause/Spielanleitung keep music playing)
   }
 
   private collision(a: Block, b: Block): boolean {
@@ -3820,6 +3832,7 @@ private getMalfunctionSpawnInterval(): number {
 
   // Quit to start page
   exitGame(): void {
+    this.audioService.stopBackgroundMusic();
     this.stopGameLoop();
     this.router.navigate(['/']);
   }
@@ -4189,6 +4202,7 @@ private getMalfunctionSpawnInterval(): number {
       this.restartGame();
     } else if (this.gameOverMenuIndex === 1) {
       // Return to Menu
+      this.audioService.stopBackgroundMusic();
       this.router.navigate(['/']);
     }
   }

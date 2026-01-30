@@ -2229,6 +2229,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
     this.startGameLoop();
   }
   ngOnDestroy(): void {
+    this.audioService.stopBackgroundMusic();
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
     }
@@ -2416,6 +2417,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
         if (this.stateTimer >= this.FINAL_EXPLOSION_DURATION) {
           this.gameState = 'gameover';
           this.gameOver = true;
+          this.audioService.stopBackgroundMusic();
           // Load leaderboard immediately
           this.loadLeaderboard();
           // Submit final score to backend
@@ -2647,7 +2649,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
       this.animationFrameId = 0;
       this.lastFrameTime = 0;
     }
-    this.audioService.stopBackgroundMusic();
+    // Do not stop background music here – only stop on game over or exit (so pause/Spielanleitung keep music playing)
   }
 
   private collision(a: Block, b: Block): boolean {
@@ -3148,6 +3150,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Quit to start page
   exitGame(): void {
+    this.audioService.stopBackgroundMusic();
     this.stopGameLoop();
     this.router.navigate(['/']);
   }
@@ -3180,6 +3183,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.announce('BOSS DEFEATED. PRODUCTION STABILIZED');
 
+    this.audioService.stopBackgroundMusic();
     this.loadLeaderboard();
     this.submitScore();
     this.stopGameLoop();
@@ -3513,6 +3517,7 @@ export class BossFightComponent implements OnInit, AfterViewInit, OnDestroy {
 
   confirmExitToMenu() {
     this.showExitConfirm = false;
+    this.audioService.stopBackgroundMusic();
     this.stopGameLoop();
     this.router.navigate(['/']);
   }

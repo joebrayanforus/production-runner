@@ -22,6 +22,8 @@ interface Slide {
 })
 export class PresentationComponent implements OnInit {
   currentSlide = 0;
+  /** 0 = BACK, 1 = JETZT SPIELEN - used for arrow-key focus on last slide */
+  actionButtonIndex = 1;
   slides: Slide[] = [
     {
       title: 'STEUERUNG',
@@ -109,6 +111,9 @@ export class PresentationComponent implements OnInit {
 
   nextSlide() {
     this.currentSlide = (this.currentSlide + 1) % this.slides.length;
+    if (this.currentSlide === this.slides.length - 1) {
+      this.actionButtonIndex = 1; // focus JETZT SPIELEN when reaching last slide
+    }
   }
 
   prevSlide() {
@@ -117,10 +122,44 @@ export class PresentationComponent implements OnInit {
 
   goToSlide(index: number) {
     this.currentSlide = index;
+    if (this.currentSlide === this.slides.length - 1) {
+      this.actionButtonIndex = 1;
+    }
   }
 
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent) {
+    const onLastSlide = this.currentSlide === this.slides.length - 1;
+
+    if (onLastSlide) {
+      // On last slide: arrow keys move focus between BACK and JETZT SPIELEN
+      if (['ArrowUp', 'ArrowLeft'].includes(event.key)) {
+        this.actionButtonIndex = 0;
+        event.preventDefault();
+        return;
+      }
+      if (['ArrowDown', 'ArrowRight'].includes(event.key)) {
+        this.actionButtonIndex = 1;
+        event.preventDefault();
+        return;
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        if (this.actionButtonIndex === 0) {
+          this.goBack();
+        } else {
+          this.startGame();
+        }
+        event.preventDefault();
+        return;
+      }
+      if (event.key === 'Escape') {
+        this.goBack();
+        event.preventDefault();
+        return;
+      }
+    }
+
+    // On other slides: arrows change slide, Enter/Escape go to start
     if (['ArrowRight', 'ArrowDown'].includes(event.key)) {
       this.nextSlide();
       event.preventDefault();
@@ -131,6 +170,10 @@ export class PresentationComponent implements OnInit {
       this.startGame();
       event.preventDefault();
     }
+  }
+
+  goBack() {
+    this.router.navigate(['/']);
   }
 
   startGame() {
