@@ -34,8 +34,10 @@
 
         <!-- Generic images grid for other slides -->
         <div class="images-grid" *ngIf="slide.images && !slide.malfunctions"
-             [class.grid-3]="slide.images.length === 3"
-             [class.grid-6]="slide.images.length === 6">
+            [class.grid-3]="slide.images.length === 3"
+            [class.grid-4]="slide.images.length === 4"
+            [class.grid-6]="slide.images.length === 6"
+            [class.grid-8]="slide.images.length === 8">
           <div class="image-item" *ngFor="let image of slide.images">
             <img [src]="image.src" [alt]="image.label" class="game-img">
             <span class="image-label">{{ image.label }}</span>
@@ -59,7 +61,7 @@
   </div>
 
   <div class="navigation">
-    <button class="nav-btn prev" (click)="prevSlide()">
+    <button type="button" class="nav-btn prev" (click)="prevSlide()">
       <span>◀</span>
       <span class="nav-label">ZURÜCK</span>
     </button>
@@ -74,14 +76,14 @@
       </span>
     </div>
 
-    <button class="nav-btn next" (click)="nextSlide()">
+    <button type="button" class="nav-btn next" (click)="nextSlide()">
       <span class="nav-label">WEITER</span>
       <span>▶</span>
     </button>
   </div>
 
   <div class="action-buttons">
-    <button class="start-btn" (click)="startGame()">
+    <button type="button" class="start-btn" (click)="startGame()">
       <span class="btn-glow"></span>
       <span class="btn-icon">🎮</span>
       JETZT SPIELEN!
