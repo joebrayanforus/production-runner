@@ -179,6 +179,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   dataStreak = 0;
   efficiencyMultiplier = 1.0;
   productionLevel = 1;
+  displayLevel = 1; // UI-only level display (does not affect difficulty)
 
   // Bonus System - Enhanced with multiple bonus types
   private bonusSpawnCooldown = 0;
@@ -1289,7 +1290,7 @@ private getMalfunctionSpawnInterval(): number {
     if (this.gameMode === '2player') {
       // Show player names on same line as level - larger and more visible
       ctx.fillStyle = '#1a1a1a';
-      const levelText = `LVL ${this.productionLevel}`;
+      const levelText = `LVL ${this.displayLevel}`;
       ctx.fillText(levelText, this.CANVAS_WIDTH / 2, TOP_BAR_CENTER_Y);
 
       // Player 1 name (Orange) - Left of center, larger font (scaled up 20%, moved outward)
@@ -1304,7 +1305,7 @@ private getMalfunctionSpawnInterval(): number {
       ctx.font = 'bold 11px "Press Start 2P", monospace';
       ctx.fillText(this.player2Name || 'PLAYER2', this.CANVAS_WIDTH / 2 + 60, TOP_BAR_CENTER_Y);
     } else {
-      ctx.fillText(`LVL: ${this.productionLevel}`, this.CANVAS_WIDTH / 2, TOP_BAR_CENTER_Y);
+      ctx.fillText(`LVL: ${this.displayLevel}`, this.CANVAS_WIDTH / 2, TOP_BAR_CENTER_Y);
     }
 
     ctx.textAlign = 'left';
@@ -1368,7 +1369,7 @@ private getMalfunctionSpawnInterval(): number {
       ctx.fillStyle = `rgba(255, 215, 0, ${levelAlpha})`; // Gold color like MAX HEALTH
       ctx.shadowBlur = 15;
       ctx.shadowColor = `rgba(255, 215, 0, ${levelAlpha})`;
-      ctx.fillText(`LEVEL ${this.productionLevel}`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      ctx.fillText(`LEVEL ${this.displayLevel}`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
       ctx.restore();
     }
       ctx.lineWidth = 4;
@@ -1381,7 +1382,7 @@ private getMalfunctionSpawnInterval(): number {
       ctx.fillStyle = `rgba(255, 215, 0, ${levelAlpha})`; // Gold color like MAX HEALTH
       ctx.shadowBlur = 15;
       ctx.shadowColor = `rgba(255, 215, 0, ${levelAlpha})`;
-      ctx.fillText(`LEVEL ${this.productionLevel}`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      ctx.fillText(`LEVEL ${this.displayLevel}`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
       ctx.restore();
     }
 
@@ -2011,7 +2012,7 @@ private getMalfunctionSpawnInterval(): number {
     "XXXXXX XXX   XX   XXX XXXXXX",  // 9
     "X..    XXXXX XX XXXXX    ..X",  // 10
     "X.     XX          XX     .X",  // 11
-    "X..    XX XXX--XXX XX    ..X",  // 12
+    "X..    XX XX----XX XX    ..X",  // 12
     "XXXXXX XX XGrGGGGX XX XXXXXX",  // 13
     "T         XGbGpGoX         T",  // 14
     "XXXXXX XX XGGGGGGX XX XXXXXX",  // 15
@@ -2676,6 +2677,7 @@ private getMalfunctionSpawnInterval(): number {
     // Gamepad Input for SPIELANLEITUNG
     if (this.showSpielanleitung) {
       this.handleSpielanleitungGamepad();
+      return; // Skip other inputs while instructions are open
     }
 
     // Gamepad Pause Button (Button 9 - Start, Button 10 - Select)
@@ -2809,15 +2811,21 @@ private getMalfunctionSpawnInterval(): number {
       }
     }
 
-    // Gamepad - Open SPIELANLEITUNG with Y button (button 3) during gameplay
+    // Gamepad/Arcade - Open SPIELANLEITUNG with Y button or arcade help button during gameplay
     if (this.gameState === 'playing' && !this.showSpielanleitung) {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
       const now = Date.now();
-      for (const gp of gamepads) {
-        if (gp && gp.buttons[3]?.pressed && now - this.lastGamepadSpielanleitungAction > 300) {
-          this.toggleSpielanleitung();
-          this.lastGamepadSpielanleitungAction = now;
-          break;
+
+      if (this.inputService.isArcadeHelpPressed() && now - this.lastGamepadSpielanleitungAction > 300) {
+        this.toggleSpielanleitung();
+        this.lastGamepadSpielanleitungAction = now;
+      } else {
+        for (const gp of gamepads) {
+          if (gp && gp.buttons[3]?.pressed && now - this.lastGamepadSpielanleitungAction > 300) {
+            this.toggleSpielanleitung();
+            this.lastGamepadSpielanleitungAction = now;
+            break;
+          }
         }
       }
     }
@@ -3137,6 +3145,7 @@ private getMalfunctionSpawnInterval(): number {
   private loadNextLevel() {
     // Increment production level (continues indefinitely)
     this.productionLevel++;
+    this.displayLevel++;
 
     // Show level announcement when entering new level
     this.levelDisplayTimer = 2500; // Display for 2.5 seconds
@@ -3485,6 +3494,7 @@ private getMalfunctionSpawnInterval(): number {
           // Systemfehler: Health verlieren
           this.audioService.play('die');
           this.systemHealth -= 1;
+          this.displayLevel += 1;
           this.damageFlash = 0.5; // Trigger damage flash
           this.gameState = 'dying';
           this.stateTimer = 0;
@@ -3507,6 +3517,7 @@ private getMalfunctionSpawnInterval(): number {
             // Player 2 loses a life
             this.audioService.play('die');
             this.systemHealth2 -= 1;
+            this.displayLevel += 1;
             this.damageFlash = 0.5; // Trigger damage flash for P2 too
 
             if (this.systemHealth2 <= 0) {
@@ -3920,6 +3931,7 @@ private getMalfunctionSpawnInterval(): number {
     this.checkpointsCollected = 0;
     this.pelletCountingEnabled = false;
     this.currentLevel = 1;
+    this.displayLevel = 1;
     this.scaredTimer = 0;
     this.scaredDuration = 10000;
     this.gameOver = false;
@@ -4353,8 +4365,8 @@ private getMalfunctionSpawnInterval(): number {
       return;
     }
 
-    // D-Pad Left - Previous slide
-    const dir = this.inputService.getDirection();
+    // Joystick/D-Pad Left - Previous slide (arcade mapping preferred)
+    const dir = this.inputService.getArcadeDirection(1) ?? this.inputService.getDirection();
     if (dir === 'L') {
       this.prevSpielanleitungSlide();
       this.lastGamepadSpielanleitungAction = now;
@@ -4368,9 +4380,16 @@ private getMalfunctionSpawnInterval(): number {
       return;
     }
 
-    // Back button (View/Select) - Close SPIELANLEITUNG
-    if (this.inputService.isBackButtonPressed()) {
+    // Back button (Arcade mapping or View/Select) - Close SPIELANLEITUNG
+    if (this.inputService.isArcadeBackPressed() || this.inputService.isBackButtonPressed()) {
       this.closeSpielanleitung();
+      this.lastGamepadSpielanleitungAction = now;
+      return;
+    }
+
+    // Arcade select/confirm button - Next slide
+    if (this.inputService.isArcadeSelectPressed()) {
+      this.nextSpielanleitungSlide();
       this.lastGamepadSpielanleitungAction = now;
       return;
     }
