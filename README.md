@@ -11,19 +11,30 @@
 [![Arcade](https://img.shields.io/badge/🕹️_ICONIC_ARCADE-Ready-FF6B00)](docs/ARCADE_QUICK_START.md)
 
 ---
-# Startanleitung für das Spiel auf der Gamestation
+# Startanleitung für die Gamestation
 
-**Um das Spiel auf der Gamestation zu starten müsst ihr den Projektordner auf einen USB stick ziehen. Im File-Explorer auf der Gamestation könnt ihr dann mit Rechtsklick auf den Ordner "Im Terminal öffnen" auswählen. Im Terminal müsst ihr dann nur noch "docker compose up --build -d" ausführen um die Container zu starten (Falls das beim ersten mal nicht klappt ggf. nochmal probieren).**
+Um das Spiel auf der Gamestation zu starten, folgt bitte diesen Schritten:
 
+## 1. Projekt auf USB‑Stick kopieren
+Kopiert den gesamten Projektordner auf einen USB‑Stick.  
+Stellt sicher, dass alle benötigten Dateien enthalten sind.
 
+## 2. Ordner auf der Gamestation öffnen
+Öffnet auf der Gamestation den File‑Explorer, macht einen Rechtsklick auf den Projektordner  
+und wählt **„Im Terminal öffnen“** aus.
 
+## 3. Docker‑Container starten
+Führt im geöffneten Terminal folgenden Befehl aus:
 
+''docker compose up --build -d''
 
+Falls der Start beim ersten Versuch fehlschlägt, den Befehl einfach erneut ausführen.
 
+## 4. Hinweis
+Nach dem erfolgreichen Start laufen alle Container im Hintergrund,  
+und das Spiel kann über die Gamestation genutzt werden.
 
-
-
-
+---
 ## 📋 Projektübersicht:
 
 
