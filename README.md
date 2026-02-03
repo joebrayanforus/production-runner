@@ -12,6 +12,7 @@
 
 ---
 
+**Um das Spiel auf der Gamestation zu starten müsst ihr den Projektordner auf einen USB stick ziehen. Im File-Explorer auf der Gamestation könnt ihr dann mit Rechtsklick auf den Ordner "Im Terminal öffnen" auswählen. Im Terminal müsst ihr dann nur noch "docker compose up --build -d" ausführen um die Container zu starten (Falls das beim ersten mal nicht klappt ggf. nochmal probieren).**
 ## 📋 Projektübersicht:
 ## hier roboter-video hinzufügen
 
