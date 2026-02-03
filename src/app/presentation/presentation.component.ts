@@ -1,4 +1,4 @@
-import { Component, OnInit, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 
@@ -20,8 +20,14 @@ interface Slide {
   templateUrl: './presentation.component.html',
   styleUrl: './presentation.component.css'
 })
-export class PresentationComponent implements OnInit {
+export class PresentationComponent implements OnInit, OnDestroy {
   currentSlide = 0;
+  /** Action button focus: 0 = BACK, 1 = JETZT SPIELEN */
+  actionButtonIndex = 0;
+  private gamepadPollInterval: ReturnType<typeof setInterval> | null = null;
+  private lastDirection = '';
+  private directionHoldTime = 0;
+  private lastSelectTime = 0;
   slides: Slide[] = [
     {
       title: 'STEUERUNG',
@@ -105,6 +111,63 @@ export class PresentationComponent implements OnInit {
     setInterval(() => {
       this.nextSlide();
     }, 5000);
+    this.startGamepadPolling();
+  }
+
+  ngOnDestroy() {
+    if (this.gamepadPollInterval) {
+      clearInterval(this.gamepadPollInterval);
+      this.gamepadPollInterval = null;
+    }
+  }
+
+  /** Arcade/gamepad: navigate buttons (U/D) and slides (L/R), A to confirm */
+  private startGamepadPolling(): void {
+    const threshold = 0.5;
+    this.gamepadPollInterval = setInterval(() => {
+      const gamepad = navigator.getGamepads()[0];
+      if (!gamepad) return;
+
+      let currentDirection = '';
+      if (gamepad.axes[1] < -threshold || gamepad.buttons[12]?.pressed) currentDirection = 'U';
+      else if (gamepad.axes[1] > threshold || gamepad.buttons[13]?.pressed) currentDirection = 'D';
+      else if (gamepad.axes[0] < -threshold || gamepad.buttons[14]?.pressed) currentDirection = 'L';
+      else if (gamepad.axes[0] > threshold || gamepad.buttons[15]?.pressed) currentDirection = 'R';
+
+      if (currentDirection && currentDirection === this.lastDirection) {
+        this.directionHoldTime += 100;
+        if (this.directionHoldTime > 300) {
+          this.handleGamepadDirection(currentDirection);
+        }
+      } else if (currentDirection && currentDirection !== this.lastDirection) {
+        this.lastDirection = currentDirection;
+        this.directionHoldTime = 0;
+        this.handleGamepadDirection(currentDirection);
+      } else {
+        this.lastDirection = '';
+        this.directionHoldTime = 0;
+      }
+
+      if (gamepad.buttons[0]?.pressed) {
+        const now = Date.now();
+        if (now - this.lastSelectTime > 300) {
+          this.activateSelectedAction();
+          this.lastSelectTime = now;
+        }
+      }
+    }, 100);
+  }
+
+  private handleGamepadDirection(direction: string): void {
+    if (direction === 'U') {
+      this.actionButtonIndex = 0; // BACK
+    } else if (direction === 'D') {
+      this.actionButtonIndex = 1; // JETZT SPIELEN
+    } else if (direction === 'L') {
+      this.prevSlide();
+    } else if (direction === 'R') {
+      this.nextSlide();
+    }
   }
 
   nextSlide() {
@@ -121,15 +184,40 @@ export class PresentationComponent implements OnInit {
 
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent) {
-    if (['ArrowRight', 'ArrowDown'].includes(event.key)) {
+    // Arrow Up/Down: select NW (0) or JETZT SPIELEN (1)
+    if (event.key === 'ArrowUp') {
+      this.actionButtonIndex = 0;
+      event.preventDefault();
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      this.actionButtonIndex = 1;
+      event.preventDefault();
+      return;
+    }
+    // Arrow Left/Right: previous/next slide
+    if (event.key === 'ArrowRight') {
       this.nextSlide();
       event.preventDefault();
-    } else if (['ArrowLeft', 'ArrowUp'].includes(event.key)) {
+      return;
+    }
+    if (event.key === 'ArrowLeft') {
       this.prevSlide();
       event.preventDefault();
-    } else if (event.key === 'Escape' || event.key === 'Enter') {
-      this.startGame();
+      return;
+    }
+    // Enter or Escape: activate selected button (both go to start page for now)
+    if (event.key === 'Escape' || event.key === 'Enter') {
+      this.activateSelectedAction();
       event.preventDefault();
+    }
+  }
+
+  private activateSelectedAction() {
+    if (this.actionButtonIndex === 0) {
+      this.startGame(); // BACK
+    } else {
+      this.startGame(); // JETZT SPIELEN
     }
   }
 
