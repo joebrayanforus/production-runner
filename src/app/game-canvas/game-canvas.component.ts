@@ -101,6 +101,7 @@ export class GameCanvasComponent implements OnInit, AfterViewInit, OnDestroy {
   private bonusIoTSensorImage = new Image();
   private bonusSpeedImage = new Image();
   private bonusShieldImage = new Image();
+  private foxBackgroundImage = new Image();
 
   // Industrial Equipment Collections
   walls: Set<Block> = new Set<Block>();
@@ -323,9 +324,16 @@ private getMalfunctionSpawnInterval(): number {
     ];
   }
   private draw(ctx: CanvasRenderingContext2D) {
-    // Fill with solid black to match classic labyrinth background
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+    // Background: fox image in the maze area (between walls), fallback to black
+    if (this.foxBackgroundImage.complete && this.foxBackgroundImage.naturalWidth > 0) {
+      ctx.drawImage(this.foxBackgroundImage, 0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+      // Dark overlay so walls and dots stand out
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+    } else {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+    }
 
     // Coordinate annotations - transparent (hidden)
     ctx.font = '6px monospace';
@@ -1734,7 +1742,7 @@ private getMalfunctionSpawnInterval(): number {
       ctx.font = 'bold 20px "Press Start 2P", monospace';
       ctx.fillStyle = '#00FF00';
       ctx.textAlign = 'center';
-      ctx.fillText(`LEVEL ${this.currentLevel - 1} COMPLETE!`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
+      ctx.fillText(`LEVEL ${this.currentLevel} COMPLETE!`, this.CANVAS_WIDTH / 2, this.CANVAS_HEIGHT / 2);
     }
   }
 
@@ -1992,6 +2000,7 @@ private getMalfunctionSpawnInterval(): number {
     this.bonusIoTSensorImage.src = 'assets/svg/bonus-iot-sensor.svg';
     this.bonusSpeedImage.src = 'assets/svg/bonus-speed.svg';
     this.bonusShieldImage.src = 'assets/svg/bonus-shield.svg';
+    this.foxBackgroundImage.src = 'assets/img/fox_fox.webp';
   }
   // Classic Industrial Factory Labyrinth (Original Map)
   // X = Wall, ' ' = Pellet, O = Power Pellet, - = Ghost House Door
@@ -2247,8 +2256,11 @@ private getMalfunctionSpawnInterval(): number {
   private updateEnergyGauge(deltaTime: number) {
     const deltaSeconds = deltaTime / 1000;
 
-    // Check if boost is active (keyboard or gamepad) for Player 1
-    const isBoostActive = this.isBoostKeyPressed || this.inputService.isBoostButtonHeld();
+    // Check if boost is active (keyboard or gamepad/arcade) for Player 1 – same logic as update() turbo
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const gp1 = gamepads[0];
+    const arcadeBoostP1 = !!(gp1 && (gp1.buttons[4]?.pressed || gp1.buttons[3]?.pressed));
+    const isBoostActive = this.isBoostKeyPressed || this.inputService.isBoostButtonHeld() || arcadeBoostP1;
 
     if (isBoostActive && this.boostEnergy > 0 && this.gameState === 'playing') {
       // Drain energy when boosting
@@ -2269,9 +2281,17 @@ private getMalfunctionSpawnInterval(): number {
       }
     }
 
-    // Player 2 boost energy in 2-player mode
+    // Player 2 boost energy in 2-player mode (keyboard + gamepad/arcade – same as update() turbo)
     if (this.gameMode === '2player') {
-      const isBoostActive2 = this.isBoostKeyPressed2;
+      let arcadeBoostP2 = false;
+      const gp2 = gamepads[1];
+      if (gp2) {
+        arcadeBoostP2 = gp2.buttons[4]?.pressed || gp2.buttons[3]?.pressed || false;
+      } else if (gp1) {
+        arcadeBoostP2 = gp1.buttons[8]?.pressed || gp1.buttons[9]?.pressed ||
+          gp1.buttons[10]?.pressed || gp1.buttons[11]?.pressed || false;
+      }
+      const isBoostActive2 = this.isBoostKeyPressed2 || arcadeBoostP2;
 
       if (isBoostActive2 && this.boostEnergy2 > 0 && this.gameState === 'playing') {
         // Drain energy when boosting
@@ -2910,6 +2930,7 @@ private getMalfunctionSpawnInterval(): number {
         if (this.stateTimer >= this.FINAL_EXPLOSION_DURATION) {
           this.gameState = 'gameover';
           this.gameOver = true;
+          this.audioService.stopBackgroundMusic();
           // Load leaderboard immediately
           this.loadLeaderboard();
           // Submit final score to backend
@@ -3173,9 +3194,7 @@ private getMalfunctionSpawnInterval(): number {
 
   private render() {
     if (!this.ctx) return;
-    // Fill with black background
-    this.ctx.fillStyle = '#000000';
-    this.ctx.fillRect(0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
+    // Background is drawn inside draw() (fox image or black)
     this.draw(this.ctx);
   }
 
@@ -3185,7 +3204,7 @@ private getMalfunctionSpawnInterval(): number {
       this.animationFrameId = 0;
       this.lastFrameTime = 0;
     }
-    this.audioService.stopBackgroundMusic();
+    // Do NOT stop background music here – only stop on game over or exit (see exitGame and gameover transition)
   }
 
   private collision(a: Block, b: Block): boolean {
@@ -3804,10 +3823,9 @@ private getMalfunctionSpawnInterval(): number {
       this.cherrySpawnCooldown = 300; // 10 Sekunden bis nächste Cherry
     }
 
-    // Level complete
+    // Level complete (do not increment here – loadNextLevel() does it)
     if (this.foods.size === 0 && this.powerPellets.size === 0) {
       this.score += 1000; // Level Complete Bonus
-      this.currentLevel++;
       this.pelletStreak = 0;
       this.streakMultiplier = 1.0;
       this.gameState = 'levelcomplete';
@@ -3820,6 +3838,7 @@ private getMalfunctionSpawnInterval(): number {
 
   // Quit to start page
   exitGame(): void {
+    this.audioService.stopBackgroundMusic();
     this.stopGameLoop();
     this.router.navigate(['/']);
   }

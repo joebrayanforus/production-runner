@@ -83,7 +83,11 @@
   </div>
 
   <div class="action-buttons">
-    <button type="button" class="start-btn" (click)="startGame()">
+    <button type="button" class="nw-btn" [class.selected]="actionButtonIndex === 0" (click)="actionButtonIndex = 0; startGame()">
+      <span class="btn-glow"></span>
+      BACK
+    </button>
+    <button type="button" class="start-btn" [class.selected]="actionButtonIndex === 1" (click)="actionButtonIndex = 1; startGame()">
       <span class="btn-glow"></span>
       <span class="btn-icon">🎮</span>
       JETZT SPIELEN!

@@ -660,6 +660,50 @@
   margin-top: 10px;
   padding-bottom: 0;
   z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.nw-btn {
+  position: relative;
+  background: linear-gradient(135deg, #FF7A01 0%, #FF9A33 50%, #FF7A01 100%);
+  background-size: 200% 100%;
+  border: 4px solid #FF7A01;
+  color: #1E2A3A;
+  padding: 16px 50px;
+  font-size: 18px;
+  font-family: 'Press Start 2P', monospace;
+  border-radius: 15px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow:
+    0 8px 24px rgba(255, 122, 1, 0.5),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.3),
+    0 0 24px rgba(255, 122, 1, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nw-btn:hover {
+  transform: translateY(-6px) scale(1.03);
+  background-position: 100% 0;
+  box-shadow:
+    0 14px 40px rgba(255, 122, 1, 0.8),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.3),
+    0 0 48px rgba(255, 122, 1, 0.6);
+}
+
+.nw-btn:active {
+  transform: translateY(-2px) scale(1.01);
+}
+
+.nw-btn.selected {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px #FF7A01, 0 0 30px rgba(255, 255, 255, 0.6);
 }
 
 .start-btn {
@@ -709,6 +753,11 @@
 
 .start-btn:active {
   transform: translateY(-4px) scale(1.02);
+}
+
+.start-btn.selected {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px #FF7A01, 0 0 40px rgba(255, 255, 255, 0.6);
 }
 
 .btn-icon {
@@ -807,6 +856,11 @@
 
   .slide-icon {
     font-size: 60px;
+  }
+
+  .nw-btn {
+    padding: 12px 36px;
+    font-size: 14px;
   }
 
   .start-btn {
