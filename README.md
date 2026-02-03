@@ -26,7 +26,7 @@ und wählt **„Im Terminal öffnen“** aus.
 ## 3. Docker‑Container starten
 Führt im geöffneten Terminal folgenden Befehl aus:
 
-''docker compose up --build -d''
+```docker compose up --build -d```
 
 Falls der Start beim ersten Versuch fehlschlägt, den Befehl einfach erneut ausführen.
 
